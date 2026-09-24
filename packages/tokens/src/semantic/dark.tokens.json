@@ -1,0 +1,35 @@
+{
+  "surface": {
+    "$type": "color",
+    "base": { "$value": "{color.neutral.1000}" },
+    "raised": { "$value": "{color.neutral.900}" },
+    "sunken": { "$value": "{color.neutral.800}" },
+    "border": { "$value": "{color.neutral.700}" }
+  },
+  "text": {
+    "$type": "color",
+    "primary": { "$value": "{color.neutral.50}" },
+    "secondary": { "$value": "{color.neutral.300}" },
+    "muted": { "$value": "{color.neutral.500}" },
+    "on-accent": { "$value": "{color.neutral.1000}" },
+    "danger": { "$value": "{color.red.100}" },
+    "success": { "$value": "{color.green.100}" }
+  },
+  "accent": {
+    "$type": "color",
+    "base": { "$value": "{color.gold.300}" },
+    "hover": { "$value": "{color.gold.500}" },
+    "subtle": { "$value": "{color.gold.700}" }
+  },
+  "status": {
+    "$type": "color",
+    "danger": { "$value": "{color.red.500}" },
+    "danger-subtle": { "$value": "{color.red.700}" },
+    "success": { "$value": "{color.green.500}" },
+    "success-subtle": { "$value": "{color.green.700}" }
+  },
+  "focus": {
+    "$type": "color",
+    "ring": { "$value": "{color.gold.300}" }
+  }
+}

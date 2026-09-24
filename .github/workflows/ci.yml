@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, test, build web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm tokens:build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @einring/app build
+        env:
+          VITE_AUTHENTIK_ISSUER: ${{ vars.VITE_AUTHENTIK_ISSUER }}
+          VITE_AUTHENTIK_CLIENT_ID: ${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
+      - run: pnpm --filter @einring/bff build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/app/dist
+
+  android:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tokens:build
+      - run: pnpm --filter @einring/app build
+        env:
+          VITE_AUTHENTIK_ISSUER: ${{ vars.VITE_AUTHENTIK_ISSUER }}
+          VITE_AUTHENTIK_CLIENT_ID: ${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - run: pnpm --filter @einring/app cap sync android
+      - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        working-directory: apps/app/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einring-debug-apk
+          path: apps/app/android/app/build/outputs/apk/debug/*.apk
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: einring:ci
+          build-args: |
+            VITE_AUTHENTIK_ISSUER=${{ vars.VITE_AUTHENTIK_ISSUER }}
+            VITE_AUTHENTIK_CLIENT_ID=${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

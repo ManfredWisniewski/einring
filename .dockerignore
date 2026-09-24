@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/android
+**/ios
+**/data
+**/.env
+**/.env.*
+!**/.env.example
+packages/tokens/build
+.git
+.agents
++intent
++wit-dev

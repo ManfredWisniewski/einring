@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "Einring",
+    "tagline": "Ein Ring"
+  },
+  "nav": {
+    "tables": "Tabellen",
+    "logout": "Abmelden"
+  },
+  "auth": {
+    "login": "Mit Authentik anmelden",
+    "loading": "Anmeldung wird geprüft…",
+    "completing": "Anmeldung wird abgeschlossen…",
+    "failed": "Anmeldung fehlgeschlagen: {{reason}}",
+    "signedInAs": "Angemeldet als {{name}}",
+    "missingConfig": "Fehlende Konfiguration: {{keys}}. apps/app/.env.example nach .env.local kopieren und befüllen."
+  },
+  "theme": {
+    "label": "Design",
+    "system": "System",
+    "light": "Hell",
+    "dark": "Dunkel"
+  },
+  "language": {
+    "label": "Sprache"
+  },
+  "nextcloud": {
+    "title": "Nextcloud",
+    "notConnected": "Einring ist noch nicht mit deinem Nextcloud-Konto verbunden.",
+    "connect": "Nextcloud verbinden",
+    "waiting": "Schließe die Anmeldung bei Nextcloud im Browserfenster ab…",
+    "openAgain": "Anmeldeseite erneut öffnen",
+    "connectedAs": "Verbunden als {{loginName}} auf {{server}}",
+    "disconnect": "Verbindung trennen",
+    "error": "Nextcloud-Anfrage fehlgeschlagen ({{status}})."
+  },
+  "tables": {
+    "loading": "Tabelle wird geladen…",
+    "empty": "Diese Tabelle enthält keine Zeilen.",
+    "rowCount_one": "{{count}} Zeile",
+    "rowCount_other": "{{count}} Zeilen",
+    "error": "Die Tabelle konnte nicht geladen werden ({{status}}).",
+    "retry": "Erneut versuchen"
+  },
+  "common": {
+    "yes": "ja",
+    "no": "nein"
+  }
+}

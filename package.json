@@ -1,0 +1,24 @@
+{
+  "name": "einring",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One ring to control them all - a mobile/web UI to manage services via their APIs.",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.13 <23 || >=23.4 <25",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "tokens:build": "pnpm --filter @einring/tokens build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "typescript": "^5.9.3"
+  }
+}

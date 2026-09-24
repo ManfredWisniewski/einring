@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "Einring",
+    "tagline": "One ring to control them all"
+  },
+  "nav": {
+    "tables": "Tables",
+    "logout": "Sign out"
+  },
+  "auth": {
+    "login": "Sign in with Authentik",
+    "loading": "Checking sign-in…",
+    "completing": "Completing sign-in…",
+    "failed": "Sign-in failed: {{reason}}",
+    "signedInAs": "Signed in as {{name}}",
+    "missingConfig": "Missing configuration: {{keys}}. Copy apps/app/.env.example to .env.local and add values."
+  },
+  "theme": {
+    "label": "Theme",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "nextcloud": {
+    "title": "Nextcloud",
+    "notConnected": "Einring is not connected to your Nextcloud account yet.",
+    "connect": "Connect Nextcloud",
+    "waiting": "Finish signing in to Nextcloud in the browser window…",
+    "openAgain": "Open login page again",
+    "connectedAs": "Connected as {{loginName}} on {{server}}",
+    "disconnect": "Disconnect",
+    "error": "Nextcloud request failed ({{status}})."
+  },
+  "tables": {
+    "loading": "Loading table…",
+    "empty": "This table has no rows.",
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
+    "error": "The table could not be loaded ({{status}}).",
+    "retry": "Retry"
+  },
+  "common": {
+    "yes": "yes",
+    "no": "no"
+  }
+}
