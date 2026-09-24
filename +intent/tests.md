@@ -40,3 +40,9 @@
 
 - `pnpm build` produces the web build; `pnpm --filter @einring/app cap sync android` succeeds; debug APK installs on emulator and device.
 - GitHub Actions produces the debug APK artifact.
+
+### A06 App information
+
+- The authenticated layout shows an accessible info button in the top-right app bar.
+- Activating it opens a localized information popover in German and English.
+- The popover can be closed with its close button, Escape, or outside interaction, and focus returns to the info button.
