@@ -16,14 +16,5 @@
     "md": { "$value": { "value": 0.5, "unit": "rem" } },
     "lg": { "$value": { "value": 1, "unit": "rem" } },
     "full": { "$value": { "value": 9999, "unit": "px" } }
-  },
-  "font-size": {
-    "$type": "dimension",
-    "xs": { "$value": { "value": 0.75, "unit": "rem" } },
-    "sm": { "$value": { "value": 0.875, "unit": "rem" } },
-    "md": { "$value": { "value": 1, "unit": "rem" } },
-    "lg": { "$value": { "value": 1.25, "unit": "rem" } },
-    "xl": { "$value": { "value": 1.5, "unit": "rem" } },
-    "2xl": { "$value": { "value": 2, "unit": "rem" } }
   }
 }

@@ -9,6 +9,8 @@ It should be possible to deploy the App to android and iOS. For now we will only
 The UI of the app shall be based on tokens defined by the the Style Dictionary system  https://styledictionary.com/
 and compatible with the compatible with Design Tokens Community Group spec. https://tr.designtokens.org/format/
 
+Tokens can be pre-generated via https://www.designsystems.one/tools/token-generator
+
 ## Name
 
 **einring** - "one ring to control them all"; norse naming consistent with related WIT projects. Android ID `de.wit.einring`.

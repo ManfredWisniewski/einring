@@ -1,0 +1,89 @@
+{
+  "fontSize": {
+    "$type": "dimension",
+    "xs": { "$value": { "value": 0.56, "unit": "rem" } },
+    "sm": { "$value": { "value": 0.7, "unit": "rem" } },
+    "base": { "$value": { "value": 0.875, "unit": "rem" } },
+    "lg": { "$value": { "value": 1.0938, "unit": "rem" } },
+    "xl": { "$value": { "value": 1.3672, "unit": "rem" } },
+    "2xl": { "$value": { "value": 1.709, "unit": "rem" } },
+    "3xl": { "$value": { "value": 2.1362, "unit": "rem" } },
+    "4xl": { "$value": { "value": 2.6703, "unit": "rem" } },
+    "5xl": { "$value": { "value": 3.3379, "unit": "rem" } },
+    "6xl": { "$value": { "value": 4.1723, "unit": "rem" } }
+  },
+  "letterSpacing": {
+    "$type": "dimension",
+    "xs": { "$value": { "value": 0, "unit": "em" } },
+    "sm": { "$value": { "value": 0, "unit": "em" } },
+    "base": { "$value": { "value": 0, "unit": "em" } },
+    "lg": { "$value": { "value": -0.005, "unit": "em" } },
+    "xl": { "$value": { "value": -0.01, "unit": "em" } },
+    "2xl": { "$value": { "value": -0.015, "unit": "em" } },
+    "3xl": { "$value": { "value": -0.02, "unit": "em" } },
+    "4xl": { "$value": { "value": -0.025, "unit": "em" } },
+    "5xl": { "$value": { "value": -0.03, "unit": "em" } },
+    "6xl": { "$value": { "value": -0.03, "unit": "em" } }
+  },
+  "spacing": {
+    "$type": "dimension",
+    "0": { "$value": { "value": 0, "unit": "rem" } },
+    "0.5": { "$value": { "value": 0.0938, "unit": "rem" } },
+    "1": { "$value": { "value": 0.1875, "unit": "rem" } },
+    "1.5": { "$value": { "value": 0.2813, "unit": "rem" } },
+    "2": { "$value": { "value": 0.375, "unit": "rem" } },
+    "2.5": { "$value": { "value": 0.4688, "unit": "rem" } },
+    "3": { "$value": { "value": 0.5625, "unit": "rem" } },
+    "4": { "$value": { "value": 0.75, "unit": "rem" } },
+    "5": { "$value": { "value": 0.9375, "unit": "rem" } },
+    "6": { "$value": { "value": 1.125, "unit": "rem" } },
+    "8": { "$value": { "value": 1.5, "unit": "rem" } },
+    "10": { "$value": { "value": 1.875, "unit": "rem" } },
+    "12": { "$value": { "value": 2.25, "unit": "rem" } },
+    "16": { "$value": { "value": 3, "unit": "rem" } },
+    "20": { "$value": { "value": 3.75, "unit": "rem" } },
+    "24": { "$value": { "value": 4.5, "unit": "rem" } },
+    "32": { "$value": { "value": 6, "unit": "rem" } },
+    "40": { "$value": { "value": 7.5, "unit": "rem" } },
+    "48": { "$value": { "value": 9, "unit": "rem" } },
+    "56": { "$value": { "value": 10.5, "unit": "rem" } },
+    "64": { "$value": { "value": 12, "unit": "rem" } }
+  },
+  "borderRadius": {
+    "$type": "dimension",
+    "none": { "$value": { "value": 0, "unit": "px" } },
+    "sm": { "$value": { "value": 0.125, "unit": "rem" } },
+    "md": { "$value": { "value": 0.25, "unit": "rem" } },
+    "lg": { "$value": { "value": 0.375, "unit": "rem" } },
+    "xl": { "$value": { "value": 0.625, "unit": "rem" } },
+    "2xl": { "$value": { "value": 1, "unit": "rem" } },
+    "3xl": { "$value": { "value": 1.5, "unit": "rem" } },
+    "full": { "$value": { "value": 9999, "unit": "px" } }
+  },
+  "boxShadow": {
+    "$type": "shadow",
+    "sm": { "$value": "0 1px 2px 0 rgba(40, 34, 36, 0.06)" },
+    "md": { "$value": "0 4px 6px -1px rgba(40, 34, 36, 0.1), 0 2px 4px -2px rgba(40, 34, 36, 0.06)" },
+    "lg": { "$value": "0 10px 15px -3px rgba(40, 34, 36, 0.1), 0 4px 6px -4px rgba(40, 34, 36, 0.06)" },
+    "xl": { "$value": "0 20px 25px -5px rgba(40, 34, 36, 0.1), 0 8px 10px -6px rgba(40, 34, 36, 0.06)" },
+    "2xl": { "$value": "0 25px 50px -12px rgba(40, 34, 36, 0.25)" }
+  },
+  "motion": {
+    "duration": {
+      "$type": "duration",
+      "instant": { "$value": { "value": 50, "unit": "ms" } },
+      "fast": { "$value": { "value": 120, "unit": "ms" } },
+      "base": { "$value": { "value": 200, "unit": "ms" } },
+      "slow": { "$value": { "value": 320, "unit": "ms" } },
+      "slower": { "$value": { "value": 500, "unit": "ms" } }
+    },
+    "easing": {
+      "$type": "cubicBezier",
+      "standard": { "$value": "cubic-bezier(0.2, 0, 0, 1)" },
+      "emphasized": { "$value": "cubic-bezier(0.3, 0, 0, 1)" },
+      "decelerate": { "$value": "cubic-bezier(0, 0, 0, 1)" },
+      "accelerate": { "$value": "cubic-bezier(0.3, 0, 1, 1)" },
+      "linear": { "$value": "linear" }
+    }
+  }
+}

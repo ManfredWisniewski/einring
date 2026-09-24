@@ -12,7 +12,7 @@ test("tokens build produces light and dark variable sets", () => {
   const css = readFileSync(resolve(root, "build/css/tokens.css"), "utf8");
   assert.match(css, /:root, \[data-theme="light"\]\s*\{/);
   assert.match(css, /\[data-theme="dark"\]\s*\{/);
-  assert.match(css, /--surface-base:\s*#f7f7f8;/);
+  assert.match(css, /--surface-base:\s*#fbf9fa;/);
   assert.match(css, /--space-4:\s*1rem;/);
   assert.match(css, /--duration-fast:\s*120ms;/);
   assert.match(css, /--font-family-sans:\s*'?Inter'?,/);
