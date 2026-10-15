@@ -59,3 +59,11 @@
 
 - "Server" view shows Nextcloud server health (load, memory, disk, update status) proxied via the serverinfo OCS endpoint; a missing serverinfo app produces a visible, localized error state, not a crash.
 - "Talk" view lists user statuses, searchable and filterable by group; if the connected account lacks the provisioning scope the fallback behaviour is implemented and documented.
+
+### A09 Wiki (Collectives mirror)
+
+- The wiki module syncs Collectives' markdown files from Nextcloud into the BFF's SQLite store; the app renders the local mirror only (read-only, no writes to Nextcloud).
+- Sync covers the page tree and page content; deleted pages are pruned. `POST /api/wiki/sync` refreshes on demand and `GET /api/wiki/tree` auto-syncs when the cache is stale (`MODULE_WIKI_SYNC_TTL_S`).
+- The UI offers navigation by collective and page and full-text search over titles and content (DE + EN).
+- Without Collectives installed (404 on the `Collectives` folder), sync reports zero pages and the UI shows a localized empty state — no crash.
+- All wiki endpoints require auth and return 424 while Nextcloud is disconnected; no credentials or tokens appear in responses.

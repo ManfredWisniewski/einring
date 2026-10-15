@@ -1,0 +1,14 @@
+{
+  "nav": "Wiki",
+  "search": "Search pages",
+  "sync": "Sync",
+  "syncing": "Syncing…",
+  "syncedAt": "Last synced {{date}}",
+  "syncError": "Synchronization failed ({{status}}).",
+  "empty": "No Collectives pages mirrored yet.",
+  "selectPage": "Select a page.",
+  "noResults": "No matching pages.",
+  "error": "The wiki could not be loaded ({{status}}).",
+  "pageError": "The page could not be loaded ({{status}}).",
+  "retry": "Retry"
+}

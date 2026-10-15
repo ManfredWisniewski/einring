@@ -1,0 +1,14 @@
+{
+  "nav": "Wiki",
+  "search": "Seiten durchsuchen",
+  "sync": "Synchronisieren",
+  "syncing": "Synchronisiere…",
+  "syncedAt": "Zuletzt synchronisiert {{date}}",
+  "syncError": "Synchronisation fehlgeschlagen ({{status}}).",
+  "empty": "Noch keine Collectives-Seiten gespiegelt.",
+  "selectPage": "Wähle eine Seite.",
+  "noResults": "Keine passenden Seiten.",
+  "error": "Das Wiki konnte nicht geladen werden ({{status}}).",
+  "pageError": "Die Seite konnte nicht geladen werden ({{status}}).",
+  "retry": "Erneut versuchen"
+}

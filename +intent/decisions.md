@@ -80,3 +80,4 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 - Secure storage for OIDC tokens on Android (Capacitor secure-storage plugin).
 - Extract shared API types into a `packages/shared` workspace instead of mirroring them in `apps/app/src/api/types.ts`.
 - Code-splitting of the web bundle (currently one ~660 kB chunk).
+- **D36 Wiki module mirrors Collectives via WebDAV**: the BFF syncs `.md` files under `remote.php/dav/files/<user>/Collectives/` into SQLite (`wiki_pages`, etags for change detection, pruning of deleted pages) and serves tree/page/search endpoints. Read-only mirror — no write-back. Chosen over the Collectives REST API because the file tree is the durable contract (localized collective names, custom folder layouts) and DAV needs no Collectives API version assumptions. Markdown is rendered client-side with marked + DOMPurify.

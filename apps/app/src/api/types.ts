@@ -74,8 +74,34 @@ export interface TalkUserStatus {
   groups: string[];
 }
 
+export interface WikiPageMeta {
+  path: string;
+  title: string;
+  collective: string;
+  mtime: string | null;
+}
+
+export interface WikiTree {
+  syncedAt: string | null;
+  pages: WikiPageMeta[];
+}
+
+export interface WikiPage extends WikiPageMeta {
+  content: string;
+}
+
+export interface WikiSearchResult extends WikiPageMeta {
+  snippet: string;
+}
+
+export interface WikiSyncResult {
+  syncedAt: string;
+  pages: number;
+}
+
 export interface TalkStatus {
   users: TalkUserStatus[];
   groups: string[];
-  groupsAvailable: boolean;
+  /** "all" = server admin, "partial" = group admin sees managed groups only, "none" = no group data. */
+  groupsScope: "all" | "partial" | "none";
 }

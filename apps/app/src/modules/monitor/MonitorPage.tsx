@@ -207,7 +207,7 @@ function TalkPanel() {
           <Label>{t("modules.monitor.talk.search")}</Label>
           <Input className="input" placeholder={t("modules.monitor.talk.search")} />
         </TextField>
-        {talk.data.groupsAvailable && talk.data.groups.length > 0 && (
+        {talk.data.groupsScope !== "none" && talk.data.groups.length > 0 && (
           <Select
             className="select"
             selectedKey={group}
@@ -231,7 +231,12 @@ function TalkPanel() {
           </Select>
         )}
       </div>
-      {!talk.data.groupsAvailable && <p className="muted">{t("modules.monitor.talk.noGroups")}</p>}
+      {talk.data.groupsScope === "none" && (
+        <p className="muted">{t("modules.monitor.talk.noGroups")}</p>
+      )}
+      {talk.data.groupsScope === "partial" && (
+        <p className="muted">{t("modules.monitor.talk.partialGroups")}</p>
+      )}
       <p className="muted">{t("modules.monitor.talk.count", { count: filtered.length })}</p>
       {filtered.length === 0 ? (
         <p className="muted">{t("modules.monitor.talk.empty")}</p>

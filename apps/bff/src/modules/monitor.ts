@@ -1,4 +1,4 @@
-import { NextcloudError, type ServerInfoData } from "../nextcloud/client.js";
+import { NextcloudError, type ServerInfoData, type UsersDetails } from "../nextcloud/client.js";
 import type { BffModule } from "./types.js";
 
 export interface ServerHealth {
@@ -126,7 +126,10 @@ export const monitorModule: BffModule = {
         Object.assign(detailsUsers, details.ocs.data.users);
         groupsScope = "all";
       } else {
-        const managedGroups = await nc.getGroups().then((r) => r.ocs.data.groups).catch(forbidden);
+        const managedGroups = await nc
+          .getGroups()
+          .then((r) => r.ocs.data.groups)
+          .catch(forbidden);
         if (managedGroups?.length) {
           await Promise.all(
             managedGroups.map(async (group) => {
@@ -172,12 +175,11 @@ export const monitorModule: BffModule = {
         }))
         .sort((a, b) => (a.displayName ?? a.userId).localeCompare(b.displayName ?? b.userId));
       const groups = [
-        ...new Set(Object.values(detailsUsers).flatMap((u) => u.groups ?? [])),
-        ...groupsByUser.values().flat(),
-      ]
-        .flat()
-        .filter((g, i, a) => a.indexOf(g) === i)
-        .sort();
+        ...new Set([
+          ...Object.values(detailsUsers).flatMap((u) => u.groups ?? []),
+          ...[...groupsByUser.values()].flat(),
+        ]),
+      ].sort();
       return { users, groups, groupsScope } satisfies TalkStatus;
     });
   },

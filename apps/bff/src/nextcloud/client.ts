@@ -1,3 +1,5 @@
+import { XMLParser } from "fast-xml-parser";
+
 export type Fetch = typeof fetch;
 
 export interface LoginFlowStart {
@@ -89,6 +91,16 @@ export interface GroupsList {
   groups: string[];
 }
 
+/** A `PROPFIND` result entry; `href` is the URL-encoded DAV path, `relPath` is decoded and
+ * relative to the user's files root (no `remote.php/dav/files/<user>/` prefix). */
+export interface DavEntry {
+  href: string;
+  relPath: string;
+  isCollection: boolean;
+  etag?: string;
+  lastModified?: string;
+}
+
 export class NextcloudError extends Error {
   constructor(
     public readonly status: number,
@@ -147,15 +159,17 @@ export class NextcloudClient {
 
 export class AuthenticatedNextcloud {
   private readonly authHeader: string;
+  private readonly davBase: string;
 
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: Fetch,
     private readonly userAgent: string,
-    loginName: string,
+    private readonly loginName: string,
     appPassword: string,
   ) {
     this.authHeader = `Basic ${Buffer.from(`${loginName}:${appPassword}`).toString("base64")}`;
+    this.davBase = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(loginName)}`;
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -217,4 +231,83 @@ export class AuthenticatedNextcloud {
       `/ocs/v2.php/cloud/groups/${encodeURIComponent(groupId)}/users`,
     );
   }
+
+  /**
+   * WebDAV PROPFIND on `relPath` (relative to the user's files root).
+   * `depth` 1 = directory listing incl. the directory itself.
+   */
+  async davPropfind(relPath: string, depth: 0 | 1): Promise<DavEntry[]> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      method: "PROPFIND",
+      headers: {
+        Authorization: this.authHeader,
+        "User-Agent": this.userAgent,
+        Depth: String(depth),
+        "Content-Type": "application/xml",
+      },
+      body: `<?xml version="1.0"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop><d:resourcetype/><d:getetag/><d:getlastmodified/></d:prop>
+</d:propfind>`,
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `PROPFIND ${relPath} -> ${res.status}`);
+    const prefix = `/remote.php/dav/files/${this.loginName}/`;
+    return parseMultistatus(await res.text(), prefix);
+  }
+
+  /** WebDAV GET — downloads a file relative to the user's files root. */
+  async davGetFile(relPath: string): Promise<string> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      headers: { Authorization: this.authHeader, "User-Agent": this.userAgent },
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `GET ${relPath} -> ${res.status}`);
+    return res.text();
+  }
+}
+
+const davPath = (relPath: string) =>
+  relPath === "" ? "" : `/${relPath.split("/").map(encodeURIComponent).join("/")}`;
+
+/** Parses a DAV multistatus response; strips the `remote.php/dav/files/<user>/` prefix. */
+export function parseMultistatus(xml: string, filesPrefix: string): DavEntry[] {
+  const doc = new XMLParser({ removeNSPrefix: true }).parse(xml) as {
+    multistatus?: { response?: DavResponse | DavResponse[] };
+  };
+  const raw = doc.multistatus?.response;
+  const responses = raw == null ? [] : Array.isArray(raw) ? raw : [raw];
+  const entries: DavEntry[] = [];
+  for (const r of responses) {
+    const stats: (DavPropstat | undefined)[] = Array.isArray(r.propstat)
+      ? r.propstat
+      : [r.propstat];
+    const ok = stats.find((s) => s && String(s.status).includes(" 200"));
+    if (!ok?.prop || typeof r.href !== "string") continue;
+    const href = decodeURIComponent(r.href);
+    const relPath = href.startsWith(filesPrefix)
+      ? href.slice(filesPrefix.length).replace(/\/$/, "")
+      : href;
+    const { resourcetype, getetag, getlastmodified } = ok.prop;
+    entries.push({
+      href: r.href,
+      relPath,
+      isCollection:
+        typeof resourcetype === "object" && resourcetype !== null && "collection" in resourcetype,
+      etag: getetag != null ? String(getetag).replaceAll('"', "") : undefined,
+      lastModified: getlastmodified != null ? String(getlastmodified) : undefined,
+    });
+  }
+  return entries;
+}
+
+interface DavResponse {
+  href?: unknown;
+  propstat?: DavPropstat | DavPropstat[];
+}
+interface DavPropstat {
+  status?: unknown;
+  prop?: {
+    resourcetype?: unknown;
+    getetag?: unknown;
+    getlastmodified?: unknown;
+  };
 }

@@ -164,14 +164,15 @@ describe("tables", () => {
   });
 });
 
+const connect = (store: Store, secrets: SecretBox) =>
+  store.saveCredential({
+    sub: TEST_USER.sub,
+    server: "https://cloud.test",
+    loginName: "frodo",
+    appPasswordSealed: secrets.seal("app-pw"),
+  });
+
 describe("monitor", () => {
-  const connect = (store: Store, secrets: SecretBox) =>
-    store.saveCredential({
-      sub: TEST_USER.sub,
-      server: "https://cloud.test",
-      loginName: "frodo",
-      appPasswordSealed: secrets.seal("app-pw"),
-    });
   const ocs = (data: unknown) => json({ ocs: { meta: { status: "ok", statuscode: 200 }, data } });
 
   it("answers 424 when Nextcloud is not connected", async () => {
@@ -262,7 +263,7 @@ describe("monitor", () => {
     const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      groupsAvailable: true,
+      groupsScope: "all",
       groups: ["admin", "elsewhere", "shire"],
       users: [
         {
@@ -293,7 +294,7 @@ describe("monitor", () => {
     });
   });
 
-  it("degrades to groupsAvailable=false without admin rights, resolving names via autocomplete", async () => {
+  it("degrades to groupsScope=none without admin rights, resolving names via autocomplete", async () => {
     const fetchImpl = fakeFetch((url) => {
       if (url.includes("/apps/user_status/api/v1/statuses")) {
         return ocs([{ userId: "frodo", status: "online" }]);
@@ -308,7 +309,7 @@ describe("monitor", () => {
     const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      groupsAvailable: false,
+      groupsScope: "none",
       groups: [],
       users: [
         {
@@ -322,6 +323,154 @@ describe("monitor", () => {
       ],
     });
   });
+
+  it("uses managed groups for group-admin accounts (groupsScope=partial)", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/apps/user_status/api/v1/statuses")) {
+        return ocs([
+          { userId: "frodo", status: "online" },
+          { userId: "sam", status: "away" },
+        ]);
+      }
+      if (url.includes("/cloud/users/details")) return json({}, 403);
+      if (url.endsWith("/cloud/groups")) return ocs({ groups: ["shire"] });
+      if (url.includes("/cloud/groups/shire/users")) {
+        return ocs({ users: ["frodo", "sam"] });
+      }
+      if (url.includes("/apps/spreed/api/v4/core/autocomplete")) {
+        const q = new URL(url).searchParams.get("search");
+        return ocs([{ id: q, label: `${q}-name`, source: "users" }]);
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      groupsScope: "partial",
+      groups: ["shire"],
+      users: [
+        {
+          userId: "frodo",
+          displayName: "frodo-name",
+          status: "online",
+          message: null,
+          icon: null,
+          groups: ["shire"],
+        },
+        {
+          userId: "sam",
+          displayName: "sam-name",
+          status: "away",
+          message: null,
+          icon: null,
+          groups: ["shire"],
+        },
+      ],
+    });
+  });
+});
+
+describe("wiki", () => {
+  const P = "/remote.php/dav/files/frodo";
+  const xmlResp = (entries: string) =>
+    new Response(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">${entries}</d:multistatus>`, {
+      status: 207,
+      headers: { "content-type": "application/xml" },
+    });
+  const dir = (href: string) =>
+    `<d:response><d:href>${href}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
+  const file = (href: string, etag: string) =>
+    `<d:response><d:href>${href}</d:href><d:propstat><d:prop><d:resourcetype/><d:getetag>"${etag}"</d:getetag><d:getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
+
+  const davFiles: Record<string, string> = {
+    "Collectives/Handbook/Intro.md": "# Intro\n\nHello world.",
+  };
+  const davFetch = () =>
+    fakeFetch((url, init) => {
+      if (init?.method === "PROPFIND") {
+        if (url.endsWith(`${P}/Collectives`)) {
+          return xmlResp(dir(`${P}/Collectives/`) + dir(`${P}/Collectives/Handbook/`));
+        }
+        if (url.endsWith(`${P}/Collectives/Handbook`)) {
+          return xmlResp(
+            dir(`${P}/Collectives/Handbook/`) +
+              Object.keys(davFiles)
+                .filter((p) => p.startsWith("Collectives/Handbook/"))
+                .map((p) => file(`${P}/${p}`, `e-${p}`))
+                .join(""),
+          );
+        }
+        return new Response("not found", { status: 404 });
+      }
+      const match = Object.entries(davFiles).find(([p]) => url.endsWith(`${P}/${p}`));
+      if (match) return new Response(match[1]);
+      return json({ error: `unexpected ${init?.method} ${url}` }, 500);
+    });
+
+  it("answers 424 when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    expect(
+      (await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth })).statusCode,
+    ).toBe(424);
+  });
+
+  it("syncs, serves tree/page/search, and prunes deleted files", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: davFetch() });
+    connect(store, secrets);
+
+    const sync = await app.inject({ method: "POST", url: "/api/wiki/sync", headers: auth });
+    expect(sync.statusCode).toBe(200);
+    expect(sync.json().pages).toBe(1);
+
+    const tree = await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth });
+    expect(tree.statusCode).toBe(200);
+    expect(tree.json().pages).toEqual([
+      {
+        path: "Handbook/Intro.md",
+        title: "Intro",
+        collective: "Handbook",
+        mtime: "Wed, 01 Jan 2025 00:00:00 GMT",
+      },
+    ]);
+
+    const page = await app.inject({
+      method: "GET",
+      url: "/api/wiki/page?path=Handbook%2FIntro.md",
+      headers: auth,
+    });
+    expect(page.statusCode).toBe(200);
+    expect(page.json().content).toBe("# Intro\n\nHello world.");
+
+    const search = await app.inject({
+      method: "GET",
+      url: "/api/wiki/search?q=world",
+      headers: auth,
+    });
+    expect(search.statusCode).toBe(200);
+    expect(search.json().results).toHaveLength(1);
+    expect(search.json().results[0].snippet).toContain("Hello world.");
+
+    // File deleted upstream → pruned on next sync.
+    delete davFiles["Collectives/Handbook/Intro.md"];
+    await app.inject({ method: "POST", url: "/api/wiki/sync", headers: auth });
+    const empty = await app.inject({
+      method: "GET",
+      url: "/api/wiki/page?path=Handbook%2FIntro.md",
+      headers: auth,
+    });
+    expect(empty.statusCode).toBe(404);
+  });
+
+  it("reports an empty mirror when Collectives is not installed", async () => {
+    const fetchImpl = fakeFetch(() => new Response("not found", { status: 404 }));
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().pages).toEqual([]);
+  });
 });
 
 describe("module framework", () => {
@@ -333,6 +482,7 @@ describe("module framework", () => {
       modules: [
         { id: "tables", requires: ["nextcloud"] },
         { id: "monitor", requires: ["nextcloud"] },
+        { id: "wiki", requires: ["nextcloud"] },
       ],
     });
   });
