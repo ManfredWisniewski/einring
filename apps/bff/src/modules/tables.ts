@@ -48,8 +48,11 @@ function resolveValue(options: Map<number, string> | undefined, value: unknown):
 }
 
 const configSchema = z.object({
-  /** Numeric ID of the Nextcloud Tables table this module shows. */
-  TABLE_ID: z.coerce.number().int().positive(),
+  /** Numeric ID of the Nextcloud Tables table this module shows. Empty/missing = not configured. */
+  TABLE_ID: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
 });
 
 export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
@@ -60,6 +63,9 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     const { store, secrets, nextcloud } = ctx;
 
     api.get("/current", async (request, reply) => {
+      if (config.TABLE_ID === undefined) {
+        return reply.code(424).send({ error: "tables module not configured" });
+      }
       const cred = store.getCredential(request.user.sub);
       if (!cred) return reply.code(424).send({ error: "nextcloud not connected" });
       const nc = nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed));

@@ -588,11 +588,20 @@ describe("module framework", () => {
   });
 
   it("fails startup when an enabled module's env config is invalid", async () => {
-    const env = testEnv();
-    delete env.MODULE_TABLES_TABLE_ID;
-    await expect(testApp({ config: loadConfig(env) })).rejects.toThrow(
-      /Invalid config for module "tables"/,
-    );
+    await expect(
+      testApp({
+        config: loadConfig({ ...testEnv(), MODULE_TABLES_TABLE_ID: "abc" }),
+      }),
+    ).rejects.toThrow(/Invalid config for module "tables"/);
+  });
+
+  it("boots with an empty MODULE_TABLES_TABLE_ID and reports not-configured", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_TABLES_TABLE_ID: "" }),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/tables/current", headers: auth });
+    expect(res.statusCode).toBe(424);
+    expect(res.json().error).toMatch(/not configured/);
   });
 
   it("ignores invalid module env when the module is disabled", async () => {
