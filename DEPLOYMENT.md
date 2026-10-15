@@ -11,11 +11,28 @@ Einring ships as a single Docker image: the Fastify BFF serves the API under `/a
   - Signing key assigned (the BFF validates JWTs against the provider's JWKS — a keyless provider returns an empty JWKS and every API call fails with 401)
   - Scopes: `openid profile email`
 - A reachable **Nextcloud** instance (`NEXTCLOUD_URL`); app passwords are obtained per user via Login Flow v2 at runtime
-- The image build needs the repo checkout (submodules are not required at runtime, but `pnpm install --frozen-lockfile` runs inside the build)
 
-## 1. Build the image
+## 1. Get the image
 
-OIDC settings are **public** (no secrets) but must be baked into the web bundle at build time:
+### From CI (default)
+
+`.github/workflows/build.yml` builds and pushes `ghcr.io/manfredwisniewski/einring` to GHCR on every push to `main`, every `v*` tag, and manual dispatch — `linux/amd64` + `linux/arm64`, tagged by commit SHA (plus the tag name for releases).
+
+The workflow needs two repository **variables** (Settings → Secrets and variables → Actions → *Variables*, not secrets — they are public OIDC config baked into the web bundle):
+
+| Variable | Value |
+|---|---|
+| `VITE_AUTHENTIK_ISSUER` | `https://auth.example.com/application/o/einring/` |
+| `VITE_AUTHENTIK_CLIENT_ID` | the provider's client ID |
+
+Then on the Docker host (GHCR login only needed while the package is private):
+
+```bash
+docker pull ghcr.io/manfredwisniewski/einring:sha-<commit>
+# or a release tag: ghcr.io/manfredwisniewski/einring:v1.0.0
+```
+
+### Local build (alternative)
 
 ```bash
 docker build -t einring \
@@ -24,7 +41,7 @@ docker build -t einring \
   .
 ```
 
-The issuer must be the provider's exact **OpenID Configuration Issuer**, normally ending in `/application/o/<slug>/`. If Authentik or the client ID ever changes, rebuild the image — `VITE_*` values are compiled in.
+The issuer must be the provider's exact **OpenID Configuration Issuer**, normally ending in `/application/o/<slug>/`. If Authentik or the client ID ever changes, the image must be rebuilt — `VITE_*` values are compiled in.
 
 ## 2. Prepare the environment file
 
@@ -62,7 +79,7 @@ docker run -d --name einring \
   --env-file .env \
   -v einring-data:/data \
   --restart unless-stopped \
-  einring
+  ghcr.io/manfredwisniewski/einring:sha-<commit>
 ```
 
 The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials + wiki mirror) — it is the only state.
@@ -72,12 +89,7 @@ The container runs as the `node` user and exposes a health check on `/healthz`. 
 ```yaml
 services:
   einring:
-    image: einring
-    build:
-      context: .
-      args:
-        VITE_AUTHENTIK_ISSUER: https://auth.example.com/application/o/einring/
-        VITE_AUTHENTIK_CLIENT_ID: <provider-client-id>
+    image: ghcr.io/manfredwisniewski/einring:v1.0.0   # or sha-<commit>
     ports:
       - "3000:3000"
     env_file: .env
@@ -122,17 +134,17 @@ Then open `https://einring.example.com`, sign in via Authentik, and connect Next
 
 ## Updating
 
+Push to `main` (or tag `v*`) — CI publishes a new image. Then on the host:
+
 ```bash
-git pull
-docker build -t einring \
-  --build-arg VITE_AUTHENTIK_ISSUER=... \
-  --build-arg VITE_AUTHENTIK_CLIENT_ID=... .
+docker pull ghcr.io/manfredwisniewski/einring:sha-<new-commit>
 docker stop einring && docker rm einring
 docker run -d --name einring -p 3000:3000 --env-file .env \
-  -v einring-data:/data --restart unless-stopped einring
+  -v einring-data:/data --restart unless-stopped \
+  ghcr.io/manfredwisniewski/einring:sha-<new-commit>
 ```
 
-SQLite schema changes are created/migrated idempotently at startup; the volume survives rebuilds.
+With compose it's `docker compose pull && docker compose up -d` after bumping the tag. SQLite schema changes are created/migrated idempotently at startup; the volume survives rebuilds.
 
 ## Backup
 

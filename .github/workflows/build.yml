@@ -1,0 +1,87 @@
+name: build-image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/manfredwisniewski/einring
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # +wit is in .dockerignore; no submodules needed for the image.
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE_REPOSITORY }}
+          tags: |
+            type=sha
+            type=ref,event=tag
+
+      # Single-arch build loaded into the runner for the smoke test; the push
+      # build below reuses this buildx cache.
+      - uses: docker/build-push-action@v6
+        id: smoke
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: einring:smoke
+          build-args: |
+            VITE_AUTHENTIK_ISSUER=${{ vars.VITE_AUTHENTIK_ISSUER }}
+            VITE_AUTHENTIK_CLIENT_ID=${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
+
+      - name: Healthcheck
+        run: |
+          set -e
+          docker run -d --name einring-smoke -p 3000:3000 \
+            -e AUTHENTIK_ISSUER="${{ vars.VITE_AUTHENTIK_ISSUER }}" \
+            -e AUTHENTIK_CLIENT_ID="${{ vars.VITE_AUTHENTIK_CLIENT_ID }}" \
+            -e NEXTCLOUD_URL="https://nextcloud.invalid" \
+            -e ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+            -e PUBLIC_URL="http://localhost:3000" \
+            einring:smoke
+          # Startup does OIDC discovery against the real issuer, then serves /healthz.
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/healthz; then break; fi
+            if [ "$i" -eq 30 ]; then
+              echo "healthz never became ready"; docker logs einring-smoke; exit 1
+            fi
+            sleep 2
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/me)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/)" = "200"
+          docker rm -f einring-smoke
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Public OIDC config baked into the web bundle — GitHub Actions variables,
+          # not secrets. Define them under repo Settings > Secrets and variables > Actions > Variables.
+          build-args: |
+            VITE_AUTHENTIK_ISSUER=${{ vars.VITE_AUTHENTIK_ISSUER }}
+            VITE_AUTHENTIK_CLIENT_ID=${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
