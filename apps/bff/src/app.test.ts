@@ -1,6 +1,6 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "./config.js";
 import type { SecretBox } from "./crypto.js";
@@ -535,6 +535,32 @@ describe("wiki", () => {
     const res = await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.json().pages).toEqual([]);
+  });
+
+  it("mirrors a local directory via MODULE_WIKI_SOURCE_DIR (basename = collective)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "einring-wiki-"));
+    await mkdir(join(dir, "Sub"), { recursive: true });
+    await mkdir(join(dir, ".obsidian"), { recursive: true });
+    await writeFile(join(dir, "Readme.md"), "# WIT\n\nRoot page.");
+    await writeFile(join(dir, "Sub", "Page.md"), "# Sub\n\nNested page.");
+    await writeFile(join(dir, ".obsidian", "app.json"), "{}");
+    try {
+      const { app, auth, store, secrets } = await testApp({
+        config: loadConfig({ ...testEnv(), MODULE_WIKI_SOURCE_DIR: dir }),
+      });
+      connect(store, secrets);
+      const tree = await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth });
+      expect(tree.statusCode).toBe(200);
+      const collective = basename(dir);
+      expect(
+        tree
+          .json()
+          .pages.map((p: { path: string }) => p.path)
+          .sort(),
+      ).toEqual([`${collective}/Readme.md`, `${collective}/Sub/Page.md`]);
+    } finally {
+      await rm(dir, { recursive: true });
+    }
   });
 });
 

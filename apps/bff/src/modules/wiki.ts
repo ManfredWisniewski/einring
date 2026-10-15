@@ -1,3 +1,5 @@
+import { readdir, readFile, stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import type { AppContext } from "../app.js";
 import type { AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
@@ -40,43 +42,101 @@ export function metaFromPath(path: string): { collective: string; title: string 
   };
 }
 
-/** Walks `<user>/Collectives/` via WebDAV and mirrors all `.md` files into the store. */
+interface SourceFile {
+  /** Store path relative to the collective root, e.g. "Handbook/Intro.md". */
+  relPath: string;
+  etag?: string;
+  lastModified?: string;
+}
+
+/** A wiki content source: lists markdown files and reads them. */
+export interface WikiSource {
+  list(): Promise<SourceFile[]>;
+  read(relPath: string): Promise<string>;
+}
+
+/** `<user>/Collectives/` via WebDAV. */
+function davSource(nc: AuthenticatedNextcloud): WikiSource {
+  return {
+    async list() {
+      const files: SourceFile[] = [];
+      const walk = async (dir: string): Promise<void> => {
+        let entries: Awaited<ReturnType<AuthenticatedNextcloud["davPropfind"]>>;
+        try {
+          entries = await nc.davPropfind(dir, 1);
+        } catch (e) {
+          if (dir === COLLECTIVES_ROOT && (e as NextcloudError).status === 404) return; // app absent
+          throw e;
+        }
+        for (const entry of entries) {
+          if (entry.relPath === dir) continue; // the directory itself
+          if (entry.isCollection) await walk(entry.relPath);
+          else if (/\.(md|markdown)$/i.test(entry.relPath)) {
+            files.push({
+              relPath: entry.relPath.slice(COLLECTIVES_ROOT.length + 1),
+              etag: entry.etag,
+              lastModified: entry.lastModified,
+            });
+          }
+        }
+      };
+      await walk(COLLECTIVES_ROOT);
+      return files;
+    },
+    read: (relPath) => nc.davGetFile(`${COLLECTIVES_ROOT}/${relPath}`),
+  };
+}
+
+/**
+ * Local directory as a single collective named after the directory — dev seeding
+ * (`MODULE_WIKI_SOURCE_DIR`). Dot-dirs (`.obsidian`, `.templates`) are skipped.
+ */
+export function fsSource(root: string): WikiSource {
+  const collective = basename(root);
+  return {
+    async list() {
+      const files: SourceFile[] = [];
+      const walk = async (dir: string, prefix: string): Promise<void> => {
+        for (const ent of await readdir(dir, { withFileTypes: true })) {
+          if (ent.name.startsWith(".")) continue;
+          const abs = join(dir, ent.name);
+          const rel = prefix ? `${prefix}/${ent.name}` : ent.name;
+          if (ent.isDirectory()) await walk(abs, rel);
+          else if (/\.(md|markdown)$/i.test(ent.name)) {
+            const s = await stat(abs);
+            files.push({
+              relPath: `${collective}/${rel}`,
+              etag: `${s.mtimeMs}-${s.size}`,
+              lastModified: s.mtime.toISOString(),
+            });
+          }
+        }
+      };
+      await walk(root, "");
+      return files;
+    },
+    read: (relPath) => readFile(join(root, relPath.slice(collective.length + 1)), "utf8"),
+  };
+}
+
+/** Mirrors a source's markdown files into the store: upsert changed, prune deleted. */
 export async function syncWiki(
-  nc: AuthenticatedNextcloud,
+  source: WikiSource,
   ctx: Pick<AppContext, "store">,
   sub: string,
 ): Promise<WikiSyncResult> {
   const { store } = ctx;
-  const files: { relPath: string; etag?: string; lastModified?: string }[] = [];
-
-  const walk = async (dir: string): Promise<void> => {
-    let entries: Awaited<ReturnType<AuthenticatedNextcloud["davPropfind"]>>;
-    try {
-      entries = await nc.davPropfind(dir, 1);
-    } catch (e) {
-      if (dir === COLLECTIVES_ROOT && (e as NextcloudError).status === 404) return; // app absent
-      throw e;
-    }
-    for (const entry of entries) {
-      if (entry.relPath === dir) continue; // the directory itself
-      if (entry.isCollection) await walk(entry.relPath);
-      else if (/\.(md|markdown)$/i.test(entry.relPath)) {
-        files.push({ relPath: entry.relPath, etag: entry.etag, lastModified: entry.lastModified });
-      }
-    }
-  };
-  await walk(COLLECTIVES_ROOT);
+  const files = await source.list();
 
   const syncedAt = new Date().toISOString();
   const known = store.wikiEtags(sub);
   for (const f of files) {
-    const rel = f.relPath.slice(COLLECTIVES_ROOT.length + 1); // strip "Collectives/"
-    if (f.etag && known.get(rel) === f.etag) continue; // unchanged
-    const content = await nc.davGetFile(f.relPath);
+    if (f.etag && known.get(f.relPath) === f.etag) continue; // unchanged
+    const content = await source.read(f.relPath);
     store.upsertWikiPage({
       sub,
-      path: rel,
-      title: metaFromPath(rel).title,
+      path: f.relPath,
+      title: metaFromPath(f.relPath).title,
       content,
       etag: f.etag ?? "",
       mtime: f.lastModified ?? null,
@@ -85,7 +145,7 @@ export async function syncWiki(
   }
   store.pruneWikiPages(
     sub,
-    files.map((f) => f.relPath.slice(COLLECTIVES_ROOT.length + 1)),
+    files.map((f) => f.relPath),
   );
   store.setWikiSyncedAt(sub, syncedAt);
   return { syncedAt, pages: files.length };
@@ -94,6 +154,11 @@ export async function syncWiki(
 const configSchema = z.object({
   /** Seconds a sync result is reused before /tree refreshes it. */
   SYNC_TTL_S: z.coerce.number().int().min(0).default(300),
+  /**
+   * Dev seeding: sync reads this local directory (basename = collective name)
+   * instead of Nextcloud WebDAV.
+   */
+  SOURCE_DIR: z.string().min(1).optional(),
 });
 
 export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
@@ -110,8 +175,12 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
       if (running) return running;
       const cred = store.getCredential(sub);
       if (!cred) return Promise.reject(new Error("nextcloud not connected"));
-      const nc = nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed));
-      const p = syncWiki(nc, ctx, sub).finally(() => inflight.delete(sub));
+      const source = config.SOURCE_DIR
+        ? fsSource(config.SOURCE_DIR)
+        : davSource(
+            nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed)),
+          );
+      const p = syncWiki(source, ctx, sub).finally(() => inflight.delete(sub));
       inflight.set(sub, p);
       return p;
     };
