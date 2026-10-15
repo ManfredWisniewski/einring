@@ -57,6 +57,7 @@ jobs:
           docker run -d --name einring-smoke -p 3000:3000 \
             -e AUTHENTIK_ISSUER="${{ vars.VITE_AUTHENTIK_ISSUER }}" \
             -e AUTHENTIK_CLIENT_ID="${{ vars.VITE_AUTHENTIK_CLIENT_ID }}" \
+            -e MODULES="wiki" \
             -e NEXTCLOUD_URL="https://nextcloud.invalid" \
             -e ENCRYPTION_KEY="$(openssl rand -base64 32)" \
             -e PUBLIC_URL="http://localhost:3000" \
