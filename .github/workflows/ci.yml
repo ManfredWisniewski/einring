@@ -16,7 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
+          # +wit content is not needed for lint/test/build; its ssh remote is unreachable from CI.
+          submodules: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
