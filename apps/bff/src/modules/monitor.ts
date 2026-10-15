@@ -52,10 +52,21 @@ export function toServerHealth(d: ServerInfoData): ServerHealth {
   };
 }
 
+/** Server data visible to any authenticated user (capabilities + own quota). */
+export interface ServerBasics {
+  product: string | null;
+  version: string | null;
+  /** Own storage quota; `totalBytes` null means unlimited. */
+  quota: { usedBytes: number; freeBytes: number; totalBytes: number | null } | null;
+  /** Installed apps relevant to Einring modules, from the capabilities map. */
+  apps: { talk: string | null; userStatus: boolean; collectives: boolean; tables: boolean };
+}
+
 export interface ServerHealthResponse {
   /** False when the account lacks admin rights for the serverinfo API. */
   available: boolean;
   health: ServerHealth | null;
+  basics: ServerBasics | null;
 }
 
 export interface TalkUserStatus {
@@ -89,16 +100,49 @@ export const monitorModule: BffModule = {
       const cred = store.getCredential(request.user.sub);
       if (!cred) return reply.code(424).send({ error: "nextcloud not connected" });
       const nc = nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed));
-      try {
-        const info = await nc.getServerInfo();
-        return { available: true, health: toServerHealth(info.ocs.data) };
-      } catch (e) {
-        // serverinfo requires admin — not an error for regular accounts.
-        if (e instanceof NextcloudError && (e.status === 401 || e.status === 403)) {
-          return { available: false, health: null } satisfies ServerHealthResponse;
-        }
+      const forbidden = (e: unknown): null => {
+        if (e instanceof NextcloudError && (e.status === 401 || e.status === 403)) return null;
         throw e;
+      };
+      const [info, caps, me] = await Promise.all([
+        nc.getServerInfo().catch(forbidden),
+        nc.getCapabilities().catch(() => null),
+        nc.getOwnUser().catch(() => null),
+      ]);
+
+      let basics: ServerBasics | null = null;
+      if (caps || me) {
+        const capMap = caps?.ocs.data.capabilities ?? {};
+        const quota = me?.ocs.data.quota;
+        basics = {
+          product: capMap.theming?.name ?? capMap.theming?.productname ?? null,
+          version: caps?.ocs.data.version?.string ?? null,
+          quota:
+            quota?.used != null
+              ? {
+                  usedBytes: quota.used,
+                  freeBytes: quota.free ?? 0,
+                  // Nextcloud reports -3 for unlimited quota.
+                  totalBytes: quota.total != null && quota.total >= 0 ? quota.total : null,
+                }
+              : null,
+          apps: {
+            talk:
+              "spreed" in capMap
+                ? ((capMap.spreed as { version?: string } | undefined)?.version ?? "")
+                : null,
+            userStatus: "user_status" in capMap,
+            collectives: "collectives" in capMap,
+            tables: "tables" in capMap,
+          },
+        };
       }
+
+      return {
+        available: info !== null,
+        health: info ? toServerHealth(info.ocs.data) : null,
+        basics,
+      } satisfies ServerHealthResponse;
     });
 
     api.get("/talk-status", async (request, reply) => {
@@ -148,11 +192,21 @@ export const monitorModule: BffModule = {
         ...new Set([...Object.keys(detailsUsers), ...groupsByUser.keys(), ...statusByUser.keys()]),
       ];
 
-      // Without provisioning access, resolve display names via Talk's autocomplete (regular users).
+      // Without provisioning access, resolve display names: DAV principals does an
+      // exact user-id lookup (works for obfuscated ids), Talk autocomplete is the fallback.
       const names = new Map<string, string>();
       if (!details) {
         await Promise.all(
           ids.map(async (userId) => {
+            try {
+              const name = await nc.getPrincipalDisplayName("users", userId);
+              if (name) {
+                names.set(userId, name);
+                return;
+              }
+            } catch {
+              // principals denied — try autocomplete
+            }
             try {
               const res = await nc.autocompleteUsers(userId);
               const hit = res.ocs.data.find((r) => r.id === userId && r.source === "users");
@@ -174,12 +228,23 @@ export const monitorModule: BffModule = {
           groups: detailsUsers[userId]?.groups ?? groupsByUser.get(userId) ?? [],
         }))
         .sort((a, b) => (a.displayName ?? a.userId).localeCompare(b.displayName ?? b.userId));
-      const groups = [
-        ...new Set([
-          ...Object.values(detailsUsers).flatMap((u) => u.groups ?? []),
-          ...[...groupsByUser.values()].flat(),
-        ]),
-      ].sort();
+
+      // Group ids are opaque too — resolve their display names via DAV principals.
+      const gids = new Set(users.flatMap((u) => u.groups));
+      const groupNames = new Map<string, string>();
+      await Promise.all(
+        [...gids].map(async (gid) => {
+          try {
+            const name = await nc.getPrincipalDisplayName("groups", gid);
+            if (name) groupNames.set(gid, name);
+          } catch {
+            // unresolved — keep the gid
+          }
+        }),
+      );
+      const groupName = (gid: string) => groupNames.get(gid) ?? gid;
+      for (const u of users) u.groups = u.groups.map(groupName);
+      const groups = [...new Set(users.flatMap((u) => u.groups))].sort();
       return { users, groups, groupsScope } satisfies TalkStatus;
     });
   },

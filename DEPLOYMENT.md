@@ -68,6 +68,7 @@ PUBLIC_URL=https://einring.example.com
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_TABLE_ID=10
 # MODULE_WIKI_SYNC_TTL_S=300
+# MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 LOG_LEVEL=info
 ```
 

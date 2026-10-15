@@ -290,6 +290,7 @@ describe("monitor", () => {
         users: { total: 42, last5min: 3, last1h: 10, last24h: 20 },
         apps: { installed: 30, updatesAvailable: 2 },
       },
+      basics: null,
     });
   });
 
@@ -301,7 +302,42 @@ describe("monitor", () => {
     connect(store, secrets);
     const res = await app.inject({ method: "GET", url: "/api/monitor/server", headers: auth });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ available: false, health: null });
+    expect(res.json()).toEqual({ available: false, health: null, basics: null });
+  });
+
+  it("serves basics (capabilities + own quota) to non-admin accounts", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/apps/serverinfo/api/v1/info")) return json({}, 401);
+      if (url.includes("/cloud/capabilities")) {
+        return ocs({
+          version: { string: "31.0.0" },
+          capabilities: {
+            theming: { name: "WIT Cloud", productname: "Nextcloud" },
+            spreed: { version: "21.1.0" },
+            user_status: { enabled: true },
+            collectives: {},
+          },
+        });
+      }
+      if (url.endsWith("/cloud/user")) {
+        return ocs({ quota: { used: 500, free: 500, total: 1000, relative: 50 } });
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/server", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      available: false,
+      health: null,
+      basics: {
+        product: "WIT Cloud",
+        version: "31.0.0",
+        quota: { usedBytes: 500, freeBytes: 500, totalBytes: 1000 },
+        apps: { talk: "21.1.0", userStatus: true, collectives: true, tables: false },
+      },
+    });
   });
 
   it("merges Talk status with provisioning details and groups", async () => {
@@ -389,8 +425,54 @@ describe("monitor", () => {
     });
   });
 
+  it("resolves obfuscated user ids via DAV principals when autocomplete misses", async () => {
+    const hash = "03d1595bc373e71671bc5d387c33c2414b9733bcb24aaa2de5cc8e23e258d4a3";
+    const fetchImpl = fakeFetch((url, init) => {
+      if (url.includes("/apps/user_status/api/v1/statuses")) {
+        return ocs([{ userId: hash, status: "offline" }]);
+      }
+      if (init?.method === "PROPFIND" && url.includes("/principals/users/")) {
+        return new Response(
+          `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/remote.php/dav/principals/users/${hash}/</d:href>
+    <d:propstat>
+      <d:prop><d:displayname>Frodo B.</d:displayname></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`,
+          { status: 207 },
+        );
+      }
+      if (url.includes("/apps/spreed/api/v4/core/autocomplete")) {
+        return ocs([]);
+      }
+      return json({}, 403);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      groupsScope: "none",
+      groups: [],
+      users: [
+        {
+          userId: hash,
+          displayName: "Frodo B.",
+          status: "offline",
+          message: null,
+          icon: null,
+          groups: [],
+        },
+      ],
+    });
+  });
+
   it("uses managed groups for group-admin accounts (groupsScope=partial)", async () => {
-    const fetchImpl = fakeFetch((url) => {
+    const fetchImpl = fakeFetch((url, init) => {
       if (url.includes("/apps/user_status/api/v1/statuses")) {
         return ocs([
           { userId: "frodo", status: "online" },
@@ -401,6 +483,21 @@ describe("monitor", () => {
       if (url.endsWith("/cloud/groups")) return ocs({ groups: ["shire"] });
       if (url.includes("/cloud/groups/shire/users")) {
         return ocs({ users: ["frodo", "sam"] });
+      }
+      if (init?.method === "PROPFIND" && url.includes("/principals/groups/shire")) {
+        return new Response(
+          `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/remote.php/dav/principals/groups/shire/</d:href>
+    <d:propstat>
+      <d:prop><d:displayname>The Shire</d:displayname></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`,
+          { status: 207 },
+        );
       }
       if (url.includes("/apps/spreed/api/v4/core/autocomplete")) {
         const q = new URL(url).searchParams.get("search");
@@ -414,7 +511,7 @@ describe("monitor", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       groupsScope: "partial",
-      groups: ["shire"],
+      groups: ["The Shire"],
       users: [
         {
           userId: "frodo",
@@ -422,7 +519,7 @@ describe("monitor", () => {
           status: "online",
           message: null,
           icon: null,
-          groups: ["shire"],
+          groups: ["The Shire"],
         },
         {
           userId: "sam",
@@ -430,7 +527,7 @@ describe("monitor", () => {
           status: "away",
           message: null,
           icon: null,
-          groups: ["shire"],
+          groups: ["The Shire"],
         },
       ],
     });
@@ -450,19 +547,19 @@ describe("wiki", () => {
     `<d:response><d:href>${href}</d:href><d:propstat><d:prop><d:resourcetype/><d:getetag>"${etag}"</d:getetag><d:getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`;
 
   const davFiles: Record<string, string> = {
-    "Collectives/Handbook/Intro.md": "# Intro\n\nHello world.",
+    ".Collectives/Handbook/Intro.md": "# Intro\n\nHello world.",
   };
   const davFetch = () =>
     fakeFetch((url, init) => {
       if (init?.method === "PROPFIND") {
-        if (url.endsWith(`${P}/Collectives`)) {
-          return xmlResp(dir(`${P}/Collectives/`) + dir(`${P}/Collectives/Handbook/`));
+        if (url.endsWith(`${P}/.Collectives`)) {
+          return xmlResp(dir(`${P}/.Collectives/`) + dir(`${P}/.Collectives/Handbook/`));
         }
-        if (url.endsWith(`${P}/Collectives/Handbook`)) {
+        if (url.endsWith(`${P}/.Collectives/Handbook`)) {
           return xmlResp(
-            dir(`${P}/Collectives/Handbook/`) +
+            dir(`${P}/.Collectives/Handbook/`) +
               Object.keys(davFiles)
-                .filter((p) => p.startsWith("Collectives/Handbook/"))
+                .filter((p) => p.startsWith(".Collectives/Handbook/"))
                 .map((p) => file(`${P}/${p}`, `e-${p}`))
                 .join(""),
           );
@@ -518,7 +615,7 @@ describe("wiki", () => {
     expect(search.json().results[0].snippet).toContain("Hello world.");
 
     // File deleted upstream → pruned on next sync.
-    delete davFiles["Collectives/Handbook/Intro.md"];
+    delete davFiles[".Collectives/Handbook/Intro.md"];
     await app.inject({ method: "POST", url: "/api/wiki/sync", headers: auth });
     const empty = await app.inject({
       method: "GET",

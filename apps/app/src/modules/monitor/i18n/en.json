@@ -20,6 +20,12 @@
     "apps": "Apps",
     "appsDetail_one": "{{installed}} installed, {{updates}} update available",
     "appsDetail_other": "{{installed}} installed, {{updates}} updates available",
+    "product": "Product",
+    "detectedApps": "Detected apps",
+    "appUserStatus": "User status",
+    "storage": "Your storage",
+    "storageOf": "{{used}} of {{total}} used",
+    "storageUnlimited": "{{used}} used (unlimited)",
     "noAdmin": "Server information requires an admin-level Nextcloud account.",
     "error": "Server information could not be loaded ({{status}}).",
     "retry": "Retry"

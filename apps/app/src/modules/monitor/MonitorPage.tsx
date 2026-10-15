@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useServerHealth, useTalkStatus } from "@/api/hooks";
+import type { ServerBasics } from "@/api/types";
 import { NextcloudGate } from "@/components/NextcloudGate";
 
 export function MonitorPage() {
@@ -25,18 +26,18 @@ export function MonitorPage() {
     <NextcloudGate>
       <Tabs className="tabs">
         <TabList className="tabs__list" aria-label={t("modules.monitor.nav")}>
-          <Tab id="server" className="tabs__tab">
-            {t("modules.monitor.tabs.server")}
-          </Tab>
           <Tab id="talk" className="tabs__tab">
             {t("modules.monitor.tabs.talk")}
           </Tab>
+          <Tab id="server" className="tabs__tab">
+            {t("modules.monitor.tabs.server")}
+          </Tab>
         </TabList>
-        <TabPanel id="server">
-          <ServerPanel />
-        </TabPanel>
         <TabPanel id="talk">
           <TalkPanel />
+        </TabPanel>
+        <TabPanel id="server">
+          <ServerPanel />
         </TabPanel>
       </Tabs>
     </NextcloudGate>
@@ -85,8 +86,8 @@ function ServerPanel() {
       </div>
     );
   }
-  if (!health.data.available || !health.data.health) {
-    return <p className="muted">{t("modules.monitor.server.noAdmin")}</p>;
+  if (!health.data.health) {
+    return <BasicsCard basics={health.data.basics} />;
   }
   const h = health.data.health;
 
@@ -153,6 +154,62 @@ function ServerPanel() {
           })}`}
         />
       )}
+    </div>
+  );
+}
+
+/** Non-admin fallback: what any authenticated user can see about the instance. */
+function BasicsCard({ basics }: { basics: ServerBasics | null }) {
+  const { t } = useTranslation();
+  if (!basics) return <p className="muted">{t("modules.monitor.server.noAdmin")}</p>;
+
+  const detected = [
+    basics.apps.talk !== null ? `Talk${basics.apps.talk ? ` ${basics.apps.talk}` : ""}` : null,
+    basics.apps.userStatus ? t("modules.monitor.server.appUserStatus") : null,
+    basics.apps.collectives ? "Collectives" : null,
+    basics.apps.tables ? "Tables" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const rows: [string, string][] = [
+    [t("modules.monitor.server.product"), fmt(basics.product)],
+    [t("modules.monitor.server.version"), fmt(basics.version)],
+    [t("modules.monitor.server.detectedApps"), detected || "—"],
+  ];
+
+  return (
+    <div className="stack">
+      <dl className="defs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="defs__row">
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {basics.quota &&
+        (basics.quota.totalBytes != null ? (
+          <Meter
+            used={basics.quota.usedBytes}
+            total={basics.quota.totalBytes}
+            label={`${t("modules.monitor.server.storage")}: ${t(
+              "modules.monitor.server.storageOf",
+              {
+                used: formatBytes(basics.quota.usedBytes),
+                total: formatBytes(basics.quota.totalBytes),
+              },
+            )}`}
+          />
+        ) : (
+          <p className="muted">
+            {t("modules.monitor.server.storage")}:{" "}
+            {t("modules.monitor.server.storageUnlimited", {
+              used: formatBytes(basics.quota.usedBytes),
+            })}
+          </p>
+        ))}
+      <p className="muted">{t("modules.monitor.server.noAdmin")}</p>
     </div>
   );
 }

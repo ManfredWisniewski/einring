@@ -60,9 +60,17 @@ export interface ServerHealth {
   apps: { installed: number | null; updatesAvailable: number | null };
 }
 
+export interface ServerBasics {
+  product: string | null;
+  version: string | null;
+  quota: { usedBytes: number; freeBytes: number; totalBytes: number | null } | null;
+  apps: { talk: string | null; userStatus: boolean; collectives: boolean; tables: boolean };
+}
+
 export interface ServerHealthResponse {
   available: boolean;
   health: ServerHealth | null;
+  basics: ServerBasics | null;
 }
 
 export interface TalkUserStatus {

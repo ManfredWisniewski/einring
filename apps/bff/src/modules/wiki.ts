@@ -5,8 +5,6 @@ import type { AppContext } from "../app.js";
 import type { AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
 import type { BffModule } from "./types.js";
 
-const COLLECTIVES_ROOT = "Collectives";
-
 export interface WikiPageMeta {
   path: string;
   title: string;
@@ -55,8 +53,8 @@ export interface WikiSource {
   read(relPath: string): Promise<string>;
 }
 
-/** `<user>/Collectives/` via WebDAV. */
-function davSource(nc: AuthenticatedNextcloud): WikiSource {
+/** `<user>/<root>/` via WebDAV — default `.Collectives` (current Nextcloud layout). */
+function davSource(nc: AuthenticatedNextcloud, root: string): WikiSource {
   return {
     async list() {
       const files: SourceFile[] = [];
@@ -65,7 +63,7 @@ function davSource(nc: AuthenticatedNextcloud): WikiSource {
         try {
           entries = await nc.davPropfind(dir, 1);
         } catch (e) {
-          if (dir === COLLECTIVES_ROOT && (e as NextcloudError).status === 404) return; // app absent
+          if (dir === root && (e as NextcloudError).status === 404) return; // app absent
           throw e;
         }
         for (const entry of entries) {
@@ -73,17 +71,17 @@ function davSource(nc: AuthenticatedNextcloud): WikiSource {
           if (entry.isCollection) await walk(entry.relPath);
           else if (/\.(md|markdown)$/i.test(entry.relPath)) {
             files.push({
-              relPath: entry.relPath.slice(COLLECTIVES_ROOT.length + 1),
+              relPath: entry.relPath.slice(root.length + 1),
               etag: entry.etag,
               lastModified: entry.lastModified,
             });
           }
         }
       };
-      await walk(COLLECTIVES_ROOT);
+      await walk(root);
       return files;
     },
-    read: (relPath) => nc.davGetFile(`${COLLECTIVES_ROOT}/${relPath}`),
+    read: (relPath) => nc.davGetFile(`${root}/${relPath}`),
   };
 }
 
@@ -155,6 +153,11 @@ const configSchema = z.object({
   /** Seconds a sync result is reused before /tree refreshes it. */
   SYNC_TTL_S: z.coerce.number().int().min(0).default(300),
   /**
+   * DAV directory holding the collectives. Current Nextcloud default is
+   * `.Collectives`; older installs used `Collectives`.
+   */
+  ROOT: z.string().min(1).default(".Collectives"),
+  /**
    * Dev seeding: sync reads this local directory (basename = collective name)
    * instead of Nextcloud WebDAV.
    */
@@ -179,6 +182,7 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
         ? fsSource(config.SOURCE_DIR)
         : davSource(
             nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed)),
+            config.ROOT,
           );
       const p = syncWiki(source, ctx, sub).finally(() => inflight.delete(sub));
       inflight.set(sub, p);

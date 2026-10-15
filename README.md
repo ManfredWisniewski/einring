@@ -171,11 +171,13 @@ Feature modules are bundled in the app and enabled at deployment level via the B
 MODULES=tables,monitor,wiki     # comma-separated; unset = all registered modules enabled
 MODULE_TABLES_TABLE_ID=10       # per-module settings use MODULE_<ID>_<KEY> (id uppercased, - → _)
 MODULE_WIKI_SYNC_TTL_S=300      # wiki: seconds a sync result is cached before /tree re-syncs
+# MODULE_WIKI_ROOT=.Collectives # wiki: DAV folder holding collectives (default .Collectives;
+                                # older Nextcloud installs used Collectives)
 # MODULE_WIKI_SOURCE_DIR=...    # wiki dev seeding: mirror a local dir (basename = collective)
                                 # instead of WebDAV
 ```
 
-Module ids today: `tables` (fixed Nextcloud Tables view), `monitor` (Nextcloud server health + Talk user status), `wiki` (read-only mirror of Nextcloud Collectives markdown via WebDAV). Monitor degrades by account rights: server info needs a server admin account, the Talk group filter works for server admins and group admins (managed groups only). With a regular account, Talk still shows statuses and resolved display names. Wiki syncs `.md` files under `Collectives/` into the BFF's SQLite store and serves tree, page and search endpoints — no write-back to Nextcloud.
+Module ids today: `tables` (fixed Nextcloud Tables view), `monitor` (Nextcloud server health + Talk user status), `wiki` (read-only mirror of Nextcloud Collectives markdown via WebDAV). Monitor degrades by account rights: server info needs a server admin account, the Talk group filter works for server admins and group admins (managed groups only). With a regular account, Talk still shows statuses and resolved display names. Wiki syncs `.md` files under `.Collectives/` into the BFF's SQLite store and serves tree, page and search endpoints — no write-back to Nextcloud.
 
 ## Deploy
 

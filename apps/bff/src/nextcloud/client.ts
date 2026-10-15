@@ -74,6 +74,23 @@ export interface UserStatus {
   status?: string; // online | away | dnd | invisible | offline
 }
 
+/** `GET /ocs/v2.php/cloud/capabilities` — any authenticated user; app capability map. */
+export interface CapabilitiesData {
+  version?: { string?: string; edition?: string };
+  capabilities?: Record<string, unknown> & {
+    theming?: { name?: string; productname?: string };
+    spreed?: { version?: string };
+    user_status?: { enabled?: boolean };
+  };
+}
+
+/** `GET /ocs/v2.php/cloud/user` — the connected account's own info incl. storage quota. */
+export interface OwnUser {
+  id?: string;
+  displayname?: string;
+  quota?: { free?: number; used?: number; total?: number; relative?: number };
+}
+
 /** `GET /ocs/v2.php/cloud/users/details` (provisioning API — admin credentials required). */
 export interface UsersDetails {
   users: Record<string, { id?: string; displayname?: string; groups?: string[] }>;
@@ -207,9 +224,56 @@ export class AuthenticatedNextcloud {
     return this.get<OcsResponse<UserStatus[]>>("/ocs/v2.php/apps/user_status/api/v1/statuses");
   }
 
+  /** Server capabilities — version + installed-app feature map; any authenticated user. */
+  getCapabilities() {
+    return this.get<OcsResponse<CapabilitiesData>>("/ocs/v2.php/cloud/capabilities");
+  }
+
+  /** Own account info incl. storage quota — any authenticated user. */
+  getOwnUser() {
+    return this.get<OcsResponse<OwnUser>>("/ocs/v2.php/cloud/user");
+  }
+
   /** Provisioning API: users incl. display names and groups. Requires admin — throws NextcloudError(401/403). */
   getUsersDetails() {
     return this.get<OcsResponse<UsersDetails>>("/ocs/v2.php/cloud/users/details");
+  }
+
+  /**
+   * DAV principals lookup — resolves a user or group display name by exact id.
+   * Works for regular users and obfuscated (non-searchable) ids.
+   */
+  async getPrincipalDisplayName(kind: "users" | "groups", id: string): Promise<string | null> {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/remote.php/dav/principals/${kind}/${encodeURIComponent(id)}`,
+      {
+        method: "PROPFIND",
+        headers: {
+          Authorization: this.authHeader,
+          "User-Agent": this.userAgent,
+          Depth: "0",
+          "Content-Type": "application/xml",
+        },
+        body: `<?xml version="1.0"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop><d:displayname/></d:prop>
+</d:propfind>`,
+      },
+    );
+    if (!res.ok) {
+      throw new NextcloudError(res.status, `PROPFIND principal ${kind}/${id} -> ${res.status}`);
+    }
+    const doc = new XMLParser({ removeNSPrefix: true }).parse(await res.text()) as {
+      multistatus?: { response?: PrincipalResponse | PrincipalResponse[] };
+    };
+    const raw = doc.multistatus?.response;
+    const responses = raw == null ? [] : Array.isArray(raw) ? raw : [raw];
+    for (const r of responses) {
+      const stats = Array.isArray(r.propstat) ? r.propstat : [r.propstat];
+      const ok = stats.find((s) => s && String(s.status).includes(" 200"));
+      if (ok?.prop?.displayname != null) return String(ok.prop.displayname);
+    }
+    return null;
   }
 
   /** Talk autocomplete for user candidates — resolves display names without admin rights. */
@@ -310,4 +374,10 @@ interface DavPropstat {
     getetag?: unknown;
     getlastmodified?: unknown;
   };
+}
+interface PrincipalResponse {
+  href?: unknown;
+  propstat?:
+    | { status?: unknown; prop?: { displayname?: unknown } }
+    | { status?: unknown; prop?: { displayname?: unknown } }[];
 }
