@@ -54,6 +54,14 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # Explicit package list — implicit defaults try to install the
+          # deprecated legacy "tools" package, which no longer exists.
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            cmdline-tools;latest
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm tokens:build
