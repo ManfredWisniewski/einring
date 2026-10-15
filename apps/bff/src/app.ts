@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
@@ -35,6 +36,26 @@ export function allowedOrigins(config: Config): string[] {
   ];
 }
 
+function escapeHtml(s: string): string {
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+/** Instance name into <title>, whitelabel CSS variable overrides as a :root style block. */
+function patchIndexHtml(html: string, config: Config): string {
+  let out = html.replace(
+    /<title>[^<]*<\/title>/,
+    `<title>${escapeHtml(config.INSTANCE_NAME)}</title>`,
+  );
+  const vars = config.INSTANCE_CSS_VARS;
+  if (vars && Object.keys(vars).length > 0) {
+    const decls = Object.entries(vars)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(";");
+    out = out.replace("</head>", `<style>:root{${decls}}</style></head>`);
+  }
+  return out;
+}
+
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Enabled modules resolve + validate their MODULE_<ID>_* env here, so bad config fails at startup.
   const modules = resolveModules(deps.config);
@@ -59,6 +80,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   app.get("/healthz", async () => ({ ok: true }));
+  // Public instance config — the app reads the deployment name before login, so no auth.
+  app.get("/api/config", async () => ({
+    name: deps.config.INSTANCE_NAME,
+    // tagline: undefined = app default, "" = hidden, string = override
+    tagline: deps.config.INSTANCE_TAGLINE,
+    cssVars: deps.config.INSTANCE_CSS_VARS,
+  }));
 
   await app.register(
     async (api) => {
@@ -85,10 +113,22 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     ? resolve(deps.config.STATIC_DIR)
     : resolve(import.meta.dirname, "../../app/dist");
   if (existsSync(staticDir)) {
-    await app.register(fastifyStatic, { root: staticDir, wildcard: false });
-    app.setNotFoundHandler((request, reply) => {
+    // index.html is excluded so "/" and SPA routes fall through to the not-found handler,
+    // which serves it with the instance name injected into <title>.
+    await app.register(fastifyStatic, {
+      root: staticDir,
+      wildcard: false,
+      index: false,
+      globIgnore: ["index.html"],
+    });
+    let indexHtml: string | undefined;
+    app.setNotFoundHandler(async (request, reply) => {
       if (request.method === "GET" && !request.url.startsWith("/api/")) {
-        return reply.sendFile("index.html");
+        indexHtml ??= patchIndexHtml(
+          await readFile(resolve(staticDir, "index.html"), "utf8"),
+          deps.config,
+        );
+        return reply.type("text/html").send(indexHtml);
       }
       return reply.code(404).send({ error: "not found" });
     });

@@ -59,6 +59,10 @@ ENCRYPTION_KEY=
 PUBLIC_URL=https://einring.example.com
 
 # --- optional ---------------------------------------------------------------
+# Whitelabel: per-deployment branding, no rebuild needed (D37)
+# INSTANCE_NAME=Einring              # header, browser tab, info dialog
+# INSTANCE_TAGLINE=                  # unset = app default; "" hides the tagline
+# INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
 # MODULES=tables,monitor,wiki
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
@@ -131,6 +135,24 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 ```
 
 Then open `https://einring.example.com`, sign in via Authentik, and connect Nextcloud under Settings (the app walks through Nextcloud Login Flow v2 — a browser redirect to approve, no manual password entry).
+
+## Whitelabel deployments
+
+One image can run multiple branded instances — branding is runtime env, not build config. Point the same image at different env files:
+
+```dotenv
+INSTANCE_NAME=Acme Portal
+INSTANCE_TAGLINE=                                  # empty hides the login-page tagline
+INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-hover":"#991b1b","--accent-subtle":"#fee2e2","--accent-subtle-fg":"#7f1d1d"}
+MODULES=wiki                                       # restrict the module set per deployment
+```
+
+- `INSTANCE_NAME` — header, browser tab (the BFF rewrites `index.html`'s `<title>`), info dialog and all name-bearing strings
+- `INSTANCE_TAGLINE` — login-page tagline; unset keeps the Einring default, empty string hides it
+- `INSTANCE_CSS_VARS` — JSON map of `--var:value` injected as `:root{…}` into `index.html` before first paint; invalid JSON or unsafe values refuse startup. Set the full accent set (`--accent-base`, `--accent-hover`, `--accent-subtle`, `--accent-subtle-fg`, `--accent-fg`) or subtler shades will stay neutral
+- `MODULES` — limits which modules the instance exposes (BFF registry is the source of truth)
+
+The Authentik client is shared — a whitelabel instance still signs in via the same provider; use a separate provider/application only if the brand needs its own IdP entry. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.
 
 ## Updating
 

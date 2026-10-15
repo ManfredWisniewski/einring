@@ -25,15 +25,15 @@
     "label": "Language"
   },
   "info": {
-    "open": "About Einring",
+    "open": "About {{name}}",
     "close": "Close information",
-    "title": "About Einring",
-    "description": "Einring provides one interface for managing connected services.",
+    "title": "About {{name}}",
+    "description": "{{name}} provides one interface for managing connected services.",
     "version": "Version {{version}}"
   },
   "nextcloud": {
     "title": "Nextcloud",
-    "notConnected": "Einring is not connected to your Nextcloud account yet.",
+    "notConnected": "{{name}} is not connected to your Nextcloud account yet.",
     "connect": "Connect Nextcloud",
     "waiting": "Finish signing in to Nextcloud in the browser window…",
     "openAgain": "Open login page again",

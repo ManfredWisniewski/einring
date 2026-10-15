@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "./config.js";
 import type { SecretBox } from "./crypto.js";
@@ -31,6 +34,68 @@ describe("auth", () => {
   it("healthz is public", async () => {
     const { app } = await testApp();
     expect((await app.inject({ method: "GET", url: "/healthz" })).statusCode).toBe(200);
+  });
+});
+
+describe("instance config", () => {
+  it("serves the instance name without auth", async () => {
+    const { app } = await testApp();
+    const res = await app.inject({ method: "GET", url: "/api/config" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ name: "Einring" });
+  });
+
+  it("exposes whitelabel tagline and css vars when configured", async () => {
+    const { app } = await testApp({
+      config: loadConfig({
+        ...testEnv(),
+        INSTANCE_NAME: "Portal",
+        INSTANCE_TAGLINE: "",
+        INSTANCE_CSS_VARS: '{"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}',
+      }),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/config" });
+    expect(res.json()).toEqual({
+      name: "Portal",
+      tagline: "",
+      cssVars: { "--accent-base": "#b91c1c", "--accent-subtle": "#fee2e2" },
+    });
+  });
+
+  it("fails config on malformed INSTANCE_CSS_VARS", () => {
+    expect(() => loadConfig({ ...testEnv(), INSTANCE_CSS_VARS: "not json" })).toThrow(
+      /INSTANCE_CSS_VARS/,
+    );
+    expect(() => loadConfig({ ...testEnv(), INSTANCE_CSS_VARS: '{"color":"red"}' })).toThrow(
+      /not a --css-variable/,
+    );
+    expect(() => loadConfig({ ...testEnv(), INSTANCE_CSS_VARS: '{"--x":"a;</style>"}' })).toThrow(
+      /not a safe CSS value/,
+    );
+  });
+
+  it("injects INSTANCE_NAME into the served index.html title", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "einring-static-"));
+    await writeFile(
+      join(dir, "index.html"),
+      "<!doctype html><html><head><title>Einring</title></head><body></body></html>",
+    );
+    const { app } = await testApp({
+      config: loadConfig({
+        ...testEnv(),
+        INSTANCE_NAME: "Mordor <Ops>",
+        INSTANCE_CSS_VARS: '{"--accent-base":"#b91c1c"}',
+        STATIC_DIR: dir,
+      }),
+    });
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("<title>Mordor &lt;Ops&gt;</title>");
+    expect(res.body).toContain("<style>:root{--accent-base:#b91c1c}</style></head>");
+    // SPA fallback gets the same patched document
+    const spa = await app.inject({ method: "GET", url: "/wiki" });
+    expect(spa.body).toContain("<title>Mordor &lt;Ops&gt;</title>");
+    await rm(dir, { recursive: true });
   });
 });
 

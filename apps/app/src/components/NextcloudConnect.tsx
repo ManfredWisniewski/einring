@@ -4,6 +4,7 @@ import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
 import { isNative } from "@/config";
+import { useInstanceName } from "@/instance";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -15,6 +16,7 @@ async function openLogin(url: string) {
 /** "Connect Nextcloud" card: starts Login Flow v2 via the BFF and polls until Nextcloud reports success. */
 export function NextcloudConnect() {
   const { t } = useTranslation();
+  const name = useInstanceName();
   const start = useStartLoginFlow();
   const poll = usePollLoginFlow();
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function NextcloudConnect() {
         </>
       ) : (
         <>
-          <p>{t("nextcloud.notConnected")}</p>
+          <p>{t("nextcloud.notConnected", { name })}</p>
           <div className="row">
             <Button className="btn btn--primary" onPress={begin} isDisabled={start.isPending}>
               {t("nextcloud.connect")}

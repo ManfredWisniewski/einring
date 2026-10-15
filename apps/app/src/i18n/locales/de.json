@@ -25,15 +25,15 @@
     "label": "Sprache"
   },
   "info": {
-    "open": "Über Einring",
+    "open": "Über {{name}}",
     "close": "Information schließen",
-    "title": "Über Einring",
-    "description": "Einring bietet eine gemeinsame Oberfläche zur Verwaltung verbundener Dienste.",
+    "title": "Über {{name}}",
+    "description": "{{name}} bietet eine gemeinsame Oberfläche zur Verwaltung verbundener Dienste.",
     "version": "Version {{version}}"
   },
   "nextcloud": {
     "title": "Nextcloud",
-    "notConnected": "Einring ist noch nicht mit deinem Nextcloud-Konto verbunden.",
+    "notConnected": "{{name}} ist noch nicht mit deinem Nextcloud-Konto verbunden.",
     "connect": "Nextcloud verbinden",
     "waiting": "Schließe die Anmeldung bei Nextcloud im Browserfenster ab…",
     "openAgain": "Anmeldeseite erneut öffnen",

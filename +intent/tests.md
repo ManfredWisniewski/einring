@@ -67,3 +67,11 @@
 - The UI offers navigation by collective and page and full-text search over titles and content (DE + EN).
 - Without Collectives installed (404 on the `Collectives` folder), sync reports zero pages and the UI shows a localized empty state — no crash.
 - All wiki endpoints require auth and return 424 while Nextcloud is disconnected; no credentials or tokens appear in responses.
+
+### A10 Instance whitelabel
+
+- `INSTANCE_NAME` sets the deployment's display name at runtime (no rebuild); it appears in the app header, browser tab (`<title>` of the served `index.html`), and name-bearing strings via `{{name}}` interpolation (DE + EN).
+- `GET /api/config` exposes `name`, `tagline` and `cssVars` without authentication; `name` defaults to `Einring` when unset.
+- `INSTANCE_TAGLINE` overrides the login-page tagline; unset = app default, empty string hides it.
+- `INSTANCE_CSS_VARS` (JSON map of `--var:value`) is injected as a `:root{}` style block into `index.html` so branding applies before first paint; malformed JSON, non-`--` keys or unsafe values fail config at startup.
+- Whitelabel + `MODULES` compose: a deployment can run a restricted module set under a different title on the same image.
