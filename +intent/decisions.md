@@ -27,6 +27,7 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 ## Design tokens
 
 - **D15 Tokens live in this repo (`packages/tokens`) as DTCG JSON, edited by hand**, built with **Style Dictionary v4** into CSS custom properties (alternatives: Figma/Tokens Studio export; separate shared token repo). Structured so it can be moved to a shared repo later.
+  - *2026-10-15 amendment*: build tool is **Terrazzo** (`@terrazzo/cli` + `@terrazzo/plugin-css`) instead of Style Dictionary — same pipeline as biti, the WIT design-token repository. Reason: one toolchain across WIT token packages; the DTCG resolver format supports theme contexts for future variants. Consequences: sources migrated to strict DTCG values (structured colors/shadows/cubic-bezier, kebab-case ids); semantic aliases now emit as `var(--*)` references; the flat `build/json/tokens.json` output was dropped (no consumer).
 - **D16 Token tiers: primitive → semantic**; component tier only when a component needs it. Light and dark are two semantic sets.
 - **D17 Theme switching: system preference by default, manual override stored on device**; implemented via `data-theme` on `<html>`.
 

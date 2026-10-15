@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // In the browser the API is same-origin; the dev server forwards it to the BFF.
-    proxy: { "/api": "http://localhost:3000" },
+    proxy: { "/api": "http://127.0.0.1:3001" },
   },
   build: { sourcemap: true },
   test: {

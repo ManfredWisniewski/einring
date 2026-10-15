@@ -6,8 +6,8 @@ Authentication: via Nextcloud and / or OpenID (Authentik)
 
 It should be possible to deploy the App to android and iOS. For now we will only develop for Android but Deploying to iOS shall always remain a possibility. If it is possible to have a WebApp version of the App as well that can be deployed on a server and accessed via a browser that would be great.
 
-The UI of the app shall be based on tokens defined by the the Style Dictionary system  https://styledictionary.com/
-and compatible with the compatible with Design Tokens Community Group spec. https://tr.designtokens.org/format/
+The UI of the app shall be based on design tokens built with Terrazzo https://terrazzo.app/
+and compatible with the Design Tokens Community Group spec. https://tr.designtokens.org/format/
 
 Tokens can be pre-generated via https://www.designsystems.one/tools/token-generator
 

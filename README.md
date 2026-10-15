@@ -16,7 +16,7 @@ Before making changes, read the shared WIT development guidance in `+wit/develop
 |------|---------|
 | `apps/app` | React + Vite UI; wrapped by Capacitor for Android (`de.wit.einring`) |
 | `apps/bff` | Fastify backend-for-frontend: validates Authentik JWTs, holds Nextcloud app passwords, proxies APIs, serves the web build |
-| `packages/tokens` | Design tokens (DTCG JSON) built with Style Dictionary into CSS variables |
+| `packages/tokens` | Design tokens (DTCG JSON) built with Terrazzo into CSS variables |
 | `+intent` | Project intent, decisions and test strategy |
 | `+team/+tasks` | Per-persona task files; `backlog.md` is the human-owned parking lot |
 | `priorities.md` | Owner-written direction for agents |
@@ -124,7 +124,7 @@ The project also provides a small Make facade. The pnpm scripts remain the canon
 
 ```powershell
 make install
-make run             # BFF on :3000 and Vite on :5173 (proxies /api)
+make run             # BFF on :3001 and Vite on :5173 (proxies /api)
 make test
 make lint
 make typecheck
@@ -161,7 +161,7 @@ pnpm --filter @einring/app android:open
 $env:CAP_SERVER_URL = "http://<your-pc-ip>:5173"; pnpm --filter @einring/app cap sync android
 ```
 
-Set `VITE_API_URL` in `apps/app/.env.local` to the BFF URL for device builds (`http://10.0.2.2:3000` on the emulator).
+Set `VITE_API_URL` in `apps/app/.env.local` to the BFF URL for device builds (`http://10.0.2.2:3001` on the emulator).
 
 ## Deploy
 

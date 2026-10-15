@@ -10,18 +10,38 @@
   },
   "font-weight": {
     "$type": "fontWeight",
-    "regular": { "$value": 400 },
-    "medium": { "$value": 500 },
-    "bold": { "$value": 700 }
+    "regular": {
+      "$value": 400
+    },
+    "medium": {
+      "$value": 500
+    },
+    "bold": {
+      "$value": 700
+    }
   },
   "line-height": {
     "$type": "number",
-    "tight": { "$value": 1.2 },
-    "normal": { "$value": 1.5 }
+    "tight": {
+      "$value": 1.2
+    },
+    "normal": {
+      "$value": 1.5
+    }
   },
   "duration": {
     "$type": "duration",
-    "fast": { "$value": { "value": 120, "unit": "ms" } },
-    "normal": { "$value": { "value": 200, "unit": "ms" } }
+    "fast": {
+      "$value": {
+        "value": 120,
+        "unit": "ms"
+      }
+    },
+    "normal": {
+      "$value": {
+        "value": 200,
+        "unit": "ms"
+      }
+    }
   }
 }

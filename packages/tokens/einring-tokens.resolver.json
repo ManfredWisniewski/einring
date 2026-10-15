@@ -1,0 +1,53 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
+  "name": "einring-tokens",
+  "description": "einring design tokens — shared primitives plus a light and a dark semantic set",
+  "version": "2025.10",
+  "resolutionOrder": [
+    {
+      "$ref": "#/modifiers/theme"
+    }
+  ],
+  "modifiers": {
+    "theme": {
+      "description": "Color scheme; both contexts share the primitives and differ only in the semantic set",
+      "contexts": {
+        "light": [
+          {
+            "$ref": "./src/primitive/color.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/design.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/dimension.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/font.tokens.json"
+          },
+          {
+            "$ref": "./src/semantic/light.tokens.json"
+          }
+        ],
+        "dark": [
+          {
+            "$ref": "./src/primitive/color.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/design.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/dimension.tokens.json"
+          },
+          {
+            "$ref": "./src/primitive/font.tokens.json"
+          },
+          {
+            "$ref": "./src/semantic/dark.tokens.json"
+          }
+        ]
+      },
+      "default": "light"
+    }
+  }
+}

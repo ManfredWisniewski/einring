@@ -2,22 +2,23 @@
   "name": "@einring/tokens",
   "version": "0.1.0",
   "private": true,
-  "description": "Design tokens (DTCG format) and Style Dictionary build for einring.",
+  "description": "Design tokens (DTCG format) and Terrazzo build for einring.",
   "type": "module",
   "files": [
     "build",
     "src"
   ],
   "exports": {
-    "./css": "./build/css/tokens.css",
-    "./tokens.json": "./build/json/tokens.json"
+    "./css": "./build/css/tokens.css"
   },
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "node --check build.mjs",
+    "typecheck": "node --check build.mjs && node --check terrazzo.config.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "style-dictionary": "^5.5.3"
+    "@terrazzo/cli": "^2.7.1",
+    "@terrazzo/parser": "^2.7.1",
+    "@terrazzo/plugin-css": "^2.7.1"
   }
 }
