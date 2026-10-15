@@ -184,6 +184,8 @@ docker build -t einring --build-arg VITE_AUTHENTIK_ISSUER=... --build-arg VITE_A
 docker run -p 3000:3000 --env-file .env -v einring-data:/data einring
 ```
 
+Full guide — TLS proxy, env reference, updates, backup, troubleshooting: `DEPLOYMENT.md`.
+
 ## Documentation
 
 - `+intent/intent.md` - what and why
