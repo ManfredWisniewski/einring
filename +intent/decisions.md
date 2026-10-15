@@ -23,6 +23,7 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 - **D12 Git workflow: `main` + short-lived feature branches, conventional commits.**
 - **D13 `.gitignore`: one common file for all projects** – keep the Python entries, add Node/Vite/Capacitor/Android; `.agents/` stays ignored while `skills-lock.json` is versioned.
 - **D14 Shared WIT guidance is included as the `+wit` submodule** from `https://github.com/ManfredWisniewski/wit-common.git`; it replaces the former `+wit-dev` submodule, which was removed on 2026-10-15.
+  - *2026-10-15 amendment*: submodule upstream moved to `ssh://git@git.w1t.org:2222/wit/wit-common.git`.
 
 ## Design tokens
 
