@@ -18,7 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        # +wit is in .dockerignore; no submodules needed for the image.
+        with:
+          # +wit is in .dockerignore; its ssh:// remote is unreachable from CI anyway.
+          submodules: false
 
       - uses: docker/setup-qemu-action@v3
 
