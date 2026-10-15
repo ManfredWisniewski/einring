@@ -625,6 +625,47 @@ describe("wiki", () => {
     expect(empty.statusCode).toBe(404);
   });
 
+  it("discovers the per-user collectives folder via the user_folder setting", async () => {
+    const fetchImpl = fakeFetch((url, init) => {
+      if (url.includes("/collectives/api/v1.0/settings/user/user_folder")) {
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: { user_folder: "Docs/SharedNotes" },
+          },
+        });
+      }
+      if (init?.method === "PROPFIND") {
+        if (url.endsWith(`${P}/Docs/SharedNotes`)) {
+          return xmlResp(dir(`${P}/Docs/SharedNotes/`) + dir(`${P}/Docs/SharedNotes/Handbook/`));
+        }
+        if (url.endsWith(`${P}/Docs/SharedNotes/Handbook`)) {
+          return xmlResp(
+            dir(`${P}/Docs/SharedNotes/Handbook/`) +
+              file(`${P}/Docs/SharedNotes/Handbook/Guide.md`, "e-guide"),
+          );
+        }
+        return new Response("not found", { status: 404 });
+      }
+      if (url.endsWith(`${P}/Docs/SharedNotes/Handbook/Guide.md`)) {
+        return new Response("# Guide");
+      }
+      return json({ error: `unexpected ${init?.method} ${url}` }, 500);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const tree = await app.inject({ method: "GET", url: "/api/wiki/tree", headers: auth });
+    expect(tree.statusCode).toBe(200);
+    expect(tree.json().pages).toEqual([
+      {
+        path: "Handbook/Guide.md",
+        title: "Guide",
+        collective: "Handbook",
+        mtime: "Wed, 01 Jan 2025 00:00:00 GMT",
+      },
+    ]);
+  });
+
   it("reports an empty mirror when Collectives is not installed", async () => {
     const fetchImpl = fakeFetch(() => new Response("not found", { status: 404 }));
     const { app, auth, store, secrets } = await testApp({ fetchImpl });

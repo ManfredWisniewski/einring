@@ -284,6 +284,16 @@ export class AuthenticatedNextcloud {
     );
   }
 
+  /**
+   * Collectives user setting, e.g. `user_folder` — the per-user path where
+   * collectives are mounted in the files tree. Any authenticated user.
+   */
+  getCollectivesUserSetting(key: string) {
+    return this.get<OcsResponse<Record<string, string>>>(
+      `/ocs/v2.php/apps/collectives/api/v1.0/settings/user/${encodeURIComponent(key)}`,
+    );
+  }
+
   /** Groups visible to the account: all for admins, managed groups for group admins. */
   getGroups() {
     return this.get<OcsResponse<GroupsList>>("/ocs/v2.php/cloud/groups");

@@ -2,7 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { z } from "zod";
 import type { AppContext } from "../app.js";
-import type { AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
+import { type AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
 import type { BffModule } from "./types.js";
 
 export interface WikiPageMeta {
@@ -53,35 +53,64 @@ export interface WikiSource {
   read(relPath: string): Promise<string>;
 }
 
-/** `<user>/<root>/` via WebDAV — default `.Collectives` (current Nextcloud layout). */
-function davSource(nc: AuthenticatedNextcloud, root: string): WikiSource {
+/**
+ * `<user>/<mount>/` via WebDAV. The mount folder is per-user configurable in the
+ * Collectives app, so it is resolved via `settings/user/user_folder` first;
+ * the configured ROOT and legacy `Collectives` are probed as fallbacks.
+ */
+function davSource(nc: AuthenticatedNextcloud, defaultRoot: string): WikiSource {
+  let root: string | null = null;
+
+  const resolveRoot = async (): Promise<string | null> => {
+    if (root) return root;
+    const candidates: string[] = [defaultRoot, "Collectives"];
+    try {
+      const setting = await nc.getCollectivesUserSetting("user_folder");
+      const folder = Object.values(setting.ocs.data ?? {})[0]
+        ?.trim()
+        .replace(/^\/+|\/+$/g, "");
+      if (folder) candidates.unshift(folder);
+    } catch (e) {
+      // HTTP failure = setting endpoint unavailable; other errors are real bugs.
+      if (!(e instanceof NextcloudError)) throw e;
+    }
+    for (const candidate of [...new Set(candidates)]) {
+      try {
+        await nc.davPropfind(candidate, 1);
+        root = candidate;
+        return root;
+      } catch (e) {
+        if ((e as NextcloudError).status !== 404) throw e;
+      }
+    }
+    return null; // no collectives folder — app absent or user has none
+  };
+
   return {
     async list() {
+      const base = await resolveRoot();
+      if (!base) return [];
       const files: SourceFile[] = [];
       const walk = async (dir: string): Promise<void> => {
-        let entries: Awaited<ReturnType<AuthenticatedNextcloud["davPropfind"]>>;
-        try {
-          entries = await nc.davPropfind(dir, 1);
-        } catch (e) {
-          if (dir === root && (e as NextcloudError).status === 404) return; // app absent
-          throw e;
-        }
-        for (const entry of entries) {
+        for (const entry of await nc.davPropfind(dir, 1)) {
           if (entry.relPath === dir) continue; // the directory itself
           if (entry.isCollection) await walk(entry.relPath);
           else if (/\.(md|markdown)$/i.test(entry.relPath)) {
             files.push({
-              relPath: entry.relPath.slice(root.length + 1),
+              relPath: entry.relPath.slice(base.length + 1),
               etag: entry.etag,
               lastModified: entry.lastModified,
             });
           }
         }
       };
-      await walk(root);
+      await walk(base);
       return files;
     },
-    read: (relPath) => nc.davGetFile(`${root}/${relPath}`),
+    read: async (relPath) => {
+      const base = (await resolveRoot()) ?? defaultRoot;
+      return nc.davGetFile(`${base}/${relPath}`);
+    },
   };
 }
 
@@ -153,8 +182,9 @@ const configSchema = z.object({
   /** Seconds a sync result is reused before /tree refreshes it. */
   SYNC_TTL_S: z.coerce.number().int().min(0).default(300),
   /**
-   * DAV directory holding the collectives. Current Nextcloud default is
-   * `.Collectives`; older installs used `Collectives`.
+   * Fallback DAV folder holding the collectives, used when the per-user
+   * `user_folder` setting can't be read. Current Nextcloud default is
+   * `.Collectives`; older installs used `Collectives` (also probed).
    */
   ROOT: z.string().min(1).default(".Collectives"),
   /**
