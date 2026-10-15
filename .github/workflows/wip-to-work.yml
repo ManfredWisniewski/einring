@@ -1,0 +1,40 @@
+# Integrates wip into work on every push to wip (WIT branch model, see
+# +wit-common/conventions/repo-setup.md). On conflict the run fails, work
+# stays unchanged, and a pull request is opened for a human to resolve.
+name: wip-to-work
+
+on:
+  push:
+    branches: [wip]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work
+          fetch-depth: 0
+
+      - name: Merge wip into work
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/wip
+
+      - name: Push work
+        run: git push origin work
+
+      - name: Open pull request for manual resolution on conflict
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --base work --head wip \
+            --title "wip → work (merge conflict)" \
+            --body "Automatic merge of wip into work failed. Resolve the conflicts in this PR, then merge it — work is unchanged until then." \
+            || true

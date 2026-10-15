@@ -1,0 +1,46 @@
+# Fast-forwards wip to a persona branch on every persona push (WIT branch
+# model, see +wit/common/conventions/repo-setup.md). ff-only: if the persona
+# branch does not contain wip (was not synced), the run skips - the local
+# integrate step (scripts\integrate-wip.ps1) remains the fallback.
+# Bootstraps wip/work from main on first run so every repository gets the
+# full chain automatically.
+name: persona-to-wip
+
+on:
+  push:
+    branches-ignore: [main, work, wip]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bootstrap wip and work from main if missing
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main || true
+          for b in wip work; do
+            if ! git rev-parse --verify -q "origin/$b"; then
+              git branch "$b" origin/main
+              git push origin "$b"
+              echo "bootstrapped $b from main"
+            fi
+          done
+
+      - name: Fast-forward wip to persona branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout wip
+          if git merge-base --is-ancestor wip "origin/${{ github.ref_name }}"; then
+            git merge --ff-only "origin/${{ github.ref_name }}"
+            git push origin wip
+          else
+            echo "::warning::${{ github.ref_name }} does not contain wip - sync locally (sync-persona-branch) then push again"
+          fi

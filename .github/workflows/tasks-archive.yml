@@ -1,0 +1,40 @@
+# Archives finished tasks (- [x] / [-]) from +team/+tasks/<persona>.md into
+# +team/+tasks/<persona>.history.md, daily at 02:00 UTC. Runs on `wip` (the
+# integrated agent state); the commit goes back to `wip`, which triggers
+# the wip-to-work workflow. Convention: +wit/common/conventions/tasks.md
+name: tasks-archive
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wip
+          submodules: true
+      - name: Sync agent skills
+        run: |
+          if [ -d "+wit/agents/skills" ]; then
+            rm -rf .agents/skills
+            mkdir -p .agents/skills
+            for d in +wit/agents/skills/*/*/; do
+              [ -d "$d" ] && cp -r "$d" .agents/skills/
+            done
+          fi
+      - run: python scripts/archive-done-tasks.py
+      - name: Commit and push to wip
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '+team/+tasks/' .agents/skills/ 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: archive done tasks and sync agent skills"
+          git push origin HEAD:wip

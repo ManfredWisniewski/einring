@@ -1,0 +1,47 @@
+# Fast-forwards main to work on every work push - but only when the pending
+# diff is content: markup files (*.md, *.markdown, *.txt) and submodule
+# gitlinks. Any other file (code, config, workflows) blocks the merge; the
+# open-work-to-main-pr workflow then leaves the PR for a human.
+# Content repos (wit-common, planning repos) thus release
+# automatically; development projects keep the human gate.
+name: work-to-main
+
+on:
+  push:
+    branches: [work]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward main to work if diff is content-only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rev-parse --verify -q origin/main || { echo "no main - skip"; exit 0; }
+          git merge-base --is-ancestor origin/main origin/work || { echo "work does not contain main - human merge needed"; exit 0; }
+          subs=$(git config --file .gitmodules --get-regexp 'path$' 2>/dev/null | awk '{print $2}' || true)
+          blocked=0
+          while IFS= read -r f; do
+            case "$f" in
+              *.md|*.markdown|*.txt) ;;
+              *)
+                if echo "$subs" | grep -qx "$f"; then :; else echo "non-content change: $f"; blocked=1; fi ;;
+            esac
+          done < <(git diff --name-only origin/main...origin/work)
+          if [ "$blocked" -eq 0 ]; then
+            git checkout main
+            git merge --ff-only origin/work
+            git push origin main
+            echo "main fast-forwarded to work"
+          else
+            echo "merge deferred - non-content files pending; PR stays for human review"
+          fi

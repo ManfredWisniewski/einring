@@ -1,0 +1,57 @@
+# Creates the coming week's daily logs in +team/+coordination/, Sunday at
+# 03:00 UTC — one file per day, Monday through Sunday, named
+# `YYYY-MM-DD Daily.md` from +wit/common/templates/coordination/YYYY-MM-DD Daily.md.
+# Existing files are never overwritten; {{placeholders}} stay untouched except
+# the date. Repos without +team/+coordination/ skip silently. Runs on `main`
+# and commits back to `main` — these are human-facing artifacts, not agent
+# state. Convention: +wit/common/conventions/coordination.md
+name: weekly-dailies
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-dailies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: true
+      - name: Create daily files for next week
+        run: |
+          set -e
+          COORD="+team/+coordination"
+          TPL="+wit/common/templates/coordination/YYYY-MM-DD Daily.md"
+          if [ ! -d "$COORD" ]; then
+            echo "no $COORD — nothing to do"
+            exit 0
+          fi
+          if [ ! -f "$TPL" ]; then
+            echo "template $TPL missing — nothing to do"
+            exit 0
+          fi
+          # Monday after the Sunday run through the following Sunday
+          for i in 1 2 3 4 5 6 7; do
+            d=$(date -d "next monday + $((i - 1)) days" +%F)
+            f="$COORD/$d Daily.md"
+            if [ -f "$f" ]; then
+              echo "exists: $f"
+            else
+              sed "s/{{YYYY-MM-DD}}/$d/g" "$TPL" > "$f"
+              echo "created: $f"
+            fi
+          done
+      - name: Commit and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '+team/+coordination/' 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: create daily logs for next week"
+          git push origin HEAD:main

@@ -1,0 +1,59 @@
+# Keeps wip on the current main baseline so persona branches only ever
+# need one upstream (origin/wip) — convention:
+# +wit/common/conventions/repo-setup.md, git-worktrees.md.
+# On push to main, and as a daily safety net, merge main into wip and push.
+# On conflict the run fails, wip stays unchanged, and a pull request is
+# opened for a human to resolve (main is never force-updated).
+name: main-to-wip
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # daily safety net (06:05 Europe/Berlin ≈ 04:05 UTC in CEST)
+    - cron: '5 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wip
+          fetch-depth: 0
+          submodules: true
+
+      - name: Check if wip already contains main
+        id: baseline
+        run: |
+          git fetch origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "wip already contains main — nothing to do."
+            echo "noop=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge main into wip
+        if: steps.baseline.outputs.noop != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+
+      - name: Push wip
+        if: steps.baseline.outputs.noop != 'true'
+        run: git push origin wip
+
+      - name: Open pull request for manual resolution on conflict
+        if: failure() && steps.baseline.outputs.noop != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --base wip --head main \
+            --title "main → wip (merge conflict)" \
+            --body "Automatic merge of main into wip failed. Resolve the conflicts in this PR, then merge it — wip is unchanged until then." \
+            || true

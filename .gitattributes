@@ -1,0 +1,9 @@
+# Merge drivers that keep parallel agent work conflict-free.
+#
+# +team/+coordination/ files are append-only shared artifacts (daily logs,
+# impediments-log): several personas append rows at the same time, which
+# would conflict on line adjacency in every integration merge. The union
+# driver keeps both sides' added lines instead. Entries there MUST stay
+# append-only - add rows, never edit or reorder another persona's rows
+# (convention: +wit/common/conventions/coordination.md).
++team/+coordination/*.md merge=union
