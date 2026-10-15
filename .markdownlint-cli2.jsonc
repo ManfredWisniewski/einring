@@ -7,5 +7,12 @@
     "MD034": false,
     "MD060": false
   },
-  "ignores": ["node_modules/**", "+wit-*/**", "__*/**"]
+  "ignores": [
+    "**/node_modules/**",
+    "+wit/**",
+    "+wit-*/**",
+    ".agents/**",
+    "apps/app/android/**",
+    "__*/**"
+  ]
 }

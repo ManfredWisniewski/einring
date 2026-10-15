@@ -1,6 +1,6 @@
 # Agent instructions for einring
 
-Before making changes, read the shared WIT guidance in `+wit/AGENTS.md` and `+wit/README.md`, then read `+intent/intent.md`, `+intent/decisions.md` and `+intent/tests.md`. Decisions are binding; change them by adding a dated entry, not by silently deviating.
+Before making changes, read the shared WIT development guidance in `+wit/development/` — start with `+wit/development/README.md` and `+wit/development/AGENTS.md` (they list the mandatory convention files), plus the shared rules in `+wit/AGENTS.md`. Then read `+intent/intent.md`, `+intent/decisions.md` and `+intent/tests.md`. Decisions are binding; change them by adding a dated entry, not by silently deviating.
 
 ## Commands
 
@@ -13,6 +13,7 @@ Before making changes, read the shared WIT guidance in `+wit/AGENTS.md` and `+wi
 
 ## Rules
 
+- Interactive IDE assistant sessions (Devin, Windsurf, Cursor, etc.) work as the human's tool in the main checkout on the currently checked-out branch — they MUST NOT create persona branches or worktrees and MUST NOT push to `wip`; the persona branch pipeline applies to autonomous personas only. Commits carry the human author plus an AI co-author trailer.
 - UI styling uses only token variables from `@einring/tokens/css`; no hard-coded colours, spacing or font sizes. New tokens go into `packages/tokens/src` (DTCG format, primitive -> semantic).
 - Every user-facing string goes through `react-i18next`; add keys to both `de.json` and `en.json`.
 - Nextcloud credentials never leave the BFF; the app only ever holds the Authentik access token.

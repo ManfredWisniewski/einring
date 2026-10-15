@@ -1,4 +1,4 @@
-# Priorities — `<project>`
+# Priorities — einring
 
 *Owner-written direction for agents: what kinds of solutions to look for. Entries are numbered `P1`, `P2`, ... and never renumbered; finished entries move to `## Archive`. Agents propose options within a P-entry — the owner ranks and re-dates.*
 
