@@ -138,7 +138,7 @@ Then open `https://einring.example.com`, sign in via Authentik, and connect Next
 
 ## Whitelabel deployments
 
-One image can run multiple branded instances — branding is runtime env, not build config. Point the same image at different env files:
+One image can run multiple branded instances — branding is runtime env, not build config. These vars go in the container's env file (step 2, passed via `docker run --env-file` or `env_file:` in compose) — one file per branded deployment, all running the same image. Nothing is set in `apps/app/.env.local` or the CI build args:
 
 ```dotenv
 INSTANCE_NAME=Acme Portal
