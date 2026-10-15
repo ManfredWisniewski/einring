@@ -1,3 +1,3 @@
-[submodule "+wit-dev"]
-	path = +wit-dev
-	url = https://github.com/ManfredWisniewski/wit-dev.git
+[submodule "+wit"]
+	path = +wit
+	url = https://github.com/ManfredWisniewski/wit-common.git
