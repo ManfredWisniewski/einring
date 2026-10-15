@@ -17,6 +17,6 @@ Tokens can be pre-generated via https://www.designsystems.one/tools/token-genera
 
 ## Guidance
 
-Before making changes, read the shared WIT development guidance in `+wit-dev/` in this repository. Start with `+wit-dev/README.md` and `+wit-dev/AGENTS.md`, then read the relevant convention or best-practice files. These shared definitions apply independently of which skill or AI agent is performing the work.
-
 Architecture decisions: `decisions.md`. Test strategy and acceptance criteria: `tests.md`.
+
+Shared WIT guidance: `+wit/README.md` and `+wit/AGENTS.md`.

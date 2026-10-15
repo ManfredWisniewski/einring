@@ -10,4 +10,4 @@ packages/tokens/build
 .git
 .agents
 +intent
-+wit-dev
++wit

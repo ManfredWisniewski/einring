@@ -10,11 +10,11 @@
 | `apps/bff` | Fastify backend-for-frontend: validates Authentik JWTs, holds Nextcloud app passwords, proxies APIs, serves the web build |
 | `packages/tokens` | Design tokens (DTCG JSON) built with Style Dictionary into CSS variables |
 | `+intent` | Project intent, decisions and test strategy |
-| `+wit-dev` | Shared WIT development guidance (git submodule) |
+| `+wit` | Shared WIT knowledge and conventions (git submodule) |
 
 AI folders:
 `/+intent` intent of the project, knowledgebase and documentation
-`/+wit-dev` internal standards for WIT development projects
+`/+wit` shared WIT knowledge and conventions
 
 ## Prerequisites
 
