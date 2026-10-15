@@ -1,0 +1,45 @@
+{
+  "nav": "Monitor",
+  "tabs": {
+    "server": "Server",
+    "talk": "Talk"
+  },
+  "server": {
+    "version": "Nextcloud version",
+    "webserver": "Web server",
+    "php": "PHP",
+    "database": "Database",
+    "cpuLoad": "CPU load (1 / 5 / 15 min)",
+    "memory": "Memory",
+    "swap": "Swap",
+    "freeOf": "{{free}} of {{total}} free",
+    "freeSpace": "Free space (data directory)",
+    "users": "Users",
+    "usersTotal": "{{count}} total",
+    "active": "{{m}} / {{h}} / {{d}} active (5 min / 1 h / 24 h)",
+    "apps": "Apps",
+    "appsDetail_one": "{{installed}} installed, {{updates}} update available",
+    "appsDetail_other": "{{installed}} installed, {{updates}} updates available",
+    "noAdmin": "Server information requires an admin-level Nextcloud account.",
+    "error": "Server information could not be loaded ({{status}}).",
+    "retry": "Retry"
+  },
+  "talk": {
+    "search": "Search user",
+    "group": "Group",
+    "allGroups": "All groups",
+    "noGroups": "Group information unavailable (requires an admin account).",
+    "empty": "No matching users.",
+    "error": "Talk status could not be loaded ({{status}}).",
+    "retry": "Retry",
+    "count_one": "{{count}} user",
+    "count_other": "{{count}} users",
+    "status": {
+      "online": "Online",
+      "away": "Away",
+      "dnd": "Do not disturb",
+      "invisible": "Invisible",
+      "offline": "Offline"
+    }
+  }
+}

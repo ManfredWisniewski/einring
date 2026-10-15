@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { fakeFetch, json, TEST_USER, testApp } from "./test-utils.js";
+import { loadConfig } from "./config.js";
+import type { SecretBox } from "./crypto.js";
+import type { Store } from "./db.js";
+import { fakeFetch, json, TEST_USER, testApp, testEnv } from "./test-utils.js";
 
 describe("auth", () => {
   it("rejects requests without a bearer token", async () => {
@@ -158,5 +161,210 @@ describe("tables", () => {
       ],
       rows: [{ id: 10, cells: { "1": "Ring", "2": "open" } }],
     });
+  });
+});
+
+describe("monitor", () => {
+  const connect = (store: Store, secrets: SecretBox) =>
+    store.saveCredential({
+      sub: TEST_USER.sub,
+      server: "https://cloud.test",
+      loginName: "frodo",
+      appPasswordSealed: secrets.seal("app-pw"),
+    });
+  const ocs = (data: unknown) => json({ ocs: { meta: { status: "ok", statuscode: 200 }, data } });
+
+  it("answers 424 when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    expect(
+      (await app.inject({ method: "GET", url: "/api/monitor/server", headers: auth })).statusCode,
+    ).toBe(424);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth }))
+        .statusCode,
+    ).toBe(424);
+  });
+
+  it("returns trimmed server health", async () => {
+    const fetchImpl = fakeFetch((url) =>
+      url.includes("/apps/serverinfo/api/v1/info")
+        ? ocs({
+            nextcloud: { system: { version: "31.0.0" }, storage: { num_users: 42 } },
+            server: {
+              webserver: "nginx",
+              php: { version: "8.3.1" },
+              database: { type: "mysql", version: "10.11", size: 1234 },
+            },
+            system: {
+              cpuload: [0.1, 0.2, 0.3],
+              mem_total: 1000,
+              mem_free: 400,
+              freespace: 99999,
+              apps: { num_installed: 30, num_updates_available: 2 },
+            },
+            activeUsers: { last5minutes: 3, last1hour: 10, last24hours: 20 },
+          })
+        : json({ error: `unexpected ${url}` }, 500),
+    );
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/server", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      available: true,
+      health: {
+        version: "31.0.0",
+        webserver: "nginx",
+        phpVersion: "8.3.1",
+        database: { type: "mysql", version: "10.11", sizeBytes: 1234 },
+        cpuLoad: [0.1, 0.2, 0.3],
+        memory: { totalBytes: 1000, freeBytes: 400 },
+        swap: null,
+        freeSpaceBytes: 99999,
+        users: { total: 42, last5min: 3, last1h: 10, last24h: 20 },
+        apps: { installed: 30, updatesAvailable: 2 },
+      },
+    });
+  });
+
+  it("reports available=false when serverinfo denies non-admin accounts", async () => {
+    const fetchImpl = fakeFetch((url) =>
+      url.includes("/apps/serverinfo/api/v1/info") ? json({}, 401) : json({}, 500),
+    );
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/server", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ available: false, health: null });
+  });
+
+  it("merges Talk status with provisioning details and groups", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/apps/user_status/api/v1/statuses")) {
+        return ocs([
+          { userId: "frodo", status: "online", message: "on vacation", icon: "🌴" },
+          { userId: "sam", status: "dnd" },
+        ]);
+      }
+      if (url.includes("/cloud/users/details")) {
+        return ocs({
+          users: {
+            frodo: { displayname: "Frodo B.", groups: ["shire", "admin"] },
+            sam: { displayname: "Sam", groups: ["shire"] },
+            gollum: { displayname: "Gollum", groups: ["elsewhere"] },
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      groupsAvailable: true,
+      groups: ["admin", "elsewhere", "shire"],
+      users: [
+        {
+          userId: "frodo",
+          displayName: "Frodo B.",
+          status: "online",
+          message: "on vacation",
+          icon: "🌴",
+          groups: ["shire", "admin"],
+        },
+        {
+          userId: "gollum",
+          displayName: "Gollum",
+          status: "offline",
+          message: null,
+          icon: null,
+          groups: ["elsewhere"],
+        },
+        {
+          userId: "sam",
+          displayName: "Sam",
+          status: "dnd",
+          message: null,
+          icon: null,
+          groups: ["shire"],
+        },
+      ],
+    });
+  });
+
+  it("degrades to groupsAvailable=false without admin rights, resolving names via autocomplete", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/apps/user_status/api/v1/statuses")) {
+        return ocs([{ userId: "frodo", status: "online" }]);
+      }
+      if (url.includes("/apps/spreed/api/v4/core/autocomplete")) {
+        return ocs([{ id: "frodo", label: "Frodo B.", source: "users" }]);
+      }
+      return json({}, 403);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/monitor/talk-status", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      groupsAvailable: false,
+      groups: [],
+      users: [
+        {
+          userId: "frodo",
+          displayName: "Frodo B.",
+          status: "online",
+          message: null,
+          icon: null,
+          groups: [],
+        },
+      ],
+    });
+  });
+});
+
+describe("module framework", () => {
+  it("GET /api/modules lists enabled modules and their service deps", async () => {
+    const { app, auth } = await testApp();
+    const res = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      modules: [
+        { id: "tables", requires: ["nextcloud"] },
+        { id: "monitor", requires: ["nextcloud"] },
+      ],
+    });
+  });
+
+  it("MODULES disables unlisted modules' routes and registry entries", async () => {
+    const { app, auth } = await testApp({ config: loadConfig({ ...testEnv(), MODULES: "" }) });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/tables/current", headers: auth })).statusCode,
+    ).toBe(404);
+    const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
+    expect(mods.json()).toEqual({ modules: [] });
+  });
+
+  it("fails startup when an enabled module's env config is invalid", async () => {
+    const env = testEnv();
+    delete env.MODULE_TABLES_TABLE_ID;
+    await expect(testApp({ config: loadConfig(env) })).rejects.toThrow(
+      /Invalid config for module "tables"/,
+    );
+  });
+
+  it("ignores invalid module env when the module is disabled", async () => {
+    const env = testEnv();
+    delete env.MODULE_TABLES_TABLE_ID;
+    const { app, auth } = await testApp({ config: loadConfig({ ...env, MODULES: "" }) });
+    const res = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("unknown MODULES entries fail fast", async () => {
+    await expect(
+      testApp({ config: loadConfig({ ...testEnv(), MODULES: "tables,nope" }) }),
+    ).rejects.toThrow(/Unknown modules in MODULES: nope/);
   });
 });

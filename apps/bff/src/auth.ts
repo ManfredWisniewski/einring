@@ -52,7 +52,18 @@ export function requireAuth(verify: TokenVerifier) {
     try {
       request.user = await verify(token);
     } catch (err) {
-      request.log.debug({ err }, "token rejected");
+      let tokenAlg: string | undefined;
+      let tokenKid: string | undefined;
+      try {
+        const header = JSON.parse(
+          Buffer.from(token.split(".")[0] ?? "", "base64url").toString(),
+        ) as { alg?: string; kid?: string };
+        tokenAlg = header.alg;
+        tokenKid = header.kid;
+      } catch {
+        // opaque token — nothing to decode
+      }
+      request.log.warn({ err, tokenAlg, tokenKid }, "token rejected");
       return reply.code(401).send({ error: "invalid token" });
     }
   };

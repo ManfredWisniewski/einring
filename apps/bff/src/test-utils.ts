@@ -9,15 +9,19 @@ import type { Fetch } from "./nextcloud/client.js";
 export const TEST_USER: AuthUser = { sub: "user-1", name: "Frodo", email: "frodo@shire.test" };
 export const TOKEN = "valid-token";
 
-export function testConfig() {
-  return loadConfig({
+export function testEnv(): Record<string, string> {
+  return {
     AUTHENTIK_ISSUER: "https://auth.test/application/o/einring/",
     AUTHENTIK_CLIENT_ID: "einring-client",
     NEXTCLOUD_URL: "https://cloud.test/",
-    NEXTCLOUD_TABLES_TABLE_ID: "7",
+    MODULE_TABLES_TABLE_ID: "7",
     ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     STATIC_DIR: "./does-not-exist",
-  });
+  };
+}
+
+export function testConfig() {
+  return loadConfig(testEnv());
 }
 
 export type FetchHandler = (url: string, init?: RequestInit) => Response | Promise<Response>;

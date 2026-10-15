@@ -61,6 +61,13 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 
 - **D31 First vertical slice: show one fixed Nextcloud Tables table (ID from BFF config) read-only.** Touches auth (Authentik), BFF, Nextcloud Login Flow, tokens and UI. Table browsing, filtering and other services go to the backlog.
 
+## Modules
+
+- **D32 Module framework: a module is a manifest `{ id, requires, app?, bff? }`** — app part bundles route + lazy page + nav item + i18n bundle; bff part registers routes under `/api/<id>` plus an optional env config schema. Frontend-only modules are legal; the BFF part exists only when the module needs API endpoints. Plan: `+wit/development/plans/einring/2026-10-15_plan-module-framework.md`.
+- **D33 Enable/disable and module config are deployment-level, env-driven, no admin UI**: `MODULES` lists enabled ids (empty = all enabled); per-module env `MODULE_<ID>_<KEY>` is validated by the module's zod schema at startup only when enabled. `GET /api/modules` reports the enabled set and is the single source of truth for app router/nav. Per-user enablement and a settings UI are backlog.
+- **D34 Modules ship bundled in the app**; code-split via lazy import. Downloadable modules are deferred — any future "downloadable" covers large content payloads, not code.
+- **D35 Services vs modules**: a service (today: Nextcloud) owns credentials and connection state at BFF level; modules declare `requires: ["nextcloud"]` and the app gates the page on the service's connection status (reusing the Login Flow v2 connect card).
+
 ## Backlog (not decided, parked)
 
 - Android App Links instead of custom scheme.

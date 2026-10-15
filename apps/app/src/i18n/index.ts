@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
+import { moduleTranslations } from "@/modules";
 import de from "./locales/de.json";
 import en from "./locales/en.json";
 
@@ -11,7 +12,11 @@ void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources: { de: { translation: de }, en: { translation: en } },
+    resources: {
+      // Core `modules.*` keys (none/error/retry) win over module ids in case of a clash.
+      de: { translation: { ...de, modules: { ...moduleTranslations("de"), ...de.modules } } },
+      en: { translation: { ...en, modules: { ...moduleTranslations("en"), ...en.modules } } },
+    },
     supportedLngs: supportedLanguages,
     fallbackLng: "en",
     interpolation: { escapeValue: false },

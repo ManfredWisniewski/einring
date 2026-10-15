@@ -35,6 +35,60 @@ export interface TablesTable {
   description?: string | null;
 }
 
+/** OCS envelope; `ocs.meta.statuscode` mirrors the HTTP status. */
+export interface OcsResponse<T> {
+  ocs: { meta: { status: string; statuscode: number; message?: string }; data: T };
+}
+
+/** `GET /ocs/v2.php/apps/serverinfo/api/v1/info` — fields vary across releases, so all optional. */
+export interface ServerInfoData {
+  nextcloud?: {
+    system?: { version?: string; theme?: string; enable_avatars?: string };
+    storage?: { num_users?: number; num_files?: number; num_storages?: number };
+  };
+  server?: {
+    webserver?: string;
+    php?: { version?: string; memory_limit?: number; upload_max_filesize?: number };
+    database?: { type?: string; version?: string; size?: number };
+  };
+  system?: {
+    cpuload?: number[];
+    mem_total?: number;
+    mem_free?: number;
+    swap_total?: number;
+    swap_free?: number;
+    freespace?: number;
+    apps?: { num_installed?: number; num_updates_available?: number };
+  };
+  activeUsers?: { last5minutes?: number; last1hour?: number; last24hours?: number };
+}
+
+/** `GET /ocs/v2.php/apps/user_status/api/v1/statuses` entry. */
+export interface UserStatus {
+  userId: string;
+  message?: string | null;
+  icon?: string | null;
+  clearAt?: number | null;
+  status?: string; // online | away | dnd | invisible | offline
+}
+
+/** `GET /ocs/v2.php/cloud/users/details` (provisioning API — admin credentials required). */
+export interface UsersDetails {
+  users: Record<string, { id?: string; displayname?: string; groups?: string[] }>;
+}
+
+/** Talk autocomplete entry (`/ocs/v2.php/apps/spreed/api/v4/core/autocomplete`) — usable by regular users. */
+export interface AutocompleteResult {
+  id: string;
+  label: string;
+  source: string;
+}
+
+/** `GET /ocs/v2.php/cloud/groups` — admins see all, group admins (subadmins) their managed groups. */
+export interface GroupsList {
+  groups: string[];
+}
+
 export class NextcloudError extends Error {
   constructor(
     public readonly status: number,
@@ -127,5 +181,40 @@ export class AuthenticatedNextcloud {
 
   getRows(tableId: number) {
     return this.get<TablesRow[]>(`/index.php/apps/tables/api/1/tables/${tableId}/rows`);
+  }
+
+  /** Serverinfo app: CPU/memory/storage/version overview. */
+  getServerInfo() {
+    return this.get<OcsResponse<ServerInfoData>>("/ocs/v2.php/apps/serverinfo/api/v1/info");
+  }
+
+  /** Current user_status entries (presence + custom status) for all users. */
+  getUserStatuses() {
+    return this.get<OcsResponse<UserStatus[]>>("/ocs/v2.php/apps/user_status/api/v1/statuses");
+  }
+
+  /** Provisioning API: users incl. display names and groups. Requires admin — throws NextcloudError(401/403). */
+  getUsersDetails() {
+    return this.get<OcsResponse<UsersDetails>>("/ocs/v2.php/cloud/users/details");
+  }
+
+  /** Talk autocomplete for user candidates — resolves display names without admin rights. */
+  autocompleteUsers(search: string) {
+    const q = new URLSearchParams({ search, itemType: "users" });
+    return this.get<OcsResponse<AutocompleteResult[]>>(
+      `/ocs/v2.php/apps/spreed/api/v4/core/autocomplete?${q}`,
+    );
+  }
+
+  /** Groups visible to the account: all for admins, managed groups for group admins. */
+  getGroups() {
+    return this.get<OcsResponse<GroupsList>>("/ocs/v2.php/cloud/groups");
+  }
+
+  /** Members of a group — admins, or group admins of that group. */
+  getGroupUsers(groupId: string) {
+    return this.get<OcsResponse<{ users: string[] }>>(
+      `/ocs/v2.php/cloud/groups/${encodeURIComponent(groupId)}/users`,
+    );
   }
 }

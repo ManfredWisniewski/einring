@@ -4,7 +4,7 @@
     "tagline": "Ein Ring"
   },
   "nav": {
-    "tables": "Tabellen",
+    "label": "Module",
     "logout": "Abmelden"
   },
   "auth": {
@@ -41,15 +41,13 @@
     "disconnect": "Verbindung trennen",
     "error": "Nextcloud-Anfrage fehlgeschlagen ({{status}})."
   },
-  "tables": {
-    "loading": "Tabelle wird geladen…",
-    "empty": "Diese Tabelle enthält keine Zeilen.",
-    "rowCount_one": "{{count}} Zeile",
-    "rowCount_other": "{{count}} Zeilen",
-    "error": "Die Tabelle konnte nicht geladen werden ({{status}}).",
+  "modules": {
+    "none": "Für diese Bereitstellung sind keine Module aktiviert.",
+    "error": "Das Modulregister konnte nicht geladen werden — ist das BFF erreichbar?",
     "retry": "Erneut versuchen"
   },
   "common": {
+    "loading": "Wird geladen…",
     "yes": "ja",
     "no": "nein"
   }

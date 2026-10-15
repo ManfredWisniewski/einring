@@ -11,7 +11,7 @@ export function formatCell(value: unknown, t: (key: string) => string): string {
 
 export function DataTable({ columns, rows }: { columns: TableColumn[]; rows: TableRow[] }) {
   const { t } = useTranslation();
-  if (rows.length === 0) return <p className="muted">{t("tables.empty")}</p>;
+  if (rows.length === 0) return <p className="muted">{t("modules.tables.empty")}</p>;
   return (
     <div className="table-wrap">
       <table className="data-table">

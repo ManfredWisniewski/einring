@@ -4,7 +4,8 @@ const schema = z.object({
   AUTHENTIK_ISSUER: z.url(),
   AUTHENTIK_CLIENT_ID: z.string().min(1),
   NEXTCLOUD_URL: z.url().transform((u) => u.replace(/\/+$/, "")),
-  NEXTCLOUD_TABLES_TABLE_ID: z.coerce.number().int().positive(),
+  /** Comma-separated enabled module ids; absent = all registered modules enabled. */
+  MODULES: z.string().optional(),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default("0.0.0.0"),
   DATA_DIR: z.string().default("./data"),
@@ -16,7 +17,14 @@ const schema = z.object({
   LOG_LEVEL: z.string().default("info"),
 });
 
-export type Config = z.infer<typeof schema>;
+type BaseConfig = Omit<z.infer<typeof schema>, "MODULES">;
+
+export interface Config extends BaseConfig {
+  /** Enabled module ids, or undefined when MODULES is unset (all enabled). */
+  modules?: string[];
+  /** Raw `MODULE_*` env vars; per-module extraction happens in modules/registry.ts. */
+  moduleEnv: Record<string, string>;
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const result = schema.safeParse(env);
@@ -24,5 +32,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`);
     throw new Error(`Invalid configuration:\n${issues.join("\n")}`);
   }
-  return result.data;
+  const { MODULES, ...rest } = result.data;
+  const moduleEnv = Object.fromEntries(
+    Object.entries(env).filter(
+      ([k, v]) => /^MODULE_[A-Z0-9]+_[A-Z0-9_]+$/.test(k) && typeof v === "string",
+    ),
+  ) as Record<string, string>;
+  return {
+    ...rest,
+    modules: MODULES?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    moduleEnv,
+  };
 }

@@ -1,0 +1,9 @@
+{
+  "nav": "Tabellen",
+  "loading": "Tabelle wird geladen…",
+  "empty": "Diese Tabelle enthält keine Zeilen.",
+  "rowCount_one": "{{count}} Zeile",
+  "rowCount_other": "{{count}} Zeilen",
+  "error": "Die Tabelle konnte nicht geladen werden ({{status}}).",
+  "retry": "Erneut versuchen"
+}

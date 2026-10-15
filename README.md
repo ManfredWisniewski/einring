@@ -163,6 +163,17 @@ $env:CAP_SERVER_URL = "http://<your-pc-ip>:5173"; pnpm --filter @einring/app cap
 
 Set `VITE_API_URL` in `apps/app/.env.local` to the BFF URL for device builds (`http://10.0.2.2:3001` on the emulator).
 
+## Modules
+
+Feature modules are bundled in the app and enabled at deployment level via the BFF env (D32–D35). The BFF is the source of truth: `GET /api/modules` tells the app which routes and nav entries to build.
+
+```dotenv
+MODULES=tables,monitor          # comma-separated; unset = all registered modules enabled
+MODULE_TABLES_TABLE_ID=10       # per-module settings use MODULE_<ID>_<KEY> (id uppercased, - → _)
+```
+
+Module ids today: `tables` (fixed Nextcloud Tables view), `monitor` (Nextcloud server health + Talk user status). The Talk tab needs an admin-level app password for group filtering; without it, status still shows but groups stay empty.
+
 ## Deploy
 
 One Docker image serves API and web build:

@@ -1,0 +1,9 @@
+{
+  "nav": "Tables",
+  "loading": "Loading table…",
+  "empty": "This table has no rows.",
+  "rowCount_one": "{{count}} row",
+  "rowCount_other": "{{count}} rows",
+  "error": "The table could not be loaded ({{status}}).",
+  "retry": "Retry"
+}

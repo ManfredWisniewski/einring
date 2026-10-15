@@ -7,9 +7,9 @@ import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { Config } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
+import { resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
 import { registerNextcloudRoutes } from "./routes/nextcloud.js";
-import { registerTablesRoutes } from "./routes/tables.js";
 
 export interface AppDeps {
   config: Config;
@@ -36,6 +36,8 @@ export function allowedOrigins(config: Config): string[] {
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  // Enabled modules resolve + validate their MODULE_<ID>_* env here, so bad config fails at startup.
+  const modules = resolveModules(deps.config);
   const app = Fastify({ logger: deps.logger ?? { level: deps.config.LOG_LEVEL } });
   const ctx: AppContext = {
     ...deps,
@@ -62,8 +64,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     async (api) => {
       api.addHook("preHandler", requireAuth(deps.verifyToken));
       api.get("/me", async (request) => request.user);
+      api.get("/modules", async () => ({
+        modules: modules.map(({ module }) => ({ id: module.id, requires: module.requires ?? [] })),
+      }));
       registerNextcloudRoutes(api, ctx);
-      registerTablesRoutes(api, ctx);
+      for (const { module, config } of modules) {
+        api.register(
+          (sub, _opts, done) => {
+            module.register(sub, ctx, config);
+            done();
+          },
+          { prefix: `/${module.id}` },
+        );
+      }
     },
     { prefix: "/api" },
   );

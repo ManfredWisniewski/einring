@@ -31,3 +31,51 @@ export interface TableView {
   columns: TableColumn[];
   rows: TableRow[];
 }
+
+/** A module enabled on the BFF; `requires` lists the services it consumes. */
+export interface ModuleInfo {
+  id: string;
+  requires: string[];
+}
+
+export interface ModuleRegistry {
+  modules: ModuleInfo[];
+}
+
+export interface ServerHealth {
+  version: string | null;
+  webserver: string | null;
+  phpVersion: string | null;
+  database: { type: string | null; version: string | null; sizeBytes: number | null } | null;
+  cpuLoad: number[] | null;
+  memory: { totalBytes: number; freeBytes: number } | null;
+  swap: { totalBytes: number; freeBytes: number } | null;
+  freeSpaceBytes: number | null;
+  users: {
+    total: number | null;
+    last5min: number | null;
+    last1h: number | null;
+    last24h: number | null;
+  };
+  apps: { installed: number | null; updatesAvailable: number | null };
+}
+
+export interface ServerHealthResponse {
+  available: boolean;
+  health: ServerHealth | null;
+}
+
+export interface TalkUserStatus {
+  userId: string;
+  displayName: string | null;
+  status: string;
+  message: string | null;
+  icon: string | null;
+  groups: string[];
+}
+
+export interface TalkStatus {
+  users: TalkUserStatus[];
+  groups: string[];
+  groupsAvailable: boolean;
+}

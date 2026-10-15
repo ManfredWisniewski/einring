@@ -4,7 +4,7 @@
     "tagline": "One ring to control them all"
   },
   "nav": {
-    "tables": "Tables",
+    "label": "Modules",
     "logout": "Sign out"
   },
   "auth": {
@@ -41,15 +41,13 @@
     "disconnect": "Disconnect",
     "error": "Nextcloud request failed ({{status}})."
   },
-  "tables": {
-    "loading": "Loading table…",
-    "empty": "This table has no rows.",
-    "rowCount_one": "{{count}} row",
-    "rowCount_other": "{{count}} rows",
-    "error": "The table could not be loaded ({{status}}).",
+  "modules": {
+    "none": "No modules are enabled for this deployment.",
+    "error": "The module registry could not be loaded — is the BFF reachable?",
     "retry": "Retry"
   },
   "common": {
+    "loading": "Loading…",
     "yes": "yes",
     "no": "no"
   }

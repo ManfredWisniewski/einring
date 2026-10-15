@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense, useMemo } from "react";
+import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router";
+import { useModuleRegistry } from "@/api/hooks";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { Layout } from "@/components/Layout";
 import { config } from "@/config";
+import { type AppModule, resolveAppModules } from "@/modules";
 import { CallbackPage } from "@/pages/CallbackPage";
 import { LoginPage } from "@/pages/LoginPage";
-import { TablesPage } from "@/pages/TablesPage";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const queryClient = new QueryClient({
@@ -23,31 +25,77 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
-const router = createBrowserRouter([
-  {
-    element: <Layout />,
-    children: [
-      { path: "/login", element: <LoginPage /> },
-      { path: config.webRedirectPath, element: <CallbackPage /> },
-      {
-        path: "/",
-        element: (
-          <RequireAuth>
-            <TablesPage />
-          </RequireAuth>
+function NoModules() {
+  const { t } = useTranslation();
+  return <p className="muted">{t("modules.none")}</p>;
+}
+
+function ModuleLoading() {
+  const { t } = useTranslation();
+  return <p className="muted">{t("common.loading")}</p>;
+}
+
+function buildRouter(modules: AppModule[]) {
+  const index = modules.find((m) => m.nav && m.routes.length)?.routes[0]?.path;
+  return createBrowserRouter([
+    {
+      element: <Layout />,
+      children: [
+        { path: "/login", element: <LoginPage /> },
+        { path: config.webRedirectPath, element: <CallbackPage /> },
+        ...modules.flatMap((m) =>
+          m.routes.map((r) => ({
+            path: r.path,
+            element: (
+              <RequireAuth>
+                <Suspense fallback={<ModuleLoading />}>
+                  <r.Component />
+                </Suspense>
+              </RequireAuth>
+            ),
+          })),
         ),
-      },
-      { path: "*", element: <Navigate to="/" replace /> },
-    ],
-  },
-]);
+        {
+          path: "/",
+          element: (
+            <RequireAuth>{index ? <Navigate to={index} replace /> : <NoModules />}</RequireAuth>
+          ),
+        },
+        { path: "*", element: <Navigate to="/" replace /> },
+      ],
+    },
+  ]);
+}
+
+function Routing() {
+  const { t } = useTranslation();
+  const { user, loading } = useAuth();
+  const registry = useModuleRegistry(!!user);
+  const ready = !loading && (!user || !registry.isPending);
+  const router = useMemo(
+    () => (ready ? buildRouter(resolveAppModules(registry.data?.modules)) : null),
+    [ready, registry.data],
+  );
+  if (user && registry.isError) {
+    return (
+      <div className="alert alert--danger row">
+        <span>{t("modules.error")}</span>
+        <Button className="btn" onPress={() => void registry.refetch()}>
+          {t("modules.retry")}
+        </Button>
+      </div>
+    );
+  }
+  if (!router) return <p className="muted">{t("auth.loading")}</p>;
+  return <RouterProvider router={router} />;
+}
 
 export function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RouterProvider router={router} />
+          <Routing />
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

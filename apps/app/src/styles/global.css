@@ -56,7 +56,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   min-height: 100dvh;
 }
 
@@ -75,6 +75,32 @@ a {
   color: var(--accent-hover);
   margin: 0;
   flex: 1;
+}
+
+.app-nav {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--surface-border);
+  overflow-x: auto;
+}
+
+.app-nav__link {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.app-nav__link:hover {
+  color: var(--text-primary);
+}
+
+.app-nav__link.active {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent-base);
 }
 
 .app-main {
@@ -267,6 +293,145 @@ a {
 
 .data-table tbody tr:last-child td {
   border-bottom: 0;
+}
+
+/* --- Tabs (react-aria-components) --------------------------------------- */
+
+.tabs__list {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: var(--space-4);
+}
+
+.tabs__tab {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+}
+
+.tabs__tab[data-hovered] {
+  color: var(--text-primary);
+}
+
+.tabs__tab[data-selected] {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.tabs__tab[data-focus-visible] {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* --- Definition list ------------------------------------------------------ */
+
+.defs {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.defs__row {
+  display: contents;
+}
+
+.defs dt {
+  color: var(--text-secondary);
+}
+
+.defs dd {
+  margin: 0;
+}
+
+/* --- Meter ---------------------------------------------------------------- */
+
+.meter {
+  width: 100%;
+  height: var(--space-2);
+}
+
+.meter::-webkit-meter-bar {
+  background: var(--surface-sunken);
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.meter::-webkit-meter-optimum-value {
+  background: var(--accent-base);
+  border-radius: var(--radius-sm);
+}
+
+.meter::-moz-meter-bar {
+  background: var(--accent-base);
+  border-radius: var(--radius-sm);
+}
+
+/* --- Text input ----------------------------------------------------------- */
+
+.input {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  min-width: 14rem;
+}
+
+.input[data-focused] {
+  border-color: var(--accent-base);
+  outline: none;
+}
+
+/* --- Status list ------------------------------------------------------------ */
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+}
+
+.status-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-dot--online {
+  background: var(--status-success);
+}
+
+.status-dot--away {
+  background: var(--accent-base);
+}
+
+.status-dot--dnd {
+  background: var(--status-danger);
+}
+
+.status-dot--offline {
+  background: var(--text-muted);
 }
 
 /* --- Status ------------------------------------------------------------- */

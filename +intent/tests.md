@@ -46,3 +46,16 @@
 - The authenticated layout shows an accessible info button in the top-right app bar.
 - Activating it opens a localized information popover in German and English.
 - The popover can be closed with its close button, Escape, or outside interaction, and focus returns to the info button.
+
+### A07 Module framework
+
+- `GET /api/modules` returns the enabled module set from `MODULES` env; disabling a module removes its BFF routes (404) and its app route + nav entry.
+- Per-module env `MODULE_<ID>_*` is validated at BFF startup; invalid config of an enabled module fails fast; a disabled module's invalid config does not.
+- A frontend-only module can be enabled without a BFF part.
+- A module requiring `nextcloud` shows the connect card instead of its content while the service is disconnected.
+- Module labels and strings exist in DE + EN; theme tokens only.
+
+### A08 Nextcloud Monitor
+
+- "Server" view shows Nextcloud server health (load, memory, disk, update status) proxied via the serverinfo OCS endpoint; a missing serverinfo app produces a visible, localized error state, not a crash.
+- "Talk" view lists user statuses, searchable and filterable by group; if the connected account lacks the provisioning scope the fallback behaviour is implemented and documented.

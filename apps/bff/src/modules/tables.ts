@@ -1,6 +1,6 @@
-import type { FastifyInstance } from "fastify";
-import type { AppContext } from "../app.js";
+import { z } from "zod";
 import type { TablesColumn, TablesRow } from "../nextcloud/client.js";
+import type { BffModule } from "./types.js";
 
 export interface TableView {
   id: number;
@@ -47,19 +47,28 @@ function resolveValue(options: Map<number, string> | undefined, value: unknown):
   return Array.isArray(value) ? resolved : resolved[0];
 }
 
-export function registerTablesRoutes(api: FastifyInstance, ctx: AppContext) {
-  const { store, secrets, nextcloud, config } = ctx;
+const configSchema = z.object({
+  /** Numeric ID of the Nextcloud Tables table this module shows. */
+  TABLE_ID: z.coerce.number().int().positive(),
+});
 
-  api.get("/tables/current", async (request, reply) => {
-    const cred = store.getCredential(request.user.sub);
-    if (!cred) return reply.code(424).send({ error: "nextcloud not connected" });
-    const nc = nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed));
-    const id = config.NEXTCLOUD_TABLES_TABLE_ID;
-    const [table, columns, rows] = await Promise.all([
-      nc.getTable(id),
-      nc.getColumns(id),
-      nc.getRows(id),
-    ]);
-    return toTableView(table, columns, rows);
-  });
-}
+export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
+  id: "tables",
+  requires: ["nextcloud"],
+  configSchema,
+  register(api, ctx, config) {
+    const { store, secrets, nextcloud } = ctx;
+
+    api.get("/current", async (request, reply) => {
+      const cred = store.getCredential(request.user.sub);
+      if (!cred) return reply.code(424).send({ error: "nextcloud not connected" });
+      const nc = nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed));
+      const [table, columns, rows] = await Promise.all([
+        nc.getTable(config.TABLE_ID),
+        nc.getColumns(config.TABLE_ID),
+        nc.getRows(config.TABLE_ID),
+      ]);
+      return toTableView(table, columns, rows);
+    });
+  },
+};
