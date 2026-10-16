@@ -10,7 +10,7 @@ import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
 import { resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
-import { registerNextcloudRoutes } from "./routes/nextcloud.js";
+import { registerNextcloudPublicRoutes, registerNextcloudRoutes } from "./routes/nextcloud.js";
 
 export interface AppDeps {
   config: Config;
@@ -103,6 +103,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     },
   }));
 
+  // Public scope: the login-flow endpoints also answer unauthenticated callers
+  // (embedded deployments sign in via Nextcloud — see D19 amendment).
+  await app.register(
+    async (api) => {
+      registerNextcloudPublicRoutes(api, ctx);
+    },
+    { prefix: "/api" },
+  );
+
   await app.register(
     async (api) => {
       api.addHook("preHandler", requireAuth(deps.verifyToken));
@@ -137,13 +146,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       globIgnore: ["index.html"],
     });
     let indexHtml: string | undefined;
+    // The instance's own Nextcloud may frame the app (External sites embed).
+    const frameAncestors = `frame-ancestors 'self' ${new URL(deps.config.NEXTCLOUD_URL).origin}`;
     app.setNotFoundHandler(async (request, reply) => {
       if (request.method === "GET" && !request.url.startsWith("/api/")) {
         indexHtml ??= patchIndexHtml(
           await readFile(resolve(staticDir, "index.html"), "utf8"),
           deps.config,
         );
-        return reply.type("text/html").send(indexHtml);
+        return reply
+          .header("Content-Security-Policy", frameAncestors)
+          .type("text/html")
+          .send(indexHtml);
       }
       return reply.code(404).send({ error: "not found" });
     });

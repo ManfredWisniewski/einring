@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
@@ -43,6 +44,39 @@ export async function createAuthentikVerifier(
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Verifies opaque einring session tokens (embedded mode, D19 amendment) — the token
+ * itself is never stored, only its sha256 hash maps to a `sub`.
+ */
+export function createSessionVerifier(
+  getSessionSub: (tokenHash: string) => string | undefined,
+): TokenVerifier {
+  return async (token) => {
+    const sub = getSessionSub(hashToken(token));
+    if (!sub) throw new Error("unknown session token");
+    return { sub };
+  };
+}
+
+/** Tries each verifier in order; the first success wins. */
+export function createCompositeVerifier(...verifiers: TokenVerifier[]): TokenVerifier {
+  return async (token) => {
+    let lastErr: unknown;
+    for (const verify of verifiers) {
+      try {
+        return await verify(token);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("invalid token");
+  };
+}
 
 export function requireAuth(verify: TokenVerifier) {
   return async (request: FastifyRequest, reply: FastifyReply) => {

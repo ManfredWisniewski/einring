@@ -158,6 +158,17 @@ MODULES=wiki                                       # restrict the module set per
 
 The SPA gets its Authentik issuer/client-id from `GET /api/config` at runtime, so each container uses its own `AUTHENTIK_ISSUER`/`AUTHENTIK_CLIENT_ID` env — the `VITE_AUTHENTIK_*` build args are only a fallback. A whitelabel instance can therefore sign in via its own Authentik provider on the same image. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.
 
+## Embedded in Nextcloud (External sites)
+
+The app can run inside a Nextcloud **External sites** iframe — Authentik login is skipped and connecting Nextcloud doubles as sign-in:
+
+1. In Nextcloud: **Administration settings → External sites**, add an entry pointing at
+   `https://<einring-host>/?embedded=nextcloud` (the `?embedded=nextcloud` query parameter is what flips the app into embedded mode).
+2. Users open the entry inside Nextcloud, land directly on "Connect Nextcloud", approve once — done. Subsequent loads reuse the stored credential.
+3. The BFF automatically allows framing by the configured `NEXTCLOUD_URL` origin (`Content-Security-Policy: frame-ancestors` on the served `index.html`).
+
+How it works: the anonymous login flow is keyed by a random `flow` id; when it completes, the BFF mints an opaque session token (`nc:<loginName>` identity, 30-day expiry, stored hashed) that the app sends as `Bearer` for all API calls. The Nextcloud app password still never leaves the BFF. The `?embedded` flag lives in sessionStorage, so it can't leak into a standalone tab of the same deployment.
+
 ## Updating
 
 Push to `main` (or tag `v*`) — CI publishes a new image. Then on the host:

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { buildApp } from "./app.js";
-import { createAuthentikVerifier } from "./auth.js";
+import { createAuthentikVerifier, createCompositeVerifier, createSessionVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { createSecretBox } from "./crypto.js";
 import { openStore } from "./db.js";
@@ -11,7 +11,11 @@ const app = await buildApp({
   config,
   store,
   secrets: createSecretBox(config.ENCRYPTION_KEY),
-  verifyToken: await createAuthentikVerifier(config.AUTHENTIK_ISSUER, config.AUTHENTIK_CLIENT_ID),
+  // Authentik JWTs (standalone) or einring session tokens (embedded) — see D19 amendment.
+  verifyToken: createCompositeVerifier(
+    await createAuthentikVerifier(config.AUTHENTIK_ISSUER, config.AUTHENTIK_CLIENT_ID),
+    createSessionVerifier(store.getSessionSub),
+  ),
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

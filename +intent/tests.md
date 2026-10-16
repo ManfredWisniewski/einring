@@ -78,3 +78,14 @@
 - `INSTANCE_THEME` selects a named theme shipped with the BFF (`apps/bff/themes/<name>.json`, e.g. `wuttke`); its `light`/`dark` variable maps are injected into `index.html` as `:root{}` + `[data-theme="dark"]{}` blocks and served via `GET /api/config` for the dev server. Unknown names, non-`--` keys or unsafe values fail config at startup.
 - `INSTANCE_CSS_VARS` (JSON map of `--var:value`) is injected as a `:root{}` style block into `index.html` so branding applies before first paint; it is emitted after the theme block, so explicit overrides win. Malformed JSON, non-`--` keys or unsafe values fail config at startup.
 - Whitelabel + `MODULES` compose: a deployment can run a restricted module set under a different title on the same image.
+
+### A11 Embedded mode (Nextcloud External sites)
+
+- Entering the app via `?embedded=nextcloud` marks the tab embedded (sessionStorage — survives SPA navigation); Authentik login is skipped and the "Connect Nextcloud" card is the sign-in.
+- `POST /api/nextcloud/login-flow` without a bearer token returns `{login, flow}`; poll takes `{flow}` and pending flows expire after 10 minutes.
+- Completing the poll anonymously stores the credential under `nc:<loginName>` and returns a `sessionToken`; the app stores it and sends it as `Authorization: Bearer` — it authenticates all `/api/*` routes like an Authentik JWT (`/api/me` answers the session's `sub`).
+- The app password never appears in any response, including the session-minting poll response.
+- A poll without `flow` gets 400; an unknown/expired `flow` gets 409.
+- `DELETE /api/nextcloud/connection` removes the credential AND the user's sessions — the dead token gets 401.
+- Standalone deployments (`?embedded` absent) are unchanged: Authentik login, user-scoped flows, no session minted on poll.
+- The served `index.html` carries `Content-Security-Policy: frame-ancestors 'self' <NEXTCLOUD origin>` so only the configured cloud may frame the app.

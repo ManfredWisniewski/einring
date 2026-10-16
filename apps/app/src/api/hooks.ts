@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { createApi } from "./client";
 import type {
   ConnectionStatus,
+  LoginFlowStart,
   Me,
   ModuleRegistry,
   ServerHealthResponse,
@@ -60,14 +61,15 @@ export function useNextcloudConnection() {
 
 export function useStartLoginFlow() {
   const api = useApi();
-  return useMutation({ mutationFn: () => api.post<{ login: string }>("/nextcloud/login-flow") });
+  return useMutation({ mutationFn: () => api.post<LoginFlowStart>("/nextcloud/login-flow") });
 }
 
 export function usePollLoginFlow() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<ConnectionStatus>("/nextcloud/login-flow/poll"),
+    mutationFn: (flow?: string) =>
+      api.post<ConnectionStatus>("/nextcloud/login-flow/poll", flow ? { flow } : undefined),
     onSuccess: (data) => {
       if (data.status === "connected") {
         qc.setQueryData(keys.connection, data);

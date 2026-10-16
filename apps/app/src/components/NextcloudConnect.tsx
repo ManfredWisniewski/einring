@@ -2,6 +2,7 @@ import { Browser } from "@capacitor/browser";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isNative } from "@/config";
@@ -18,30 +19,36 @@ async function openLogin(url: string) {
 export function NextcloudConnect() {
   const { t } = useTranslation();
   const name = useInstanceName();
+  const { setSession } = useAuth();
   const start = useStartLoginFlow();
   const poll = usePollLoginFlow();
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
+  /** Anonymous (embedded) flows get a flow id that must be echoed on each poll. */
+  const [flowId, setFlowId] = useState<string | undefined>();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!loginUrl) return;
     timer.current = setInterval(() => {
-      if (!poll.isPending) poll.mutate();
+      if (!poll.isPending) poll.mutate(flowId);
     }, POLL_INTERVAL_MS);
     return () => {
       if (timer.current) clearInterval(timer.current);
     };
-  }, [loginUrl, poll]);
+  }, [loginUrl, poll, flowId]);
 
   useEffect(() => {
     if (poll.data?.status === "connected") {
       setLoginUrl(null);
       if (isNative) void Browser.close().catch(() => {});
+      // Anonymous embedded flow: adopt the minted session as our auth.
+      if (poll.data.sessionToken) void setSession(poll.data.sessionToken);
     }
-  }, [poll.data]);
+  }, [poll.data, setSession]);
 
   const begin = async () => {
-    const { login } = await start.mutateAsync();
+    const { login, flow } = await start.mutateAsync();
+    setFlowId(flow);
     setLoginUrl(login);
     await openLogin(login);
   };

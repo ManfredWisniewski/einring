@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/auth/AuthProvider";
+import { NextcloudConnect } from "@/components/NextcloudConnect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { missingAuthConfig } from "@/config";
+import { isEmbedded } from "@/embedded";
 import { useInstanceTagline } from "@/instance";
 
 export function LoginPage() {
@@ -15,6 +17,8 @@ export function LoginPage() {
 
   if (loading) return <p className="muted">{t("auth.loading")}</p>;
   if (user) return <Navigate to={returnTo} replace />;
+  // Embedded: the connect card is the sign-in; there is no Authentik button.
+  if (isEmbedded()) return <NextcloudConnect />;
 
   const title = tagline === undefined ? t("app.tagline") : tagline;
 

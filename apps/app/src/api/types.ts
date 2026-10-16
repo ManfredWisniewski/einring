@@ -10,7 +10,20 @@ export interface Me {
 export type ConnectionStatus =
   | { status: "disconnected" }
   | { status: "pending"; login: string }
-  | { status: "connected"; loginName: string; displayName: string | null; server: string };
+  | {
+      status: "connected";
+      loginName: string;
+      displayName: string | null;
+      server: string;
+      /** Set only when an anonymous embedded flow completes — the einring session token. */
+      sessionToken?: string;
+    };
+
+/** `flow` is set only for anonymous (embedded) starts; echo it back on poll. */
+export interface LoginFlowStart {
+  login: string;
+  flow?: string;
+}
 
 export interface TableColumn {
   id: number;

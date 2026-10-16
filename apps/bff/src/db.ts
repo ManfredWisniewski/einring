@@ -33,9 +33,16 @@ export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
   deleteCredential(sub: string): void;
+  /** Pending flows expire after 10 min — stale rows read as "no pending flow". */
   getPendingFlow(sub: string): PendingLoginFlow | undefined;
   savePendingFlow(flow: PendingLoginFlow): void;
   deletePendingFlow(sub: string): void;
+  /** Embedded-mode sessions: token is stored as its sha256 hash, never in clear. */
+  saveSession(tokenHash: string, sub: string, expiresAt: string): void;
+  /** The session's sub, or undefined for unknown/expired tokens (expired rows are pruned on read). */
+  getSessionSub(tokenHash: string): string | undefined;
+  /** Drops all sessions of a user (called on Nextcloud disconnect). */
+  deleteSessionsForSub(sub: string): void;
   listWikiPages(sub: string): Omit<WikiPageRow, "content" | "sub">[];
   getWikiPage(sub: string, path: string): WikiPageRow | undefined;
   /** path→etag map, for change detection during sync. */
@@ -78,6 +85,12 @@ CREATE TABLE IF NOT EXISTS wiki_sync (
   sub TEXT PRIMARY KEY,
   at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -109,7 +122,8 @@ export function openStore(path: string): Store {
   );
   const delCred = db.prepare("DELETE FROM nextcloud_credentials WHERE sub = ?");
   const getFlow = db.prepare(
-    "SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint FROM login_flows WHERE sub = ?",
+    `SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint FROM login_flows
+     WHERE sub = ? AND created_at > datetime('now', '-10 minutes')`,
   );
   const putFlow = db.prepare(
     `INSERT INTO login_flows (sub, poll_token, poll_endpoint) VALUES (?, ?, ?)
@@ -117,6 +131,12 @@ export function openStore(path: string): Store {
        created_at = datetime('now')`,
   );
   const delFlow = db.prepare("DELETE FROM login_flows WHERE sub = ?");
+  const putSession = db.prepare(
+    "INSERT INTO sessions (token_hash, sub, expires_at) VALUES (?, ?, ?)",
+  );
+  const delExpiredSessions = db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')");
+  const getSession = db.prepare("SELECT sub FROM sessions WHERE token_hash = ?");
+  const delSessionsForSub = db.prepare("DELETE FROM sessions WHERE sub = ?");
   const listPages = db.prepare(
     "SELECT path, title, etag, mtime, synced_at AS syncedAt FROM wiki_pages WHERE sub = ? ORDER BY path",
   );
@@ -148,6 +168,12 @@ export function openStore(path: string): Store {
     getPendingFlow: (sub) => getFlow.get(sub) as PendingLoginFlow | undefined,
     savePendingFlow: (f) => void putFlow.run(f.sub, f.pollToken, f.pollEndpoint),
     deletePendingFlow: (sub) => void delFlow.run(sub),
+    saveSession: (tokenHash, sub, expiresAt) => void putSession.run(tokenHash, sub, expiresAt),
+    getSessionSub: (tokenHash) => {
+      delExpiredSessions.run();
+      return (getSession.get(tokenHash) as { sub: string } | undefined)?.sub;
+    },
+    deleteSessionsForSub: (sub) => void delSessionsForSub.run(sub),
     listWikiPages: (sub) => listPages.all(sub) as Omit<WikiPageRow, "content" | "sub">[],
     getWikiPage: (sub, path) => getPage.get(sub, path) as WikiPageRow | undefined,
     wikiEtags: (sub) =>

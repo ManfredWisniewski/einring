@@ -2,9 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createCompositeVerifier, createSessionVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import type { SecretBox } from "./crypto.js";
-import type { Store } from "./db.js";
+import { openStore, type Store } from "./db.js";
 import { fakeFetch, json, TEST_USER, testApp, testEnv } from "./test-utils.js";
 
 describe("auth", () => {
@@ -225,6 +226,162 @@ describe("nextcloud login flow", () => {
       headers: auth,
     });
     expect(res.statusCode).toBe(409);
+  });
+});
+
+describe("embedded login flow (anonymous)", () => {
+  const LOGIN_URL = "https://cloud.test/login/v2/flow/abc";
+  const POLL_URL = "https://cloud.test/login/v2/poll";
+
+  function nextcloudFake(state: { finished: boolean }) {
+    return fakeFetch((url, init) => {
+      if (url === "https://cloud.test/index.php/login/v2" && init?.method === "POST") {
+        return json({ poll: { token: "poll-token", endpoint: POLL_URL }, login: LOGIN_URL });
+      }
+      if (url === POLL_URL) {
+        return state.finished
+          ? json({ server: "https://cloud.test", loginName: "frodo", appPassword: "app-pw-secret" })
+          : new Response("", { status: 404 });
+      }
+      if (url === "https://cloud.test/ocs/v2.php/cloud/user") {
+        return json({
+          ocs: { meta: { status: "ok", statuscode: 200 }, data: { displayname: "Frodo B." } },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+  }
+
+  /** App whose verifier accepts the test JWT and real session tokens. */
+  async function embeddedApp(state: { finished: boolean }) {
+    const store = openStore(":memory:");
+    const { app, auth } = await testApp({
+      store,
+      fetchImpl: nextcloudFake(state),
+      verifyToken: createCompositeVerifier(async (token) => {
+        if (token !== "valid-token") throw new Error("bad token");
+        return TEST_USER;
+      }, createSessionVerifier(store.getSessionSub)),
+    });
+    return { app, store, auth };
+  }
+
+  it("mints a session on flow completion and accepts it on all routes", async () => {
+    const state = { finished: false };
+    const { app, store } = await embeddedApp(state);
+
+    // No bearer: start returns a flow id instead of binding to a user sub.
+    let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" });
+    expect(res.statusCode).toBe(200);
+    const { login, flow } = res.json() as { login: string; flow?: string };
+    expect(login).toBe(LOGIN_URL);
+    expect(flow).toBeTruthy();
+    expect(store.getPendingFlow(`flow:${flow}`)).toBeDefined();
+
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow },
+    });
+    expect(res.json()).toEqual({ status: "pending", login: "" });
+
+    state.finished = true;
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow },
+    });
+    const body = res.json() as { status: string; sessionToken?: string };
+    expect(body.status).toBe("connected");
+    expect(body.sessionToken).toBeTruthy();
+    // The app password never leaves the BFF — not in the session response either.
+    expect(JSON.stringify(body)).not.toContain("app-pw-secret");
+
+    const sessionAuth = { authorization: `Bearer ${body.sessionToken}` };
+    res = await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth });
+    expect(res.json()).toEqual({ sub: "nc:frodo" });
+    res = await app.inject({
+      method: "GET",
+      url: "/api/nextcloud/connection",
+      headers: sessionAuth,
+    });
+    expect(res.json()).toEqual({
+      status: "connected",
+      loginName: "frodo",
+      displayName: "Frodo B.",
+      server: "https://cloud.test",
+    });
+    expect(store.getCredential("nc:frodo")?.appPasswordSealed).toBeDefined();
+  });
+
+  it("poll without a flow id answers 400; unknown flow id answers 409", async () => {
+    const { app } = await embeddedApp({ finished: false });
+    let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow/poll" });
+    expect(res.statusCode).toBe(400);
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow: "bogus" },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("an authed caller's flow still binds to their own sub (no session minted)", async () => {
+    const state = { finished: true };
+    const { app, auth, store } = await embeddedApp(state);
+    let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow", headers: auth });
+    expect(res.json()).toEqual({ login: LOGIN_URL }); // no flow id for authed starts
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      headers: auth,
+    });
+    const body = res.json() as { status: string; sessionToken?: string };
+    expect(body.status).toBe("connected");
+    expect(body.sessionToken).toBeUndefined();
+    expect(store.getCredential(TEST_USER.sub)).toBeDefined();
+    expect(store.getCredential("nc:frodo")).toBeUndefined();
+  });
+
+  it("disconnecting deletes the session — a dead token gets 401", async () => {
+    const state = { finished: true };
+    const { app } = await embeddedApp(state);
+    const { flow } = (
+      await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" })
+    ).json() as { flow: string };
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow },
+    });
+    const sessionAuth = { authorization: `Bearer ${res.json().sessionToken}` };
+    expect(
+      (await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth })).statusCode,
+    ).toBe(200);
+    await app.inject({
+      method: "DELETE",
+      url: "/api/nextcloud/connection",
+      headers: sessionAuth,
+    });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth })).statusCode,
+    ).toBe(401);
+  });
+
+  it("serves index.html with frame-ancestors for the configured Nextcloud origin", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "einring-static-"));
+    await writeFile(
+      join(dir, "index.html"),
+      "<!doctype html><html><head><title>Einring</title></head><body></body></html>",
+    );
+    const { app } = await testApp({
+      config: loadConfig({ ...testEnv(), STATIC_DIR: dir }),
+    });
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.headers["content-security-policy"]).toBe(
+      "frame-ancestors 'self' https://cloud.test",
+    );
+    await rm(dir, { recursive: true });
   });
 });
 

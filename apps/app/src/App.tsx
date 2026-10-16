@@ -5,8 +5,10 @@ import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "reac
 import { useModuleRegistry } from "@/api/hooks";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { Layout } from "@/components/Layout";
+import { NextcloudConnect } from "@/components/NextcloudConnect";
 import { Button } from "@/components/ui/button";
 import { config } from "@/config";
+import { isEmbedded } from "@/embedded";
 import { type AppModule, resolveAppModules } from "@/modules";
 import { CallbackPage } from "@/pages/CallbackPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -21,7 +23,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <p className="muted">{t("auth.loading")}</p>;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // Embedded: no /login route — the Nextcloud connect card IS the sign-in.
+  if (!user) {
+    if (isEmbedded()) return <NextcloudConnect />;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
   return children;
 }
 

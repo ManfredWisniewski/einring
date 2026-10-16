@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useDisconnectNextcloud, useNextcloudConnection } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
+import { isEmbedded } from "@/embedded";
 import { NextcloudConnect } from "./NextcloudConnect";
 
 /**
@@ -11,8 +13,13 @@ import { NextcloudConnect } from "./NextcloudConnect";
  */
 export function NextcloudGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const { logout } = useAuth();
   const connection = useNextcloudConnection();
   const disconnect = useDisconnectNextcloud();
+
+  // Embedded: disconnect = logout — it drops the credential AND the session server-side
+  // and clears the local session token.
+  const onDisconnect = () => (isEmbedded() ? void logout() : disconnect.mutate());
 
   if (connection.isPending) return <p className="muted">{t("common.loading")}</p>;
   if (connection.isError) {
@@ -30,7 +37,7 @@ export function NextcloudGate({ children }: { children: ReactNode }) {
             server: connection.data.server,
           })}
         </span>
-        <Button variant="ghost" size="sm" onClick={() => disconnect.mutate()}>
+        <Button variant="ghost" size="sm" onClick={onDisconnect}>
           {t("nextcloud.disconnect")}
         </Button>
       </div>
