@@ -4,7 +4,8 @@ UI ported from biti (`P:\git\arr\biti`, `src/components/ui/`) on 2026-10-16:
 button, card, input, label, select, textarea, checkbox, pagination + `cn()` in
 `apps/app/src/utilities/ui.ts`. Styling resolves via the `@theme inline` bridge
 in `apps/app/src/styles/global.css` onto `@einring/tokens` vars. Target biti
-theme: **wuttke** (does not exist yet — einring token values apply until it does).
+theme: **wuttke** (exists in biti since 2026-10-16; resolved values ship in
+`apps/bff/themes/wuttke.json`, selected via `INSTANCE_THEME=wuttke` at deploy time).
 
 ## Components einring needs that biti does not have
 
@@ -23,4 +24,4 @@ Current fallbacks stay in place until biti provides them.
 | TreeView | Wiki navigation: collective → folder → page hierarchy | `.wiki-tree` + ghost buttons |
 | NavigationMenu | App-level module nav bar | `.app-nav` NavLinks |
 | Spinner | Loading states (currently muted text) | `<p className="muted">` |
-| `wuttke` theme | einring palette + theme-specific components | theme doesn't exist in biti yet (arr / wit / trurl / manni only) |
+| `wuttke` theme components | theme-specific UI variants | values done (`apps/bff/themes/wuttke.json` + `INSTANCE_THEME`); theme components still open |

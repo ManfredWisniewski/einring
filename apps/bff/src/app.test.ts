@@ -38,11 +38,17 @@ describe("auth", () => {
 });
 
 describe("instance config", () => {
-  it("serves the instance name without auth", async () => {
+  it("serves the instance name and OIDC client settings without auth", async () => {
     const { app } = await testApp();
     const res = await app.inject({ method: "GET", url: "/api/config" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ name: "Einring" });
+    expect(res.json()).toEqual({
+      name: "Einring",
+      authentik: {
+        issuer: "https://auth.test/application/o/einring/",
+        clientId: "einring-client",
+      },
+    });
   });
 
   it("exposes whitelabel tagline and css vars when configured", async () => {
@@ -59,7 +65,38 @@ describe("instance config", () => {
       name: "Portal",
       tagline: "",
       cssVars: { "--accent-base": "#b91c1c", "--accent-subtle": "#fee2e2" },
+      authentik: {
+        issuer: "https://auth.test/application/o/einring/",
+        clientId: "einring-client",
+      },
     });
+  });
+
+  it("exposes the named theme when INSTANCE_THEME is set", async () => {
+    const { app } = await testApp({
+      config: loadConfig({ ...testEnv(), INSTANCE_THEME: "wuttke" }),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/config" });
+    expect(res.json()).toEqual({
+      name: "Einring",
+      authentik: {
+        issuer: "https://auth.test/application/o/einring/",
+        clientId: "einring-client",
+      },
+      theme: expect.objectContaining({
+        light: expect.objectContaining({ "--accent-base": "#1e73be" }),
+        dark: expect.objectContaining({ "--surface-base": "#000000" }),
+      }),
+    });
+  });
+
+  it("fails config on an unknown or malformed INSTANCE_THEME", () => {
+    expect(() => loadConfig({ ...testEnv(), INSTANCE_THEME: "nope" })).toThrow(
+      /INSTANCE_THEME: no theme file for "nope"/,
+    );
+    expect(() => loadConfig({ ...testEnv(), INSTANCE_THEME: "../etc/passwd" })).toThrow(
+      /INSTANCE_THEME/,
+    );
   });
 
   it("fails config on malformed INSTANCE_CSS_VARS", () => {
@@ -92,9 +129,26 @@ describe("instance config", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("<title>Mordor &lt;Ops&gt;</title>");
     expect(res.body).toContain("<style>:root{--accent-base:#b91c1c}</style></head>");
+    await rm(dir, { recursive: true });
+  });
+
+  it("injects theme vars scoped per color scheme into index.html", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "einring-static-"));
+    await writeFile(
+      join(dir, "index.html"),
+      "<!doctype html><html><head><title>Einring</title></head><body></body></html>",
+    );
+    const { app } = await testApp({
+      config: loadConfig({ ...testEnv(), INSTANCE_THEME: "wuttke", STATIC_DIR: dir }),
+    });
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.body).toContain(":root{");
+    expect(res.body).toContain("--surface-base:#f5f5f5");
+    expect(res.body).toContain('[data-theme="dark"]{');
+    expect(res.body).toContain("--surface-base:#000000");
     // SPA fallback gets the same patched document
     const spa = await app.inject({ method: "GET", url: "/wiki" });
-    expect(spa.body).toContain("<title>Mordor &lt;Ops&gt;</title>");
+    expect(spa.body).toContain("--surface-base:#000000");
     await rm(dir, { recursive: true });
   });
 });

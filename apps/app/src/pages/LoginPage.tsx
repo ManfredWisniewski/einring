@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { missingConfig } from "@/config";
+import { missingAuthConfig } from "@/config";
 import { useInstanceTagline } from "@/instance";
 
 export function LoginPage() {
@@ -26,9 +26,9 @@ export function LoginPage() {
         </CardHeader>
       )}
       <CardContent className="stack">
-        {missingConfig.length > 0 ? (
+        {missingAuthConfig().length > 0 ? (
           <p className="alert alert--danger">
-            {t("auth.missingConfig", { keys: missingConfig.join(", ") })}
+            {t("auth.missingConfig", { keys: missingAuthConfig().join(", ") })}
           </p>
         ) : (
           <div className="row">

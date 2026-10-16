@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { userManager } from "@/auth/oidc";
+import { getUserManager } from "@/auth/oidc";
 
 /** Web-only: Authentik redirects here with `?code=…&state=…`. */
 export function CallbackPage() {
@@ -10,8 +10,8 @@ export function CallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    userManager
-      .signinCallback(window.location.href)
+    getUserManager()
+      .then((m) => m.signinCallback(window.location.href))
       .then((user) => {
         const returnTo = (user?.state as { returnTo?: string } | undefined)?.returnTo ?? "/";
         navigate(returnTo, { replace: true });

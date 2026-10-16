@@ -1,6 +1,6 @@
-import type { User } from "oidc-client-ts";
+import type { User, UserManager } from "oidc-client-ts";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
-import { listenForNativeCallback, login, logout, userManager } from "./oidc";
+import { getUserManager, listenForNativeCallback, login, logout } from "./oidc";
 
 export interface AuthState {
   user: User | null;
@@ -17,28 +17,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const u = await userManager.getUser();
+    const u = await (await getUserManager()).getUser();
     setUser(u && !u.expired ? u : null);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     void refresh();
-    const events = userManager.events;
-    events.addUserLoaded(refresh);
-    events.addUserUnloaded(refresh);
-    events.addAccessTokenExpired(refresh);
+    // The manager builds after /api/config resolves — subscribe once it's ready.
+    let manager: UserManager | undefined;
+    void getUserManager().then((m) => {
+      manager = m;
+      m.events.addUserLoaded(refresh);
+      m.events.addUserUnloaded(refresh);
+      m.events.addAccessTokenExpired(refresh);
+    });
     const stopNative = listenForNativeCallback(refresh);
     return () => {
-      events.removeUserLoaded(refresh);
-      events.removeUserUnloaded(refresh);
-      events.removeAccessTokenExpired(refresh);
+      manager?.events.removeUserLoaded(refresh);
+      manager?.events.removeUserUnloaded(refresh);
+      manager?.events.removeAccessTokenExpired(refresh);
       stopNative();
     };
   }, [refresh]);
 
   const getAccessToken = useCallback(async () => {
-    const u = await userManager.getUser();
+    const u = await (await getUserManager()).getUser();
     if (!u || u.expired) return null;
     return u.access_token;
   }, []);

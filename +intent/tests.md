@@ -13,6 +13,7 @@
 ### A01 Authentik login
 
 - Unauthenticated user opening the app sees a login screen.
+- `GET /api/config` serves the deployment's `authentik.issuer`/`authentik.clientId` without auth; the SPA builds its OIDC manager only after that fetch resolves and prefers those values over the baked `VITE_AUTHENTIK_*` ones, so one image works with different Authentik providers.
 - Login redirects to Authentik (Authorization Code + PKCE) and returns to `/auth/callback` (web) or `einring://auth/callback` (Android).
 - After login the app shows the user's display name.
 - Access token is sent as `Authorization: Bearer` to the BFF; BFF rejects missing, expired or wrongly-signed tokens with `401`.
@@ -72,7 +73,8 @@
 ### A10 Instance whitelabel
 
 - `INSTANCE_NAME` sets the deployment's display name at runtime (no rebuild); it appears in the app header, browser tab (`<title>` of the served `index.html`), and name-bearing strings via `{{name}}` interpolation (DE + EN).
-- `GET /api/config` exposes `name`, `tagline` and `cssVars` without authentication; `name` defaults to `Einring` when unset.
+- `GET /api/config` exposes `name`, `tagline`, `cssVars` and `theme` without authentication; `name` defaults to `Einring` when unset.
 - `INSTANCE_TAGLINE` overrides the login-page tagline; unset = app default, empty string hides it.
-- `INSTANCE_CSS_VARS` (JSON map of `--var:value`) is injected as a `:root{}` style block into `index.html` so branding applies before first paint; malformed JSON, non-`--` keys or unsafe values fail config at startup.
+- `INSTANCE_THEME` selects a named theme shipped with the BFF (`apps/bff/themes/<name>.json`, e.g. `wuttke`); its `light`/`dark` variable maps are injected into `index.html` as `:root{}` + `[data-theme="dark"]{}` blocks and served via `GET /api/config` for the dev server. Unknown names, non-`--` keys or unsafe values fail config at startup.
+- `INSTANCE_CSS_VARS` (JSON map of `--var:value`) is injected as a `:root{}` style block into `index.html` so branding applies before first paint; it is emitted after the theme block, so explicit overrides win. Malformed JSON, non-`--` keys or unsafe values fail config at startup.
 - Whitelabel + `MODULES` compose: a deployment can run a restricted module set under a different title on the same image.

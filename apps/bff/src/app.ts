@@ -40,18 +40,26 @@ function escapeHtml(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-/** Instance name into <title>, whitelabel CSS variable overrides as a :root style block. */
+/** Instance name into <title>, theme + whitelabel CSS variable overrides as style blocks. */
 function patchIndexHtml(html: string, config: Config): string {
   let out = html.replace(
     /<title>[^<]*<\/title>/,
     `<title>${escapeHtml(config.INSTANCE_NAME)}</title>`,
   );
-  const vars = config.INSTANCE_CSS_VARS;
-  if (vars && Object.keys(vars).length > 0) {
-    const decls = Object.entries(vars)
+  const decls = (vars?: Record<string, string>) =>
+    Object.entries(vars ?? {})
       .map(([k, v]) => `${k}:${v}`)
       .join(";");
-    out = out.replace("</head>", `<style>:root{${decls}}</style></head>`);
+  const blocks: string[] = [];
+  const theme = config.INSTANCE_THEME;
+  if (theme) {
+    blocks.push(`:root{${decls(theme.light)}}[data-theme="dark"]{${decls(theme.dark)}}`);
+  }
+  if (config.INSTANCE_CSS_VARS && Object.keys(config.INSTANCE_CSS_VARS).length > 0) {
+    blocks.push(`:root{${decls(config.INSTANCE_CSS_VARS)}}`);
+  }
+  if (blocks.length > 0) {
+    out = out.replace("</head>", `<style>${blocks.join("")}</style></head>`);
   }
   return out;
 }
@@ -86,6 +94,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     // tagline: undefined = app default, "" = hidden, string = override
     tagline: deps.config.INSTANCE_TAGLINE,
     cssVars: deps.config.INSTANCE_CSS_VARS,
+    theme: deps.config.INSTANCE_THEME,
+    // Public OIDC client settings — the SPA prefers these over its baked VITE_* values
+    // so one image serves deployments with different Authentik providers.
+    authentik: {
+      issuer: deps.config.AUTHENTIK_ISSUER,
+      clientId: deps.config.AUTHENTIK_CLIENT_ID,
+    },
   }));
 
   await app.register(
