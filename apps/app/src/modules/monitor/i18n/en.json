@@ -37,6 +37,7 @@
     "noGroups": "Group information unavailable (requires an admin or group-admin account).",
     "partialGroups": "Showing only the groups manageable by the connected account.",
     "empty": "No matching users.",
+    "lastSeen": "Last seen",
     "error": "Talk status could not be loaded ({{status}}).",
     "retry": "Retry",
     "count_one": "{{count}} user",

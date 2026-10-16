@@ -37,6 +37,7 @@
     "noGroups": "Gruppeninformationen nicht verfügbar (erfordert ein Admin- oder Gruppenadmin-Konto).",
     "partialGroups": "Es werden nur die Gruppen angezeigt, die das verbundene Konto verwalten darf.",
     "empty": "Keine passenden Benutzer.",
+    "lastSeen": "Zuletzt aktiv",
     "error": "Talk-Status konnte nicht geladen werden ({{status}}).",
     "retry": "Erneut versuchen",
     "count_one": "{{count}} Benutzer",

@@ -60,6 +60,7 @@
 
 - "Server" view shows Nextcloud server health (load, memory, disk, update status) proxied via the serverinfo OCS endpoint; a missing serverinfo app produces a visible, localized error state, not a crash.
 - "Talk" view lists user statuses, searchable and filterable by group; if the connected account lacks the provisioning scope the fallback behaviour is implemented and documented.
+- Each Talk status row ends with the user's "last seen" timestamp (`lastLogin` from the provisioning API, exposed as `lastSeenAt` epoch ms): relative within the last week, absolute date beyond that, localized (DE + EN). Without provisioning access or for never-logged-in accounts it renders as "—".
 
 ### A09 Wiki (Collectives mirror)
 

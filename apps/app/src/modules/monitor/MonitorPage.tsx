@@ -56,6 +56,38 @@ function fmt(value: string | number | null | undefined): string {
   return value == null || value === "" ? "—" : String(value);
 }
 
+const MINUTE_MS = 60_000;
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+/** Relative ("2 hours ago") for the last week, else an absolute date; null for missing/never. */
+function formatLastSeen(ms: number | null, lang: string): string | null {
+  if (ms == null || ms <= 0) return null;
+  const diff = ms - Date.now();
+  const abs = Math.abs(diff);
+  if (abs < MINUTE_MS)
+    return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(0, "minute");
+  if (abs < HOUR_MS) {
+    return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(
+      Math.round(diff / MINUTE_MS),
+      "minute",
+    );
+  }
+  if (abs < DAY_MS) {
+    return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(
+      Math.round(diff / HOUR_MS),
+      "hour",
+    );
+  }
+  if (abs < 7 * DAY_MS) {
+    return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(
+      Math.round(diff / DAY_MS),
+      "day",
+    );
+  }
+  return new Intl.DateTimeFormat(lang, { dateStyle: "medium" }).format(ms);
+}
+
 function Meter({ used, total, label }: { used: number; total: number; label: string }) {
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
   return (
@@ -221,7 +253,7 @@ const STATUS_DOT: Record<string, string> = {
 const ALL_GROUPS = "__all__";
 
 function TalkPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const talk = useTalkStatus(true);
   const searchId = useId();
   const groupId = useId();
@@ -316,6 +348,17 @@ function TalkPanel() {
                   {u.icon ?? ""} {u.message ?? ""}
                 </span>
               )}
+              <time
+                className="status-item__lastseen muted"
+                dateTime={u.lastSeenAt ? new Date(u.lastSeenAt).toISOString() : undefined}
+                title={
+                  u.lastSeenAt
+                    ? `${t("modules.monitor.talk.lastSeen")}: ${new Date(u.lastSeenAt).toLocaleString()}`
+                    : t("modules.monitor.talk.lastSeen")
+                }
+              >
+                {formatLastSeen(u.lastSeenAt, i18n.language) ?? "—"}
+              </time>
             </li>
           ))}
         </ul>

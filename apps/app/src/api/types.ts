@@ -93,6 +93,8 @@ export interface TalkUserStatus {
   message: string | null;
   icon: string | null;
   groups: string[];
+  /** Epoch ms of the user's last login; null when the account lacks admin access. */
+  lastSeenAt: number | null;
 }
 
 export interface WikiPageMeta {

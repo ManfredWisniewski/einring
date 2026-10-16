@@ -568,9 +568,13 @@ describe("monitor", () => {
       if (url.includes("/cloud/users/details")) {
         return ocs({
           users: {
-            frodo: { displayname: "Frodo B.", groups: ["shire", "admin"] },
+            frodo: {
+              displayname: "Frodo B.",
+              groups: ["shire", "admin"],
+              lastLogin: 1700000000000,
+            },
             sam: { displayname: "Sam", groups: ["shire"] },
-            gollum: { displayname: "Gollum", groups: ["elsewhere"] },
+            gollum: { displayname: "Gollum", groups: ["elsewhere"], lastLogin: 0 },
           },
         });
       }
@@ -591,6 +595,7 @@ describe("monitor", () => {
           message: "on vacation",
           icon: "🌴",
           groups: ["shire", "admin"],
+          lastSeenAt: 1700000000000,
         },
         {
           userId: "gollum",
@@ -599,6 +604,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: ["elsewhere"],
+          lastSeenAt: 0,
         },
         {
           userId: "sam",
@@ -607,6 +613,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: ["shire"],
+          lastSeenAt: null,
         },
       ],
     });
@@ -637,6 +644,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: [],
+          lastSeenAt: null,
         },
       ],
     });
@@ -683,6 +691,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: [],
+          lastSeenAt: null,
         },
       ],
     });
@@ -737,6 +746,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: ["The Shire"],
+          lastSeenAt: null,
         },
         {
           userId: "sam",
@@ -745,6 +755,7 @@ describe("monitor", () => {
           message: null,
           icon: null,
           groups: ["The Shire"],
+          lastSeenAt: null,
         },
       ],
     });

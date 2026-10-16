@@ -93,7 +93,16 @@ export interface OwnUser {
 
 /** `GET /ocs/v2.php/cloud/users/details` (provisioning API — admin credentials required). */
 export interface UsersDetails {
-  users: Record<string, { id?: string; displayname?: string; groups?: string[] }>;
+  users: Record<
+    string,
+    {
+      id?: string;
+      displayname?: string;
+      groups?: string[];
+      /** Epoch ms of the last login; 0 = never logged in. Admin-only data. */
+      lastLogin?: number;
+    }
+  >;
 }
 
 /** Talk autocomplete entry (`/ocs/v2.php/apps/spreed/api/v4/core/autocomplete`) — usable by regular users. */

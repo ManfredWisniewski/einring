@@ -374,6 +374,13 @@ a {
   background: var(--text-muted);
 }
 
+/* "last seen" sits at the right edge of the row, regardless of earlier spans. */
+.status-item__lastseen {
+  margin-inline-start: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* --- Status ------------------------------------------------------------- */
 
 .alert {

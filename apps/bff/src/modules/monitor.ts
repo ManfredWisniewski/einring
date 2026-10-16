@@ -76,6 +76,8 @@ export interface TalkUserStatus {
   message: string | null;
   icon: string | null;
   groups: string[];
+  /** Epoch ms of the user's last login; only available with provisioning (admin) access. */
+  lastSeenAt: number | null;
 }
 
 export interface TalkStatus {
@@ -226,6 +228,7 @@ export const monitorModule: BffModule = {
           message: statusByUser.get(userId)?.message ?? null,
           icon: statusByUser.get(userId)?.icon ?? null,
           groups: detailsUsers[userId]?.groups ?? groupsByUser.get(userId) ?? [],
+          lastSeenAt: detailsUsers[userId]?.lastLogin ?? null,
         }))
         .sort((a, b) => (a.displayName ?? a.userId).localeCompare(b.displayName ?? b.userId));
 
