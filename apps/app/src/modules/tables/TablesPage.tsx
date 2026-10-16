@@ -1,9 +1,9 @@
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useCurrentTable, useNextcloudConnection } from "@/api/hooks";
 import { DataTable } from "@/components/DataTable";
 import { NextcloudGate } from "@/components/NextcloudGate";
+import { Button } from "@/components/ui/button";
 
 export function TablesPage() {
   return (
@@ -28,7 +28,7 @@ function TablesContent() {
               status: table.error instanceof ApiError ? table.error.status : "?",
             })}
           </span>
-          <Button className="btn" onPress={() => void table.refetch()}>
+          <Button variant="outline" onClick={() => void table.refetch()}>
             {t("modules.tables.retry")}
           </Button>
         </div>

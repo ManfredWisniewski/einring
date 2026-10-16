@@ -10,7 +10,7 @@ export interface Me {
 export type ConnectionStatus =
   | { status: "disconnected" }
   | { status: "pending"; login: string }
-  | { status: "connected"; loginName: string; server: string };
+  | { status: "connected"; loginName: string; displayName: string | null; server: string };
 
 export interface TableColumn {
   id: number;

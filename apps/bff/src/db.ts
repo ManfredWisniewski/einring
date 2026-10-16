@@ -5,7 +5,10 @@ import { DatabaseSync } from "node:sqlite";
 export interface NextcloudCredential {
   sub: string;
   server: string;
+  /** Nextcloud's internal user id — opaque hash under SSO backends; not for display. */
   loginName: string;
+  /** Human-readable name from `ocs/v2.php/cloud/user`; null until resolved. */
+  displayName?: string | null;
   appPasswordSealed: string;
 }
 
@@ -77,19 +80,31 @@ CREATE TABLE IF NOT EXISTS wiki_sync (
 );
 `;
 
+/** Additive migrations for existing databases (SCHEMA covers fresh ones). */
+function migrate(db: DatabaseSync) {
+  const cols = db.prepare("PRAGMA table_info(nextcloud_credentials)").all() as {
+    name: string;
+  }[];
+  if (!cols.some((c) => c.name === "display_name")) {
+    db.exec("ALTER TABLE nextcloud_credentials ADD COLUMN display_name TEXT");
+  }
+}
+
 /** `path` may be ":memory:" for tests. */
 export function openStore(path: string): Store {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec(SCHEMA);
+  migrate(db);
 
   const getCred = db.prepare(
-    "SELECT sub, server, login_name AS loginName, app_password_sealed AS appPasswordSealed FROM nextcloud_credentials WHERE sub = ?",
+    "SELECT sub, server, login_name AS loginName, display_name AS displayName, app_password_sealed AS appPasswordSealed FROM nextcloud_credentials WHERE sub = ?",
   );
   const putCred = db.prepare(
-    `INSERT INTO nextcloud_credentials (sub, server, login_name, app_password_sealed) VALUES (?, ?, ?, ?)
+    `INSERT INTO nextcloud_credentials (sub, server, login_name, display_name, app_password_sealed) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(sub) DO UPDATE SET server = excluded.server, login_name = excluded.login_name,
+       display_name = excluded.display_name,
        app_password_sealed = excluded.app_password_sealed, created_at = datetime('now')`,
   );
   const delCred = db.prepare("DELETE FROM nextcloud_credentials WHERE sub = ?");
@@ -127,7 +142,8 @@ export function openStore(path: string): Store {
 
   return {
     getCredential: (sub) => getCred.get(sub) as NextcloudCredential | undefined,
-    saveCredential: (c) => void putCred.run(c.sub, c.server, c.loginName, c.appPasswordSealed),
+    saveCredential: (c) =>
+      void putCred.run(c.sub, c.server, c.loginName, c.displayName ?? null, c.appPasswordSealed),
     deleteCredential: (sub) => void delCred.run(sub),
     getPendingFlow: (sub) => getFlow.get(sub) as PendingLoginFlow | undefined,
     savePendingFlow: (f) => void putFlow.run(f.sub, f.pollToken, f.pollEndpoint),

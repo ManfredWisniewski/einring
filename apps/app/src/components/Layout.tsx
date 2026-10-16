@@ -1,8 +1,8 @@
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet } from "react-router";
 import { useModuleRegistry } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
+import { Button } from "@/components/ui/button";
 import { useInstanceName } from "@/instance";
 import { resolveAppModules } from "@/modules";
 import { InfoButton } from "./InfoButton";
@@ -24,7 +24,7 @@ export function Layout() {
         <LanguageSelect />
         <InfoButton />
         {user && (
-          <Button className="btn btn--ghost" onPress={() => void logout()}>
+          <Button variant="ghost" onClick={() => void logout()}>
             {t("nav.logout")}
           </Button>
         )}

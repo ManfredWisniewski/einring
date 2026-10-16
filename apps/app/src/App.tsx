@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, Suspense, useMemo } from "react";
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router";
 import { useModuleRegistry } from "@/api/hooks";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
 import { config } from "@/config";
 import { type AppModule, resolveAppModules } from "@/modules";
 import { CallbackPage } from "@/pages/CallbackPage";
@@ -80,7 +80,7 @@ function Routing() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.error")}</span>
-        <Button className="btn" onPress={() => void registry.refetch()}>
+        <Button variant="outline" onClick={() => void registry.refetch()}>
           {t("modules.retry")}
         </Button>
       </div>

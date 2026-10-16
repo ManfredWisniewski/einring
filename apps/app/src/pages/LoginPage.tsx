@@ -1,7 +1,8 @@
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/auth/AuthProvider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { missingConfig } from "@/config";
 import { useInstanceTagline } from "@/instance";
 
@@ -15,22 +16,26 @@ export function LoginPage() {
   if (loading) return <p className="muted">{t("auth.loading")}</p>;
   if (user) return <Navigate to={returnTo} replace />;
 
+  const title = tagline === undefined ? t("app.tagline") : tagline;
+
   return (
-    <section className="card stack" style={{ maxWidth: "28rem", marginInline: "auto" }}>
-      {(tagline === undefined ? t("app.tagline") : tagline) !== "" && (
-        <h2>{tagline === undefined ? t("app.tagline") : tagline}</h2>
+    <Card className="mx-auto max-w-md">
+      {title !== "" && (
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
       )}
-      {missingConfig.length > 0 ? (
-        <p className="alert alert--danger">
-          {t("auth.missingConfig", { keys: missingConfig.join(", ") })}
-        </p>
-      ) : (
-        <div className="row">
-          <Button className="btn btn--primary" onPress={() => void login(returnTo)}>
-            {t("auth.login")}
-          </Button>
-        </div>
-      )}
-    </section>
+      <CardContent className="stack">
+        {missingConfig.length > 0 ? (
+          <p className="alert alert--danger">
+            {t("auth.missingConfig", { keys: missingConfig.join(", ") })}
+          </p>
+        ) : (
+          <div className="row">
+            <Button onClick={() => void login(returnTo)}>{t("auth.login")}</Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

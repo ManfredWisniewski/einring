@@ -1,12 +1,14 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useMemo, useState } from "react";
-import { Button, Input, Label, TextField } from "react-aria-components";
+import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useWikiPage, useWikiSearch, useWikiSync, useWikiTree } from "@/api/hooks";
 import type { WikiPageMeta } from "@/api/types";
 import { NextcloudGate } from "@/components/NextcloudGate";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface TreeNode {
   name: string;
@@ -65,8 +67,10 @@ function TreeList({
         <li key={n.path ?? `${n.name}/${depth}`}>
           {n.path ? (
             <Button
+              variant="ghost"
+              size="clear"
               className={`wiki-tree__item${n.path === selected ? " wiki-tree__item--active" : ""}`}
-              onPress={() => onSelect(n.path as string)}
+              onClick={() => onSelect(n.path as string)}
             >
               {n.name}
             </Button>
@@ -99,6 +103,7 @@ function WikiContent() {
   const { t } = useTranslation();
   const tree = useWikiTree(true);
   const sync = useWikiSync();
+  const searchId = useId();
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const page = useWikiPage(selected, true);
@@ -113,7 +118,7 @@ function WikiContent() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.wiki.error", { status })}</span>
-        <Button className="btn" onPress={() => void tree.refetch()}>
+        <Button variant="outline" onClick={() => void tree.refetch()}>
           {t("modules.wiki.retry")}
         </Button>
       </div>
@@ -125,16 +130,18 @@ function WikiContent() {
   return (
     <div className="stack">
       <div className="row">
-        <TextField
-          className="select"
-          value={query}
-          onChange={setQuery}
-          aria-label={t("modules.wiki.search")}
-        >
-          <Label>{t("modules.wiki.search")}</Label>
-          <Input className="input" placeholder={t("modules.wiki.search")} />
-        </TextField>
-        <Button className="btn" onPress={() => sync.mutate()} isDisabled={sync.isPending}>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={searchId}>{t("modules.wiki.search")}</Label>
+          <Input
+            id={searchId}
+            className="w-72"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("modules.wiki.search")}
+            aria-label={t("modules.wiki.search")}
+          />
+        </div>
+        <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
           {sync.isPending ? t("modules.wiki.syncing") : t("modules.wiki.sync")}
         </Button>
         {tree.data.syncedAt && (
@@ -209,7 +216,7 @@ function SearchResults({
           className="status-item"
           style={{ flexDirection: "column", alignItems: "start" }}
         >
-          <Button className="link" onPress={() => onSelect(r.path)}>
+          <Button variant="link" size="clear" onClick={() => onSelect(r.path)}>
             {r.title}
           </Button>
           <span className="muted">{r.collective}</span>

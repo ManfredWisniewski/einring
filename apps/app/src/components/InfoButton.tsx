@@ -1,5 +1,6 @@
 import { Button, Dialog, DialogTrigger, Heading, Popover } from "react-aria-components";
 import { useTranslation } from "react-i18next";
+import { buttonVariants } from "@/components/ui/button";
 import { useInstanceName } from "@/instance";
 
 export function InfoButton() {
@@ -7,7 +8,10 @@ export function InfoButton() {
   const name = useInstanceName();
   return (
     <DialogTrigger>
-      <Button className="btn btn--icon" aria-label={t("info.open", { name })}>
+      <Button
+        className={buttonVariants({ variant: "outline", size: "icon" })}
+        aria-label={t("info.open", { name })}
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
           <path
@@ -24,7 +28,11 @@ export function InfoButton() {
         <Dialog>
           <div className="info-popover__header">
             <Heading slot="title">{t("info.title", { name })}</Heading>
-            <Button className="btn btn--icon btn--ghost" slot="close" aria-label={t("info.close")}>
+            <Button
+              className={buttonVariants({ variant: "ghost", size: "icon" })}
+              slot="close"
+              aria-label={t("info.close")}
+            >
               <span aria-hidden="true">×</span>
             </Button>
           </div>

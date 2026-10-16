@@ -37,7 +37,7 @@
     "connect": "Nextcloud verbinden",
     "waiting": "Schließe die Anmeldung bei Nextcloud im Browserfenster ab…",
     "openAgain": "Anmeldeseite erneut öffnen",
-    "connectedAs": "Verbunden als {{loginName}} auf {{server}}",
+    "connectedAs": "Verbunden als {{user}} auf {{server}}",
     "disconnect": "Verbindung trennen",
     "error": "Nextcloud-Anfrage fehlgeschlagen ({{status}})."
   },

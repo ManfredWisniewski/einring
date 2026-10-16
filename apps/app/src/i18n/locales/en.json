@@ -37,7 +37,7 @@
     "connect": "Connect Nextcloud",
     "waiting": "Finish signing in to Nextcloud in the browser window…",
     "openAgain": "Open login page again",
-    "connectedAs": "Connected as {{loginName}} on {{server}}",
+    "connectedAs": "Connected as {{user}} on {{server}}",
     "disconnect": "Disconnect",
     "error": "Nextcloud request failed ({{status}})."
   },

@@ -18,6 +18,7 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 - **D08 UI components: headless (Radix / React Aria) + own CSS driven by token variables** (alternatives: plain React, Ionic React). Accessible behaviour for free, visuals fully from the design tokens.
 - **D09 Frontend libraries: React Router (v8, `react-router` package), TanStack Query v5, react-i18next; headless UI via `react-aria-components`; OIDC via `oidc-client-ts`.**
   - Access/refresh tokens are kept by `oidc-client-ts` in `localStorage` (web and Capacitor WebView). Moving them to a secure-storage plugin on Android is a backlog item.
+  - *2026-10-16 amendment*: the UI component layer comes from **biti** (`P:\git\arr\biti`, `src/components/ui/*` — shadcn-style: Tailwind v4 + Radix primitives + cva + lucide), ported near-verbatim into `apps/app/src/components/ui/`; styling resolves through the `@theme inline` block in `global.css`, which maps biti's semantic vars onto `@einring/tokens` variables. `react-aria-components` remains installed for elements biti has no component for yet (Tabs, Popover/Dialog — see the gap list kept with this work). The intended biti theme for einring is **`wuttke`**, which does not exist in biti yet — until it does, einring's own token values apply.
 - **D10 UI languages: German and English from the start** via an i18n layer.
 - **D11 Lint/format: Biome** (alternative: ESLint + Prettier). Fall back to ESLint only if a required rule is missing.
 - **D12 Git workflow: `main` + short-lived feature branches, conventional commits.**

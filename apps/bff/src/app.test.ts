@@ -114,6 +114,11 @@ describe("nextcloud login flow", () => {
           ? json({ server: "https://cloud.test", loginName: "frodo", appPassword: "app-pw-secret" })
           : new Response("", { status: 404 });
       }
+      if (url === "https://cloud.test/ocs/v2.php/cloud/user") {
+        return json({
+          ocs: { meta: { status: "ok", statuscode: 200 }, data: { displayname: "Frodo B." } },
+        });
+      }
       return json({ error: `unexpected ${url}` }, 500);
     });
   }
@@ -144,6 +149,7 @@ describe("nextcloud login flow", () => {
     expect(res.json()).toEqual({
       status: "connected",
       loginName: "frodo",
+      displayName: "Frodo B.",
       server: "https://cloud.test",
     });
 

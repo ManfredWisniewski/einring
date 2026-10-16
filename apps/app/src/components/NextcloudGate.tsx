@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useDisconnectNextcloud, useNextcloudConnection } from "@/api/hooks";
+import { Button } from "@/components/ui/button";
 import { NextcloudConnect } from "./NextcloudConnect";
 
 /**
@@ -26,11 +26,11 @@ export function NextcloudGate({ children }: { children: ReactNode }) {
       <div className="row muted">
         <span>
           {t("nextcloud.connectedAs", {
-            loginName: connection.data.loginName,
+            user: connection.data.displayName ?? connection.data.loginName,
             server: connection.data.server,
           })}
         </span>
-        <Button className="btn btn--ghost" onPress={() => disconnect.mutate()}>
+        <Button variant="ghost" size="sm" onClick={() => disconnect.mutate()}>
           {t("nextcloud.disconnect")}
         </Button>
       </div>

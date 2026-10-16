@@ -1,24 +1,20 @@
-import { useMemo, useState } from "react";
-import {
-  Button,
-  Input,
-  Label,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  Select,
-  SelectValue,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-  TextField,
-} from "react-aria-components";
+import { useId, useMemo, useState } from "react";
+import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useServerHealth, useTalkStatus } from "@/api/hooks";
 import type { ServerBasics } from "@/api/types";
 import { NextcloudGate } from "@/components/NextcloudGate";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function MonitorPage() {
   const { t } = useTranslation();
@@ -80,7 +76,7 @@ function ServerPanel() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.monitor.server.error", { status })}</span>
-        <Button className="btn" onPress={() => void health.refetch()}>
+        <Button variant="outline" onClick={() => void health.refetch()}>
           {t("modules.monitor.server.retry")}
         </Button>
       </div>
@@ -222,9 +218,13 @@ const STATUS_DOT: Record<string, string> = {
   offline: "status-dot--offline",
 };
 
+const ALL_GROUPS = "__all__";
+
 function TalkPanel() {
   const { t } = useTranslation();
   const talk = useTalkStatus(true);
+  const searchId = useId();
+  const groupId = useId();
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string>("");
 
@@ -245,7 +245,7 @@ function TalkPanel() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.monitor.talk.error", { status })}</span>
-        <Button className="btn" onPress={() => void talk.refetch()}>
+        <Button variant="outline" onClick={() => void talk.refetch()}>
           {t("modules.monitor.talk.retry")}
         </Button>
       </div>
@@ -255,37 +255,37 @@ function TalkPanel() {
   return (
     <div className="stack">
       <div className="row">
-        <TextField
-          className="select"
-          value={search}
-          onChange={setSearch}
-          aria-label={t("modules.monitor.talk.search")}
-        >
-          <Label>{t("modules.monitor.talk.search")}</Label>
-          <Input className="input" placeholder={t("modules.monitor.talk.search")} />
-        </TextField>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={searchId}>{t("modules.monitor.talk.search")}</Label>
+          <Input
+            id={searchId}
+            className="w-56"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("modules.monitor.talk.search")}
+            aria-label={t("modules.monitor.talk.search")}
+          />
+        </div>
         {talk.data.groupsScope !== "none" && talk.data.groups.length > 0 && (
-          <Select
-            className="select"
-            selectedKey={group}
-            onSelectionChange={(k) => setGroup(String(k ?? ""))}
-            aria-label={t("modules.monitor.talk.group")}
-          >
-            <Label>{t("modules.monitor.talk.group")}</Label>
-            <Button className="btn">
-              <SelectValue />
-            </Button>
-            <Popover>
-              <ListBox>
-                <ListBoxItem id="">{t("modules.monitor.talk.allGroups")}</ListBoxItem>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={groupId}>{t("modules.monitor.talk.group")}</Label>
+            <Select
+              value={group === "" ? ALL_GROUPS : group}
+              onValueChange={(v) => setGroup(v === ALL_GROUPS ? "" : v)}
+            >
+              <SelectTrigger id={groupId} aria-label={t("modules.monitor.talk.group")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_GROUPS}>{t("modules.monitor.talk.allGroups")}</SelectItem>
                 {talk.data.groups.map((g) => (
-                  <ListBoxItem key={g} id={g}>
+                  <SelectItem key={g} value={g}>
                     {g}
-                  </ListBoxItem>
+                  </SelectItem>
                 ))}
-              </ListBox>
-            </Popover>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
         )}
       </div>
       {talk.data.groupsScope === "none" && (

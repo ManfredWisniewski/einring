@@ -1,8 +1,9 @@
 import { Browser } from "@capacitor/browser";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isNative } from "@/config";
 import { useInstanceName } from "@/instance";
 
@@ -46,28 +47,32 @@ export function NextcloudConnect() {
   };
 
   return (
-    <section className="card stack">
-      <h2>{t("nextcloud.title")}</h2>
-      {loginUrl ? (
-        <>
-          <p className="muted">{t("nextcloud.waiting")}</p>
-          <div className="row">
-            <Button className="btn" onPress={() => openLogin(loginUrl)}>
-              {t("nextcloud.openAgain")}
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p>{t("nextcloud.notConnected", { name })}</p>
-          <div className="row">
-            <Button className="btn btn--primary" onPress={begin} isDisabled={start.isPending}>
-              {t("nextcloud.connect")}
-            </Button>
-          </div>
-        </>
-      )}
-      {start.isError && <p className="text-danger">{String(start.error)}</p>}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("nextcloud.title")}</CardTitle>
+      </CardHeader>
+      <CardContent className="stack">
+        {loginUrl ? (
+          <>
+            <p className="muted">{t("nextcloud.waiting")}</p>
+            <div className="row">
+              <Button variant="outline" onClick={() => openLogin(loginUrl)}>
+                {t("nextcloud.openAgain")}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p>{t("nextcloud.notConnected", { name })}</p>
+            <div className="row">
+              <Button onClick={() => void begin()} disabled={start.isPending}>
+                {t("nextcloud.connect")}
+              </Button>
+            </div>
+          </>
+        )}
+        {start.isError && <p className="text-danger">{String(start.error)}</p>}
+      </CardContent>
+    </Card>
   );
 }
