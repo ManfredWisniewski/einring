@@ -62,6 +62,7 @@ PUBLIC_URL=https://einring.example.com
 # Whitelabel: per-deployment branding, no rebuild needed (D37)
 # INSTANCE_NAME=Einring              # header, browser tab, info dialog
 # INSTANCE_TAGLINE=                  # unset = app default; "" hides the tagline
+# INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
 # MODULES=tables,monitor,wiki
@@ -144,16 +145,18 @@ One image can run multiple branded instances — branding is runtime env, not bu
 ```dotenv
 INSTANCE_NAME=Acme Portal
 INSTANCE_TAGLINE=                                  # empty hides the login-page tagline
+INSTANCE_THEME=wuttke                              # named biti theme; unset = einring palette
 INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-hover":"#991b1b","--accent-subtle":"#fee2e2","--accent-subtle-fg":"#7f1d1d"}
 MODULES=wiki                                       # restrict the module set per deployment
 ```
 
 - `INSTANCE_NAME` — header, browser tab (the BFF rewrites `index.html`'s `<title>`), info dialog and all name-bearing strings
 - `INSTANCE_TAGLINE` — login-page tagline; unset keeps the Einring default, empty string hides it
-- `INSTANCE_CSS_VARS` — JSON map of `--var:value` injected as `:root{…}` into `index.html` before first paint; invalid JSON or unsafe values refuse startup. Set the full accent set (`--accent-base`, `--accent-hover`, `--accent-subtle`, `--accent-subtle-fg`, `--accent-fg`) or subtler shades will stay neutral
+- `INSTANCE_THEME` — named biti theme shipped with the image (`apps/bff/themes/<name>.json`, today: `wuttke`); injected per color scheme into `index.html`. Unknown names or malformed files refuse startup
+- `INSTANCE_CSS_VARS` — JSON map of `--var:value` injected as `:root{…}` into `index.html` before first paint; emitted after the theme, so explicit overrides win. Set the full accent set (`--accent-base`, `--accent-hover`, `--accent-subtle`, `--accent-subtle-fg`, `--accent-fg`) or subtler shades will stay neutral
 - `MODULES` — limits which modules the instance exposes (BFF registry is the source of truth)
 
-The Authentik client is shared — a whitelabel instance still signs in via the same provider; use a separate provider/application only if the brand needs its own IdP entry. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.
+The SPA gets its Authentik issuer/client-id from `GET /api/config` at runtime, so each container uses its own `AUTHENTIK_ISSUER`/`AUTHENTIK_CLIENT_ID` env — the `VITE_AUTHENTIK_*` build args are only a fallback. A whitelabel instance can therefore sign in via its own Authentik provider on the same image. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.
 
 ## Updating
 
