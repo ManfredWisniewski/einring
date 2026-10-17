@@ -386,63 +386,236 @@ describe("embedded login flow (anonymous)", () => {
 });
 
 describe("tables", () => {
+  const V1 = "/index.php/apps/tables/api/1";
+  const CTX = "/ocs/v2.php/apps/tables/api/2/contexts";
+  const ocs = (data: unknown, status = 200) =>
+    json({ ocs: { meta: { status: "ok", statuscode: status }, data } }, status);
+
+  const columns = [
+    { id: 2, title: "Done", type: "selection", subtype: "check", orderWeight: 1 },
+    {
+      id: 4,
+      title: "Status",
+      type: "selection",
+      orderWeight: 2,
+      selectionOptions: [
+        { id: 0, label: "open" },
+        { id: 1, label: "closed" },
+      ],
+    },
+    { id: 1, title: "Name", type: "text", subtype: "line", orderWeight: 0 },
+  ];
+  const row10 = {
+    id: 10,
+    tableId: 7,
+    data: [
+      { columnId: 1, value: "Ring" },
+      { columnId: 2, value: true },
+      { columnId: 4, value: 0 },
+    ],
+  };
+
+  /** Full application fake: context 3 with a view node and a table node. */
+  const appFetch = (seen?: { puts?: { url: string; body: unknown }[]; deletes?: string[] }) =>
+    fakeFetch((url, init) => {
+      const authHeader = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      expect(authHeader).toBe(`Basic ${Buffer.from("frodo:app-pw").toString("base64")}`);
+      if (url.endsWith(`${CTX}/3`)) {
+        // Real shape (verified against cloud.wit.gmbh): `nodes` is an id-keyed
+        // map of ContextNodeRelation with snake_case fields — no titles.
+        return ocs({
+          id: 3,
+          name: "Field Ops",
+          nodes: {
+            12: { id: 12, context_id: 3, node_id: 5, node_type: 1, permissions: 31 },
+            13: { id: 13, context_id: 3, node_id: 7, node_type: 0, permissions: 31 },
+            14: { id: 14, context_id: 3, node_id: 9, node_type: 7, permissions: 31 },
+          },
+          pages: {
+            1: {
+              id: 1,
+              context_id: 3,
+              page_type: "startpage",
+              content: { 7: { order: 10, node_rel_id: 12 } },
+            },
+          },
+        });
+      }
+      if (url.endsWith(`${V1}/views/5`)) {
+        return json({ id: 5, title: "Open items", emoji: "👀", tableId: 7 });
+      }
+      if (url.endsWith(`${V1}/views/5/columns`)) return json(columns);
+      if (url.endsWith(`${V1}/views/5/rows`) && init?.method === "GET") return json([row10]);
+      if (url.endsWith(`${V1}/views/5/rows`) && init?.method === "POST") {
+        return json({ ...row10, id: 11, data: [] }, 201);
+      }
+      if (url.endsWith(`${V1}/tables/7`) && init?.method === "GET") {
+        return json({ id: 7, title: "All items", emoji: "📦" });
+      }
+      if (url.endsWith(`${V1}/tables/7/columns`)) return json(columns);
+      if (url.endsWith(`${V1}/tables/7/rows`) && init?.method === "GET") return json([row10]);
+      if (url.endsWith(`${V1}/tables/7/rows`) && init?.method === "POST") {
+        return json({ ...row10, id: 11, data: [] }, 201);
+      }
+      if (url.endsWith(`${V1}/rows/10`) && init?.method === "PUT") {
+        seen?.puts?.push({ url, body: JSON.parse(String(init?.body)) });
+        return json({
+          ...row10,
+          data: [
+            { columnId: 1, value: "Ring" },
+            { columnId: 2, value: false },
+            { columnId: 4, value: 0 },
+          ],
+        });
+      }
+      if (url.endsWith(`${V1}/views/5/rows/10`) && init?.method === "DELETE") {
+        seen?.deletes?.push(url);
+        return json({}, 200);
+      }
+      if (url.endsWith(`${V1}/rows/10`) && init?.method === "DELETE") {
+        seen?.deletes?.push(url);
+        return json({}, 200);
+      }
+      return json({ error: `unexpected ${init?.method ?? "GET"} ${url}` }, 500);
+    });
+
+  it("answers 424 when the application id is not configured", async () => {
+    const env = testEnv();
+    delete env.MODULE_TABLES_APPLICATION_ID;
+    const { app, auth } = await testApp({ config: loadConfig(env) });
+    const res = await app.inject({ method: "GET", url: "/api/tables", headers: auth });
+    expect(res.statusCode).toBe(424);
+    expect(res.json().error).toMatch(/not configured/);
+  });
+
   it("answers 424 when Nextcloud is not connected", async () => {
     const { app, auth } = await testApp();
-    const res = await app.inject({ method: "GET", url: "/api/tables/current", headers: auth });
+    const res = await app.inject({ method: "GET", url: "/api/tables", headers: auth });
     expect(res.statusCode).toBe(424);
   });
 
-  it("returns the configured table with flattened rows", async () => {
-    const fetchImpl = fakeFetch((url, init) => {
-      const authHeader = (init?.headers as Record<string, string> | undefined)?.Authorization;
-      expect(authHeader).toBe(`Basic ${Buffer.from("frodo:app-pw").toString("base64")}`);
-      if (url.endsWith("/api/1/tables/7")) return json({ id: 7, title: "Inventory", emoji: "📦" });
-      if (url.endsWith("/api/1/tables/7/columns")) {
-        return json([
-          {
-            id: 2,
-            title: "Status",
-            type: "selection",
-            orderWeight: 1,
-            selectionOptions: [{ id: 0, label: "open" }],
-          },
-          { id: 1, title: "Name", type: "text", subtype: "line", orderWeight: 0 },
-        ]);
-      }
-      if (url.endsWith("/api/1/tables/7/rows")) {
-        return json([
-          {
-            id: 10,
-            tableId: 7,
-            data: [
-              { columnId: 1, value: "Ring" },
-              { columnId: 2, value: 0 },
-            ],
-          },
-        ]);
-      }
-      return json({ error: `unexpected ${url}` }, 500);
-    });
-    const { app, auth, store, secrets } = await testApp({ fetchImpl });
-    store.saveCredential({
-      sub: TEST_USER.sub,
-      server: "https://cloud.test",
-      loginName: "frodo",
-      appPasswordSealed: secrets.seal("app-pw"),
-    });
-
-    const res = await app.inject({ method: "GET", url: "/api/tables/current", headers: auth });
+  it("lists the application's views and tables from the v2 context", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: appFetch() });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/tables", headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      id: 7,
-      title: "Inventory",
-      emoji: "📦",
-      columns: [
-        { id: 1, title: "Name", type: "text", subtype: "line" },
-        { id: 2, title: "Status", type: "selection", subtype: undefined },
+      name: "Field Ops",
+      nodes: [
+        { type: "view", id: 5, title: "Open items" },
+        { type: "table", id: 7, title: "All items" },
       ],
-      rows: [{ id: 10, cells: { "1": "Ring", "2": "open" } }],
     });
+  });
+
+  it("returns a view node with columns and raw cells", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: appFetch() });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/tables/nodes/view/5",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      kind: "view",
+      id: 5,
+      title: "Open items",
+      emoji: "👀",
+      columns: [
+        { id: 2, title: "Done", type: "selection", subtype: "check" },
+        {
+          id: 4,
+          title: "Status",
+          type: "selection",
+          subtype: undefined,
+          options: [
+            { id: 0, label: "open" },
+            { id: 1, label: "closed" },
+          ],
+        },
+        { id: 1, title: "Name", type: "text", subtype: "line" },
+      ],
+      rows: [{ id: 10, cells: { "1": "Ring", "2": true, "4": 0 } }],
+    });
+  });
+
+  it("returns a table node through table endpoints", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: appFetch() });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/tables/nodes/table/7",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().kind).toBe("table");
+    expect(res.json().title).toBe("All items");
+  });
+
+  it("updates, creates and deletes rows via the correct v1 routes", async () => {
+    const seen: { puts: { url: string; body: unknown }[]; deletes: string[] } = {
+      puts: [],
+      deletes: [],
+    };
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: appFetch(seen) });
+    connect(store, secrets);
+
+    const patch = await app.inject({
+      method: "PATCH",
+      url: "/api/tables/rows/10",
+      headers: auth,
+      payload: { data: { "2": false } },
+    });
+    expect(patch.statusCode).toBe(200);
+    expect(seen.puts).toHaveLength(1);
+    expect(seen.puts[0]!.url).toContain("/api/1/rows/10");
+    expect(seen.puts[0]!.body).toEqual({ data: [{ columnId: 2, value: false }] });
+    expect(patch.json().cells["2"]).toBe(false);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/tables/nodes/view/5/rows",
+      headers: auth,
+      payload: {},
+    });
+    expect(created.statusCode).toBe(201);
+
+    const delView = await app.inject({
+      method: "DELETE",
+      url: "/api/tables/nodes/view/5/rows/10",
+      headers: auth,
+    });
+    expect(delView.statusCode).toBe(204);
+    const delTable = await app.inject({
+      method: "DELETE",
+      url: "/api/tables/nodes/table/7/rows/10",
+      headers: auth,
+    });
+    expect(delTable.statusCode).toBe(204);
+    expect(seen.deletes[0]).toContain("/api/1/views/5/rows/10");
+    expect(seen.deletes[1]).toContain("/api/1/rows/10");
+  });
+
+  it("rejects bad node ids and surfaces an upstream 404", async () => {
+    const fetchImpl = fakeFetch((url) =>
+      url.includes("/api/1/views/999") ? json({ message: "not found" }, 404) : appFetch()(url),
+    );
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+
+    expect(
+      (await app.inject({ method: "GET", url: "/api/tables/nodes/folder/5", headers: auth }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/tables/nodes/view/abc", headers: auth }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/tables/nodes/view/999", headers: auth }))
+        .statusCode,
+    ).toBe(404);
   });
 });
 
@@ -1303,7 +1476,7 @@ describe("module framework", () => {
   it("MODULES disables unlisted modules' routes and registry entries", async () => {
     const { app, auth } = await testApp({ config: loadConfig({ ...testEnv(), MODULES: "" }) });
     expect(
-      (await app.inject({ method: "GET", url: "/api/tables/current", headers: auth })).statusCode,
+      (await app.inject({ method: "GET", url: "/api/tables", headers: auth })).statusCode,
     ).toBe(404);
     const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
     expect(mods.json()).toEqual({ modules: [] });
@@ -1312,23 +1485,23 @@ describe("module framework", () => {
   it("fails startup when an enabled module's env config is invalid", async () => {
     await expect(
       testApp({
-        config: loadConfig({ ...testEnv(), MODULE_TABLES_TABLE_ID: "abc" }),
+        config: loadConfig({ ...testEnv(), MODULE_TABLES_APPLICATION_ID: "abc" }),
       }),
     ).rejects.toThrow(/Invalid config for module "tables"/);
   });
 
-  it("boots with an empty MODULE_TABLES_TABLE_ID and reports not-configured", async () => {
+  it("boots with an empty MODULE_TABLES_APPLICATION_ID and reports not-configured", async () => {
     const { app, auth } = await testApp({
-      config: loadConfig({ ...testEnv(), MODULE_TABLES_TABLE_ID: "" }),
+      config: loadConfig({ ...testEnv(), MODULE_TABLES_APPLICATION_ID: "" }),
     });
-    const res = await app.inject({ method: "GET", url: "/api/tables/current", headers: auth });
+    const res = await app.inject({ method: "GET", url: "/api/tables", headers: auth });
     expect(res.statusCode).toBe(424);
     expect(res.json().error).toMatch(/not configured/);
   });
 
   it("ignores invalid module env when the module is disabled", async () => {
     const env = testEnv();
-    delete env.MODULE_TABLES_TABLE_ID;
+    delete env.MODULE_TABLES_APPLICATION_ID;
     const { app, auth } = await testApp({ config: loadConfig({ ...env, MODULES: "" }) });
     const res = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
     expect(res.statusCode).toBe(200);

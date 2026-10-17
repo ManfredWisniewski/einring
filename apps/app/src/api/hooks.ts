@@ -11,6 +11,10 @@ import type {
   Me,
   ModuleRegistry,
   ServerHealthResponse,
+  TableNode,
+  TableNodeType,
+  TableRow,
+  TablesApplication,
   TableView,
   TalkStatus,
   WikiAskResult,
@@ -30,7 +34,8 @@ export function useApi() {
 export const keys = {
   me: ["me"] as const,
   connection: ["nextcloud", "connection"] as const,
-  currentTable: ["tables", "current"] as const,
+  tablesApp: ["tables", "app"] as const,
+  tableNode: (type: TableNodeType, id: number) => ["tables", "node", type, id] as const,
   modules: ["modules"] as const,
   serverHealth: ["monitor", "server"] as const,
   talkStatus: ["monitor", "talk-status"] as const,
@@ -81,7 +86,7 @@ export function usePollLoginFlow() {
     onSuccess: (data) => {
       if (data.status === "connected") {
         qc.setQueryData(keys.connection, data);
-        void qc.invalidateQueries({ queryKey: keys.currentTable });
+        void qc.invalidateQueries({ queryKey: ["tables"] });
       }
     },
   });
@@ -94,17 +99,66 @@ export function useDisconnectNextcloud() {
     mutationFn: () => api.delete<void>("/nextcloud/connection"),
     onSuccess: () => {
       qc.setQueryData(keys.connection, { status: "disconnected" } satisfies ConnectionStatus);
-      qc.removeQueries({ queryKey: keys.currentTable });
+      qc.removeQueries({ queryKey: ["tables"] });
     },
   });
 }
 
-export function useCurrentTable(enabled: boolean) {
+/** The configured Tables application: name + its nodes (views + tables). */
+export function useTablesApplication(enabled: boolean) {
   const api = useApi();
   return useQuery({
-    queryKey: keys.currentTable,
-    queryFn: () => api.get<TableView>("/tables/current"), // module route: /api/tables/*
+    queryKey: keys.tablesApp,
+    queryFn: () => api.get<TablesApplication>("/tables"),
     enabled,
+  });
+}
+
+/** A node's columns + rows, read view-scoped (Nextcloud-side filters apply). */
+export function useTableNode(node: TableNode | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.tableNode(node?.type ?? "view", node?.id ?? 0),
+    queryFn: () => api.get<TableView>(`/tables/nodes/${node?.type}/${node?.id}`),
+    enabled: enabled && node !== null,
+  });
+}
+
+export function useTablePatchRow(node: TableNode) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rowId: number; data: Record<string, unknown> }) =>
+      api.patch<TableRow>(`/tables/rows/${input.rowId}`, { data: input.data }),
+    // setQueryData keeps checkbox toggles snappy; the response is the canonical row.
+    onSuccess: (row) => {
+      qc.setQueryData<TableView>(keys.tableNode(node.type, node.id), (old) =>
+        old ? { ...old, rows: old.rows.map((r) => (r.id === row.id ? row : r)) } : old,
+      );
+    },
+  });
+}
+
+export function useTableAddRow() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (node: TableNode) =>
+      api.post<TableRow>(`/tables/nodes/${node.type}/${node.id}/rows`, {}),
+    // Invalidate: view filters may keep the new (empty) row out of the result.
+    onSuccess: (_row, node) =>
+      void qc.invalidateQueries({ queryKey: keys.tableNode(node.type, node.id) }),
+  });
+}
+
+export function useTableDeleteRow() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { node: TableNode; rowId: number }) =>
+      api.delete<void>(`/tables/nodes/${input.node.type}/${input.node.id}/rows/${input.rowId}`),
+    onSuccess: (_v, input) =>
+      void qc.invalidateQueries({ queryKey: keys.tableNode(input.node.type, input.node.id) }),
   });
 }
 

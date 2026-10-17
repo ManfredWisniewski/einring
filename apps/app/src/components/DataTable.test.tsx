@@ -35,6 +35,6 @@ describe("DataTable", () => {
 
   it("shows the empty state", () => {
     render(<DataTable columns={[{ id: 1, title: "Name", type: "text" }]} rows={[]} />);
-    expect(screen.getByText("This table has no rows.")).toBeInTheDocument();
+    expect(screen.getByText("This view has no rows.")).toBeInTheDocument();
   });
 });

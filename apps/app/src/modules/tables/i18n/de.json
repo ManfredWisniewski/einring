@@ -1,9 +1,15 @@
 {
   "nav": "Tabellen",
-  "loading": "Tabelle wird geladen…",
-  "empty": "Diese Tabelle enthält keine Zeilen.",
+  "loading": "Tabellen werden geladen…",
+  "empty": "Diese Ansicht enthält keine Zeilen.",
+  "emptyApp": "Diese Anwendung enthält keine Ansichten oder Tabellen.",
   "rowCount_one": "{{count}} Zeile",
   "rowCount_other": "{{count}} Zeilen",
-  "error": "Die Tabelle konnte nicht geladen werden ({{status}}).",
+  "addRow": "Zeile hinzufügen",
+  "deleteRow": "Zeile löschen",
+  "decrease": "Verringern",
+  "increase": "Erhöhen",
+  "selectPlaceholder": "Auswählen…",
+  "error": "Die Daten konnten nicht geladen werden ({{status}}).",
   "retry": "Erneut versuchen"
 }

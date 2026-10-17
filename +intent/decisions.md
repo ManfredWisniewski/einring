@@ -70,6 +70,8 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 - **D34 Modules ship bundled in the app**; code-split via lazy import. Downloadable modules are deferred — any future "downloadable" covers large content payloads, not code.
 - **D35 Services vs modules**: a service (today: Nextcloud) owns credentials and connection state at BFF level; modules declare `requires: ["nextcloud"]` and the app gates the page on the service's connection status (reusing the Login Flow v2 connect card).
 
+- **D40 Tables module consumes a configured Nextcloud Tables Application (context)** via `MODULE_TABLES_APPLICATION_ID` (the context id from its `/app/<id>` URL): the application's nodes (views + tables) are listed in the app, rows are read and written through view/table-scoped API v1 endpoints (`/api/1/views/{id}/rows`, `PUT /api/1/rows/{id}`, `deleteRowByView`), so filters, sorting, column visibility and sharing rights stay configured in Nextcloud — einring is the mobile client, not the authority. The context listing is the sole OCS v2 call (`/api/2/contexts/{id}`; v1 has no contexts). `MODULE_TABLES_TABLE_ID` and `GET /api/tables/current` are removed — this supersedes D31's fixed-table MVP. CSV import into Tables is out of scope for this module (csv-manager stays the einring-side import path). Cells keep native types: `selection`+`check` renders as a checkbox (the "done" pattern), `number` numeric, `text` inline-editable, `selection` as dropdown, `datetime`/`usergroup` read-only in v1. Plan: `+wit/development/plans/einring/2026-10-16_plan-tables-manager.md`.
+
 ## Backlog (not decided, parked)
 
 - Android App Links instead of custom scheme.

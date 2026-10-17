@@ -28,9 +28,7 @@
 
 ### A03 Nextcloud Tables – fixed table read-only (MVP)
 
-- BFF exposes `GET /api/tables/current` returning columns and rows of the configured table ID.
-- App renders columns as headers and rows as a scrollable table/list, in light and dark theme, in DE and EN.
-- Loading and error states are visible.
+- Superseded by A14 (D40): the module is application-scoped, not single-table.
 
 ### A04 Design tokens
 
@@ -106,3 +104,10 @@
 - The system prompt instructs the model to answer only from the supplied context and to say when the context lacks the answer; an empty index produces a localized "index first / not indexed" state, not a hallucinated answer.
 - All LLM endpoints require auth, are scoped to the caller's `sub`, and answer **424** when LLM config is missing (the wiki mirror itself keeps working); provider errors surface as a localized error state, not a crash. The question body is validated (non-empty, length-capped).
 - The wiki module shows a localized "Ask" input (DE + EN); the answer renders through the existing marked+DOMPurify pipeline and each source links to its mirrored page. When LLM is unconfigured the Ask UI is hidden or shows the localized disabled state.
+
+### A14 Tables application (Nextcloud Tables context)
+
+- With `MODULE_TABLES_APPLICATION_ID` set, `GET /api/tables` returns the application's name and its nodes (`{type: "view"|"table", id, title}`) read via the OCS v2 contexts endpoint. Unset → 424 plus a localized not-configured state in the app; a context 404 from Nextcloud surfaces as a localized error, not a crash.
+- `GET /api/tables/nodes/<view|table>/<id>` returns `{kind, id, title, emoji?, columns (id/title/type/subtype/options), rows (id + raw cell values keyed by columnId)}` — view nodes read through `/api/1/views/{id}/*` (filters/sorting applied Nextcloud-side), table nodes through `/api/1/tables/{id}/*`. Unknown node type → 400; a node missing upstream → 404.
+- `PATCH /api/tables/rows/<rowId>` writes typed cell values (`{data: {columnId: value}}` → `PUT /api/1/rows/{id}`); `POST /api/tables/nodes/<type>/<id>/rows` creates a row view/table-scoped; `DELETE …/rows/<rowId>` removes it (view-scoped delete for view nodes). All endpoints require auth and answer 424 while Nextcloud is disconnected.
+- The app lists the application's nodes and renders the open one as an interactive grid: `selection`+`check` columns as checkboxes (the "done" pattern), `number` cells numeric with −/+ steppers, `selection` columns with options as dropdowns, `text` inline-editable, `datetime`/`usergroup` read-only. Add/delete row controls; DE + EN, token variables only.

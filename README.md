@@ -169,7 +169,8 @@ Feature modules are bundled in the app and enabled at deployment level via the B
 
 ```dotenv
 MODULES=tables,monitor,wiki     # comma-separated; unset = all registered modules enabled
-MODULE_TABLES_TABLE_ID=10       # per-module settings use MODULE_<ID>_<KEY> (id uppercased, - → _)
+MODULE_TABLES_APPLICATION_ID=3  # per-module settings use MODULE_<ID>_<KEY> (id uppercased, - → _)
+                                # tables: Tables application (context) id from its /app/<id> URL
 MODULE_WIKI_SYNC_TTL_S=300      # wiki: seconds a sync result is cached before /tree re-syncs
 # MODULE_WIKI_ROOT=.Collectives # wiki: fallback DAV folder holding collectives — the per-user
                                 # user_folder setting (Collectives API) is resolved first;

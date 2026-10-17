@@ -14,7 +14,7 @@ export function testEnv(): Record<string, string> {
     AUTHENTIK_ISSUER: "https://auth.test/application/o/einring/",
     AUTHENTIK_CLIENT_ID: "einring-client",
     NEXTCLOUD_URL: "https://cloud.test/",
-    MODULE_TABLES_TABLE_ID: "7",
+    MODULE_TABLES_APPLICATION_ID: "3",
     ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     STATIC_DIR: "./does-not-exist",
   };

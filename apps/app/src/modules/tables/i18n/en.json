@@ -1,9 +1,15 @@
 {
   "nav": "Tables",
-  "loading": "Loading table…",
-  "empty": "This table has no rows.",
+  "loading": "Loading tables…",
+  "empty": "This view has no rows.",
+  "emptyApp": "This application has no views or tables.",
   "rowCount_one": "{{count}} row",
   "rowCount_other": "{{count}} rows",
-  "error": "The table could not be loaded ({{status}}).",
+  "addRow": "Add row",
+  "deleteRow": "Delete row",
+  "decrease": "Decrease",
+  "increase": "Increase",
+  "selectPlaceholder": "Select…",
+  "error": "The data could not be loaded ({{status}}).",
   "retry": "Retry"
 }

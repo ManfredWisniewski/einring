@@ -30,14 +30,31 @@ export interface TableColumn {
   title: string;
   type: string;
   subtype?: string;
+  options?: { id: number; label: string }[];
 }
 
 export interface TableRow {
   id: number;
+  /** Raw cell values keyed by columnId — resolve labels via `TableColumn.options`. */
   cells: Record<string, unknown>;
 }
 
+export type TableNodeType = "view" | "table";
+
+export interface TableNode {
+  type: TableNodeType;
+  id: number;
+  title: string;
+}
+
+/** A Nextcloud Tables application (context) and its nodes (D40). */
+export interface TablesApplication {
+  name: string;
+  nodes: TableNode[];
+}
+
 export interface TableView {
+  kind: TableNodeType;
   id: number;
   title: string;
   emoji?: string;

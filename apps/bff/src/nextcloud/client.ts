@@ -30,6 +30,44 @@ export interface TablesRow {
   data: { columnId: number; value: unknown }[];
 }
 
+/** A Tables view (curated filtered/sorted slice of a table). */
+export interface TablesViewMeta {
+  id: number;
+  title: string;
+  emoji?: string;
+  tableId?: number;
+}
+
+/**
+ * A node inside a Tables context (application). Serialized `ContextNodeRelation`;
+ * `nodeType` is a numeric enum (0 = table, 1 = view), no title included. Field
+ * casing varies across releases — snake_case (`node_id`/`node_type`) on older
+ * versions, camelCase on newer ones.
+ */
+export interface TablesContextNode {
+  nodeType?: number | string;
+  nodeId?: number | string;
+  nodeTitle?: string;
+  node_type?: number | string;
+  node_id?: number | string;
+  node_title?: string;
+}
+
+/**
+ * `GET /api/2/contexts/{id}` payload (OCS `data`). Field layout varies across
+ * Tables releases — `nodes`, `content` or `pages[].content` — the module
+ * flattens all of them.
+ */
+export interface TablesContext {
+  id?: number;
+  name?: string;
+  title?: string;
+  iconEmoji?: string;
+  nodes?: TablesContextNode[];
+  content?: TablesContextNode[];
+  pages?: { content?: TablesContextNode[] }[];
+}
+
 export interface TablesTable {
   id: number;
   title: string;
@@ -198,17 +236,38 @@ export class AuthenticatedNextcloud {
     this.davBase = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(loginName)}`;
   }
 
-  private async get<T>(path: string): Promise<T> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      headers: {
-        Authorization: this.authHeader,
-        "OCS-APIRequest": "true",
-        Accept: "application/json",
-        "User-Agent": this.userAgent,
-      },
-    });
-    if (!res.ok) throw new NextcloudError(res.status, `GET ${path} -> ${res.status}`);
+  private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const headers: Record<string, string> = {
+      Authorization: this.authHeader,
+      "OCS-APIRequest": "true",
+      Accept: "application/json",
+      "User-Agent": this.userAgent,
+    };
+    const init: RequestInit = { method, headers };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, init);
+    if (!res.ok) throw new NextcloudError(res.status, `${method} ${path} -> ${res.status}`);
+    if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
+  }
+
+  private get<T>(path: string): Promise<T> {
+    return this.send<T>("GET", path);
+  }
+
+  private post<T>(path: string, body: unknown): Promise<T> {
+    return this.send<T>("POST", path, body);
+  }
+
+  private put<T>(path: string, body: unknown): Promise<T> {
+    return this.send<T>("PUT", path, body);
+  }
+
+  private del<T>(path: string): Promise<T> {
+    return this.send<T>("DELETE", path);
   }
 
   getTable(tableId: number) {
@@ -221,6 +280,51 @@ export class AuthenticatedNextcloud {
 
   getRows(tableId: number) {
     return this.get<TablesRow[]>(`/index.php/apps/tables/api/1/tables/${tableId}/rows`);
+  }
+
+  // -- Tables applications (contexts) — OCS v2; v1 has no context endpoints (D40).
+
+  getContext(contextId: number) {
+    return this.get<OcsResponse<TablesContext>>(
+      `/ocs/v2.php/apps/tables/api/2/contexts/${contextId}`,
+    );
+  }
+
+  // -- Views — v1 REST.
+
+  getView(viewId: number) {
+    return this.get<TablesViewMeta>(`/index.php/apps/tables/api/1/views/${viewId}`);
+  }
+
+  getViewColumns(viewId: number) {
+    return this.get<TablesColumn[]>(`/index.php/apps/tables/api/1/views/${viewId}/columns`);
+  }
+
+  getViewRows(viewId: number) {
+    return this.get<TablesRow[]>(`/index.php/apps/tables/api/1/views/${viewId}/rows`);
+  }
+
+  // -- Row writes — v1 REST; `data` is [{columnId, value}] like the read shape.
+
+  createRowInTable(tableId: number, data: { columnId: number; value: unknown }[]) {
+    return this.post<TablesRow>(`/index.php/apps/tables/api/1/tables/${tableId}/rows`, { data });
+  }
+
+  createRowInView(viewId: number, data: { columnId: number; value: unknown }[]) {
+    return this.post<TablesRow>(`/index.php/apps/tables/api/1/views/${viewId}/rows`, { data });
+  }
+
+  updateRow(rowId: number, data: { columnId: number; value: unknown }[]) {
+    return this.put<TablesRow>(`/index.php/apps/tables/api/1/rows/${rowId}`, { data });
+  }
+
+  deleteRow(rowId: number) {
+    return this.del<void>(`/index.php/apps/tables/api/1/rows/${rowId}`);
+  }
+
+  /** View-scoped delete — the only correct way to drop a row inside a shared view. */
+  deleteRowByView(viewId: number, rowId: number) {
+    return this.del<void>(`/index.php/apps/tables/api/1/views/${viewId}/rows/${rowId}`);
   }
 
   /** Serverinfo app: CPU/memory/storage/version overview. */

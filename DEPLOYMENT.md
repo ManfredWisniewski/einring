@@ -67,7 +67,9 @@ PUBLIC_URL=https://einring.example.com
 # Comma-separated enabled module ids; unset = all registered modules enabled
 # MODULES=tables,monitor,wiki,csv-manager
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
-# MODULE_TABLES_TABLE_ID=10
+# MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
+#                                 # the module lists the application's views/tables and edits
+#                                 # rows through them. Requires the Nextcloud Tables app.
 # MODULE_WIKI_SYNC_TTL_S=300
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 # MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)
