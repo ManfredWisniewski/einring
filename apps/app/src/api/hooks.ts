@@ -12,6 +12,8 @@ import type {
   EinChatReply,
   EinChatStatus,
   EinChatTools,
+  EmailList,
+  EmailMessage,
   LoginFlowStart,
   Me,
   ModuleRegistry,
@@ -51,6 +53,8 @@ export const keys = {
   csvFile: (id: number) => ["csv-manager", "file", id] as const,
   einchatStatus: ["einchat", "status"] as const,
   einchatTools: ["einchat", "tools"] as const,
+  emailList: ["email", "list"] as const,
+  emailMessage: (uid: number) => ["email", "message", uid] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -410,5 +414,36 @@ export function useConnectorDisconnect(service: string) {
   return useMutation({
     mutationFn: () => api.delete<ConnectorStatus>(`/${service}/credentials`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["connector", service] }),
+  });
+}
+
+export function useEmailList(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.emailList,
+    queryFn: () => api.get<EmailList>("/email/list"),
+    enabled,
+  });
+}
+
+/** Lazy per-message fetch — run only when a mail row is expanded. */
+export function useEmailMessage(uid: number | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.emailMessage(uid ?? 0),
+    queryFn: () => api.get<EmailMessage>(`/email/message/${uid}`),
+    enabled: uid !== null,
+  });
+}
+
+export function useEmailDelete() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uid: number) => api.delete(`/email/message/${uid}`),
+    onSuccess: (_d, uid) => {
+      void qc.invalidateQueries({ queryKey: keys.emailList });
+      void qc.removeQueries({ queryKey: keys.emailMessage(uid) });
+    },
   });
 }

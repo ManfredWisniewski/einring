@@ -1,0 +1,55 @@
+{
+  "nav": "Moniteur",
+  "tabs": {
+    "server": "Serveur",
+    "talk": "Talk"
+  },
+  "server": {
+    "version": "Version de Nextcloud",
+    "webserver": "Serveur web",
+    "php": "PHP",
+    "database": "Base de données",
+    "cpuLoad": "Charge CPU (1 / 5 / 15 min)",
+    "memory": "Mémoire",
+    "swap": "Swap",
+    "freeOf": "{{free}} libres sur {{total}}",
+    "freeSpace": "Espace libre (répertoire de données)",
+    "users": "Utilisateurs",
+    "usersTotal": "{{count}} au total",
+    "active": "{{m}} / {{h}} / {{d}} actifs (5 min / 1 h / 24 h)",
+    "apps": "Applications",
+    "appsDetail_one": "{{installed}} installées, {{updates}} mise à jour disponible",
+    "appsDetail_many": "{{installed}} installées, {{updates}} mises à jour disponibles",
+    "appsDetail_other": "{{installed}} installées, {{updates}} mises à jour disponibles",
+    "product": "Produit",
+    "detectedApps": "Applications détectées",
+    "appUserStatus": "Statut utilisateur",
+    "storage": "Votre stockage",
+    "storageOf": "{{used}} utilisés sur {{total}}",
+    "storageUnlimited": "{{used}} utilisés (illimité)",
+    "noAdmin": "Les informations du serveur nécessitent un compte Nextcloud administrateur.",
+    "error": "Les informations du serveur n'ont pas pu être chargées ({{status}}).",
+    "retry": "Réessayer"
+  },
+  "talk": {
+    "search": "Rechercher un utilisateur",
+    "group": "Groupe",
+    "allGroups": "Tous les groupes",
+    "noGroups": "Informations sur les groupes indisponibles (nécessite un compte administrateur ou administrateur de groupe).",
+    "partialGroups": "Seuls les groupes gérables par le compte connecté sont affichés.",
+    "empty": "Aucun utilisateur correspondant.",
+    "lastSeen": "Dernière connexion",
+    "error": "Le statut Talk n'a pas pu être chargé ({{status}}).",
+    "retry": "Réessayer",
+    "count_one": "{{count}} utilisateur",
+    "count_many": "{{count}} utilisateurs",
+    "count_other": "{{count}} utilisateurs",
+    "status": {
+      "online": "En ligne",
+      "away": "Absent",
+      "dnd": "Ne pas déranger",
+      "invisible": "Invisible",
+      "offline": "Hors ligne"
+    }
+  }
+}

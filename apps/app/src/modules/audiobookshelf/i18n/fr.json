@@ -1,0 +1,15 @@
+{
+  "nav": "Audiobookshelf",
+  "intro": "Connectez votre compte Audiobookshelf pour qu'EinChat puisse rechercher dans votre bibliothèque de livres audio et de podcasts et vous dire où vous en êtes. Créez un jeton API dans Audiobookshelf sous Paramètres → Utilisateurs → votre utilisateur → API Token.",
+  "apiKey": "Jeton API",
+  "apiKeyPlaceholder": "Jeton API Audiobookshelf",
+  "url": "URL du serveur",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "EinChat peut maintenant répondre aux questions comme « est-ce que j'écoute ce livre audio ? »",
+  "invalidKey": "Audiobookshelf a rejeté ce jeton API.",
+  "error": "Échec de la connexion à Audiobookshelf ({{status}})."
+}

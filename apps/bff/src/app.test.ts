@@ -1528,6 +1528,8 @@ describe("einchat", () => {
         "trek_list_trips",
         "trek_trip_details",
         "trek_bucket_list",
+        "email_recent",
+        "email_read",
       ],
     });
   });
@@ -1645,7 +1647,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(10);
+    expect(all.json().tools.length).toBe(12);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -1958,6 +1960,139 @@ describe("connectors (audiobookshelf, navidrome, trek)", () => {
   });
 });
 
+describe("email", () => {
+  const RFC822 = [
+    "From: Galadriel <galadriel@lorien.test>",
+    "To: frodo@shire.test",
+    "Subject: Ring status",
+    "Date: Tue, 16 Oct 2026 10:00:00 +0000",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "It is still on your finger.",
+  ].join("\r\n");
+
+  /** Fake IMAP client: `exists` envelopes + one readable source (uid 42). */
+  function fakeImap(opts: { exists?: number; authFail?: boolean } = {}) {
+    const envelopes = Array.from({ length: opts.exists ?? 7 }, (_, i) => ({
+      uid: 36 + i,
+      envelope: {
+        subject: `Mail ${i + 1}`,
+        date: new Date(`2026-10-${10 + i}T08:00:00Z`),
+        from: [{ name: `Sender ${i + 1}`, address: `s${i + 1}@test` }],
+      },
+    }));
+    const calls: { host?: string; port?: number; user?: string } = {};
+    const deleted: number[] = [];
+    const open = async (c: { host: string; port: number; user: string }) => {
+      Object.assign(calls, c);
+      if (opts.authFail) {
+        const err = new Error("AUTHENTICATIONFAILED") as Error & { authenticationFailed: boolean };
+        err.authenticationFailed = true;
+        throw err;
+      }
+      return {
+        mailbox: { exists: envelopes.length },
+        connect: async () => {},
+        logout: async () => {},
+        getMailboxLock: async () => ({ release: () => {} }),
+        async *fetch(range: string) {
+          // honor "<start>:*" seq ranges (1-based), like a real server
+          const start = Number(range.split(":")[0]) || 1;
+          for (const m of envelopes.slice(start - 1)) yield m;
+        },
+        fetchOne: async (_seq: unknown, query?: { source?: boolean }) => {
+          const uid = Number(_seq);
+          if (uid === 42) {
+            return { uid, source: query?.source ? Buffer.from(RFC822) : undefined };
+          }
+          return false;
+        },
+        messageDelete: async (range: number | string) => {
+          deleted.push(Number(range));
+          return true;
+        },
+      };
+    };
+    return { open, calls, deleted };
+  }
+
+  it("connects with a bare host, verifies via IMAP login, lists last 5", async () => {
+    const imap = fakeImap();
+    const { app, auth, store } = await testApp({ imapOpen: imap.open });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: "imap.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(conn.json()).toEqual({ connected: true, url: "imaps://imap.test" });
+    expect(imap.calls).toMatchObject({ host: "imap.test", port: 993, user: "frodo" });
+    expect(store.getServiceCredential(TEST_USER.sub, "email")?.secretSealed).not.toContain("ring");
+
+    const list = await app.inject({ method: "GET", url: "/api/email/list", headers: auth });
+    expect(list.statusCode).toBe(200);
+    const emails = list.json().emails as { uid: number; subject: string }[];
+    expect(emails).toHaveLength(5); // 7 exist → newest 5
+    expect(emails[0]?.uid).toBe(42); // reversed: newest first
+    expect(emails[0]?.subject).toBe("Mail 7");
+  });
+
+  it("reads a message body by uid, 404s unknown, 424s unconnected", async () => {
+    const imap = fakeImap();
+    const { app, auth } = await testApp({ imapOpen: imap.open });
+    await app.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: "imaps://imap.test:9993" },
+    });
+    expect(imap.calls.port).toBe(9993);
+
+    const msg = await app.inject({ method: "GET", url: "/api/email/message/42", headers: auth });
+    expect(msg.statusCode).toBe(200);
+    expect(msg.json()).toMatchObject({
+      subject: "Ring status",
+      from: { address: "galadriel@lorien.test" },
+      text: expect.stringContaining("still on your finger"),
+    });
+
+    expect(
+      (await app.inject({ method: "GET", url: "/api/email/message/99", headers: auth })).statusCode,
+    ).toBe(404);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/email/message/x", headers: auth })).statusCode,
+    ).toBe(400);
+
+    const del = await app.inject({ method: "DELETE", url: "/api/email/message/42", headers: auth });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toEqual({ deleted: true });
+    expect(imap.deleted).toEqual([42]);
+    expect(
+      (await app.inject({ method: "DELETE", url: "/api/email/message/99", headers: auth }))
+        .statusCode,
+    ).toBe(404);
+
+    const { app: bare, auth: bareAuth } = await testApp({ imapOpen: imap.open });
+    expect(
+      (await bare.inject({ method: "GET", url: "/api/email/list", headers: bareAuth })).statusCode,
+    ).toBe(424);
+  });
+
+  it("maps an IMAP auth failure to 401 and never stores the secret", async () => {
+    const imap = fakeImap({ authFail: true });
+    const { app, auth, store } = await testApp({ imapOpen: imap.open });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "wrong", url: "imap.test" },
+    });
+    expect(conn.statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "email")).toBeUndefined();
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -1974,6 +2109,7 @@ describe("module framework", () => {
         { id: "audiobookshelf", requires: [] },
         { id: "navidrome", requires: [] },
         { id: "trek", requires: [] },
+        { id: "email", requires: [] },
       ],
     });
   });

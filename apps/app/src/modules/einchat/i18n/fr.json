@@ -1,0 +1,14 @@
+{
+  "nav": "EinChat",
+  "connections": "Connexions de données",
+  "connectionsError": "La sélection n'a pas pu être enregistrée ({{status}}).",
+  "empty": "Demandez ce que vous voulez — les modules connectés peuvent répondre à partir de vos données.",
+  "inputLabel": "Message",
+  "placeholder": "par ex. ai-je vu Les Deux Tours ?",
+  "send": "Envoyer",
+  "sending": "Envoi…",
+  "thinking": "Réflexion…",
+  "tools": "Outils disponibles : {{tools}}",
+  "notConfigured": "EinChat n'est pas configuré sur ce serveur.",
+  "error": "Le message n'a pas pu être envoyé ({{status}})."
+}

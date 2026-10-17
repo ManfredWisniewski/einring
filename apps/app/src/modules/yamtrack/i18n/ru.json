@@ -1,0 +1,15 @@
+{
+  "nav": "Yamtrack",
+  "intro": "Подключите ваш аккаунт Yamtrack, чтобы EinChat мог отвечать на вопросы о просмотренных фильмах, сериалах, книгах и играх. Создайте API-токен в Yamtrack в разделе Настройки → Интеграции.",
+  "apiKey": "API-ключ",
+  "apiKeyPlaceholder": "API-токен Yamtrack",
+  "url": "URL экземпляра (необязательно)",
+  "connect": "Подключить",
+  "connecting": "Подключение…",
+  "connected": "Подключено к {{url}}.",
+  "disconnect": "Отключить",
+  "disconnecting": "Отключение…",
+  "hint": "EinChat теперь может отвечать на вопросы вроде «смотрел ли я этот фильм?»",
+  "invalidKey": "Yamtrack отклонил этот API-ключ.",
+  "error": "Не удалось подключиться к Yamtrack ({{status}})."
+}

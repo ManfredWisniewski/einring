@@ -1,0 +1,15 @@
+{
+  "nav": "Navidrome",
+  "intro": "Connectez votre compte Navidrome pour qu'EinChat puisse rechercher dans votre bibliothèque musicale. Utilisez votre nom d'utilisateur et mot de passe Navidrome — le mot de passe est stocké chiffré et sert uniquement à générer des jetons API Subsonic.",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "url": "URL du serveur",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "EinChat peut maintenant répondre aux questions comme « est-ce que j'ai cet album ? »",
+  "invalidKey": "Navidrome a rejeté ces identifiants.",
+  "error": "Échec de la connexion à Navidrome ({{status}})."
+}

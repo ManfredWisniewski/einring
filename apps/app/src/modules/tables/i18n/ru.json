@@ -1,0 +1,17 @@
+{
+  "nav": "Таблицы",
+  "loading": "Загрузка таблиц…",
+  "empty": "В этом представлении нет строк.",
+  "emptyApp": "В этом приложении нет представлений или таблиц.",
+  "rowCount_one": "{{count}} строка",
+  "rowCount_few": "{{count}} строки",
+  "rowCount_many": "{{count}} строк",
+  "rowCount_other": "{{count}} строк",
+  "addRow": "Добавить строку",
+  "deleteRow": "Удалить строку",
+  "decrease": "Уменьшить",
+  "increase": "Увеличить",
+  "selectPlaceholder": "Выбрать…",
+  "error": "Не удалось загрузить данные ({{status}}).",
+  "retry": "Повторить"
+}

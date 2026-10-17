@@ -1,0 +1,54 @@
+{
+  "app": {
+    "name": "Einring",
+    "tagline": "Un anneau pour les contrôler tous"
+  },
+  "nav": {
+    "label": "Modules",
+    "logout": "Se déconnecter"
+  },
+  "auth": {
+    "login": "Se connecter avec Authentik",
+    "loading": "Vérification de la connexion…",
+    "completing": "Finalisation de la connexion…",
+    "failed": "Échec de la connexion : {{reason}}",
+    "signedInAs": "Connecté en tant que {{name}}",
+    "missingConfig": "Configuration manquante : {{keys}}. Copiez apps/app/.env.example vers .env.local et ajoutez les valeurs."
+  },
+  "theme": {
+    "label": "Thème",
+    "system": "Système",
+    "light": "Clair",
+    "dark": "Sombre"
+  },
+  "language": {
+    "label": "Langue"
+  },
+  "info": {
+    "open": "À propos de {{name}}",
+    "close": "Fermer les informations",
+    "title": "À propos de {{name}}",
+    "description": "{{name}} fournit une interface unique pour gérer les services connectés.",
+    "version": "Version {{version}}"
+  },
+  "nextcloud": {
+    "title": "Nextcloud",
+    "notConnected": "{{name}} n'est pas encore connecté à votre compte Nextcloud.",
+    "connect": "Connecter Nextcloud",
+    "waiting": "Terminez la connexion à Nextcloud dans la fenêtre du navigateur…",
+    "openAgain": "Rouvrir la page de connexion",
+    "connectedAs": "Connecté en tant que {{user}} sur {{server}}",
+    "disconnect": "Déconnecter",
+    "error": "La requête Nextcloud a échoué ({{status}})."
+  },
+  "modules": {
+    "none": "Aucun module n'est activé pour ce déploiement.",
+    "error": "Le registre des modules n'a pas pu être chargé — le BFF est-il accessible ?",
+    "retry": "Réessayer"
+  },
+  "common": {
+    "loading": "Chargement…",
+    "yes": "oui",
+    "no": "non"
+  }
+}

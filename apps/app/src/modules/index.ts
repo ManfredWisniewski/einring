@@ -2,6 +2,7 @@ import type { ModuleInfo } from "@/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
+import { emailModule } from "./email";
 import { monitorModule } from "./monitor";
 import { navidromeModule } from "./navidrome";
 import { tablesModule } from "./tables";
@@ -23,6 +24,7 @@ export const appModules: AppModule[] = [
   audiobookshelfModule,
   navidromeModule,
   trekModule,
+  emailModule,
 ];
 
 /**
@@ -35,6 +37,6 @@ export function resolveAppModules(registry?: ModuleInfo[]): AppModule[] {
 }
 
 /** `modules.<id>` translation subtree for one language, across all bundled modules. */
-export function moduleTranslations(lang: "de" | "en"): Record<string, unknown> {
+export function moduleTranslations(lang: "de" | "en" | "ru" | "fr"): Record<string, unknown> {
   return Object.fromEntries(appModules.map((m) => [m.id, m.i18n?.[lang] ?? {}]));
 }

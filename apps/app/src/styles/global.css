@@ -548,3 +548,10 @@ a {
   color: var(--text-secondary);
   text-decoration: line-through;
 }
+
+/* --- Email ---------------------------------------------------------------- */
+
+.email-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

@@ -211,9 +211,33 @@ export interface EinChatTools {
   tools: EinChatTool[];
 }
 
-/** Connector-module connection state (yamtrack, audiobookshelf, navidrome, trek). */
+/** Connector-module connection state (yamtrack, audiobookshelf, navidrome, trek, email). */
 export interface ConnectorStatus {
   connected: boolean;
   /** Connected instance URL, or the deployment default when not yet connected. */
   url: string | null;
+}
+
+export interface EmailAddress {
+  name: string | null;
+  address: string | null;
+}
+
+export interface EmailSummary {
+  uid: number;
+  subject: string | null;
+  from: EmailAddress | null;
+  date: string | null;
+}
+
+export interface EmailList {
+  emails: EmailSummary[];
+}
+
+export interface EmailMessage {
+  subject: string | null;
+  from: EmailAddress | null;
+  date: string | null;
+  text: string | null;
+  html: string | null;
 }

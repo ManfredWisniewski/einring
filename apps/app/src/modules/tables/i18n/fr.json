@@ -1,0 +1,16 @@
+{
+  "nav": "Tables",
+  "loading": "Chargement des tables…",
+  "empty": "Cette vue ne contient aucune ligne.",
+  "emptyApp": "Cette application ne contient aucune vue ni table.",
+  "rowCount_one": "{{count}} ligne",
+  "rowCount_many": "{{count}} lignes",
+  "rowCount_other": "{{count}} lignes",
+  "addRow": "Ajouter une ligne",
+  "deleteRow": "Supprimer la ligne",
+  "decrease": "Diminuer",
+  "increase": "Augmenter",
+  "selectPlaceholder": "Choisir…",
+  "error": "Les données n'ont pas pu être chargées ({{status}}).",
+  "retry": "Réessayer"
+}

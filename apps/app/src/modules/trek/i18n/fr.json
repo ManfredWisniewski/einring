@@ -1,0 +1,15 @@
+{
+  "nav": "Trek",
+  "intro": "Connectez votre compte Trek pour qu'EinChat puisse lister vos voyages et itinéraires. Créez une clé API dans Trek sous Paramètres → Intégrations → API Keys (les clés commencent par trek_).",
+  "apiKey": "Clé API",
+  "apiKeyPlaceholder": "trek_…",
+  "url": "URL de l'instance",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "EinChat peut maintenant répondre aux questions comme « quels voyages ai-je prévus ? »",
+  "invalidKey": "Trek a rejeté cette clé API.",
+  "error": "Échec de la connexion à Trek ({{status}})."
+}

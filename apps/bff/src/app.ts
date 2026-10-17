@@ -9,6 +9,7 @@ import type { Config } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
 import { createLlmService, LlmError, type LlmService } from "./llm/client.js";
+import type { ImapOpen } from "./modules/email.js";
 import { type ResolvedModule, resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
 import { registerNextcloudPublicRoutes, registerNextcloudRoutes } from "./routes/nextcloud.js";
@@ -19,6 +20,8 @@ export interface AppDeps {
   secrets: SecretBox;
   verifyToken: TokenVerifier;
   fetchImpl?: Fetch;
+  /** IMAP opener for the email module; injectable for tests. */
+  imapOpen?: ImapOpen;
   logger?: boolean | object;
 }
 

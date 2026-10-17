@@ -2,6 +2,8 @@ import { lazy } from "react";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
+import fr from "./i18n/fr.json";
+import ru from "./i18n/ru.json";
 
 const YamtrackPage = lazy(() =>
   import("./YamtrackPage").then((m) => ({ default: m.YamtrackPage })),
@@ -12,5 +14,5 @@ export const yamtrackModule: AppModule = {
   hasBackend: true,
   nav: { i18nKey: "modules.yamtrack.nav" },
   routes: [{ path: "/yamtrack", Component: YamtrackPage }],
-  i18n: { de, en },
+  i18n: { de, en, fr, ru },
 };

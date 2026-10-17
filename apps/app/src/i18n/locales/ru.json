@@ -1,0 +1,54 @@
+{
+  "app": {
+    "name": "Einring",
+    "tagline": "Одно кольцо, чтобы управлять всеми"
+  },
+  "nav": {
+    "label": "Модули",
+    "logout": "Выйти"
+  },
+  "auth": {
+    "login": "Войти через Authentik",
+    "loading": "Проверка входа…",
+    "completing": "Завершение входа…",
+    "failed": "Ошибка входа: {{reason}}",
+    "signedInAs": "Вы вошли как {{name}}",
+    "missingConfig": "Отсутствует конфигурация: {{keys}}. Скопируйте apps/app/.env.example в .env.local и добавьте значения."
+  },
+  "theme": {
+    "label": "Тема",
+    "system": "Системная",
+    "light": "Светлая",
+    "dark": "Тёмная"
+  },
+  "language": {
+    "label": "Язык"
+  },
+  "info": {
+    "open": "О приложении {{name}}",
+    "close": "Закрыть информацию",
+    "title": "О приложении {{name}}",
+    "description": "{{name}} предоставляет единый интерфейс для управления подключёнными сервисами.",
+    "version": "Версия {{version}}"
+  },
+  "nextcloud": {
+    "title": "Nextcloud",
+    "notConnected": "{{name}} ещё не подключён к вашему аккаунту Nextcloud.",
+    "connect": "Подключить Nextcloud",
+    "waiting": "Завершите вход в Nextcloud в окне браузера…",
+    "openAgain": "Открыть страницу входа снова",
+    "connectedAs": "Подключено как {{user}} на {{server}}",
+    "disconnect": "Отключить",
+    "error": "Ошибка запроса к Nextcloud ({{status}})."
+  },
+  "modules": {
+    "none": "Для этого развёртывания модули не включены.",
+    "error": "Не удалось загрузить реестр модулей — доступен ли BFF?",
+    "retry": "Повторить"
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "yes": "да",
+    "no": "нет"
+  }
+}

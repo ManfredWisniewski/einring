@@ -1,0 +1,21 @@
+{
+  "nav": "E-Mail",
+  "intro": "Verbinde dein IMAP-Postfach, damit einring deine neuesten E-Mails anzeigen kann. Nutze Benutzername und Passwort deines Mail-Kontos — verschlüsselt gespeichert und nur für den IMAP-Login verwendet.",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "url": "IMAP-Server",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "EinChat kann jetzt Fragen zu deinem Posteingang beantworten.",
+  "invalidKey": "Der Mailserver hat diese Zugangsdaten abgelehnt.",
+  "error": "Mail-Verbindung fehlgeschlagen ({{status}}).",
+  "empty": "Dein Posteingang ist leer.",
+  "noSubject": "(kein Betreff)",
+  "noContent": "(kein Inhalt)",
+  "unknownSender": "Unbekannter Absender",
+  "delete": "Löschen",
+  "deleting": "Lösche…"
+}

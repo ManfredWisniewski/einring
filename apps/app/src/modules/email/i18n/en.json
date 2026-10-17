@@ -1,0 +1,21 @@
+{
+  "nav": "E-Mail",
+  "intro": "Connect your IMAP mailbox so einring can list your newest mail. Use your mail account's username and password — stored encrypted, used only for the IMAP login.",
+  "username": "Username",
+  "password": "Password",
+  "url": "IMAP server",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "EinChat can now answer questions about your inbox.",
+  "invalidKey": "The mail server rejected these credentials.",
+  "error": "Mail connection failed ({{status}}).",
+  "empty": "Your inbox is empty.",
+  "noSubject": "(no subject)",
+  "noContent": "(no content)",
+  "unknownSender": "Unknown sender",
+  "delete": "Delete",
+  "deleting": "Deleting…"
+}

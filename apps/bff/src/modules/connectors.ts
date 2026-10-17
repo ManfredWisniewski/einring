@@ -16,6 +16,12 @@ export interface ConnectorOptions {
    * Return {error} on bad input → 400.
    */
   parseSecret(body: unknown): { secret: string } | { error: string };
+  /**
+   * Override URL handling (default: `z.url()` on body.url, else defaultUrl).
+   * For non-HTTP connectors (e.g. IMAP hosts) return the normalized address or
+   * null → 400. `raw` is the body's url field.
+   */
+  parseUrl?(raw: unknown): string | null;
   /** Probe the upstream service with the would-be secret; return its HTTP status. */
   verify(fetchImpl: Fetch, url: string, secret: string): Promise<number>;
 }
@@ -79,6 +85,9 @@ export function registerConnectorRoutes(
   const { store, secrets } = ctx;
   const fetchImpl = ctx.fetchImpl ?? fetch;
   const urlOf = (body: unknown) => {
+    if (opts.parseUrl) {
+      return opts.parseUrl((body as { url?: unknown })?.url ?? opts.defaultUrl) ?? "";
+    }
     const raw = connectorUrlSchema.safeParse((body as { url?: unknown })?.url);
     return normalizeBase(raw.success ? raw.data : (opts.defaultUrl ?? ""));
   };

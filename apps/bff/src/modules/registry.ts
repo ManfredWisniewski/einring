@@ -2,6 +2,7 @@ import type { Config } from "../config.js";
 import { audiobookshelfModule } from "./audiobookshelf.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
+import { emailModule } from "./email.js";
 import { monitorModule } from "./monitor.js";
 import { navidromeModule } from "./navidrome.js";
 import { tablesModule } from "./tables.js";
@@ -21,6 +22,7 @@ export const bffModules: BffModule[] = [
   audiobookshelfModule,
   navidromeModule,
   trekModule,
+  emailModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

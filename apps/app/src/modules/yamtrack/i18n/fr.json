@@ -1,0 +1,15 @@
+{
+  "nav": "Yamtrack",
+  "intro": "Connectez votre compte Yamtrack pour qu'EinChat puisse répondre aux questions sur vos films, séries, livres et jeux. Créez un jeton API dans Yamtrack sous Paramètres → Intégrations.",
+  "apiKey": "Clé API",
+  "apiKeyPlaceholder": "Jeton API Yamtrack",
+  "url": "URL de l'instance (facultatif)",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "EinChat peut maintenant répondre aux questions comme « ai-je vu ce film ? »",
+  "invalidKey": "Yamtrack a rejeté cette clé API.",
+  "error": "Échec de la connexion à Yamtrack ({{status}})."
+}

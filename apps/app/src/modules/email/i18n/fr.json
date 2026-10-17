@@ -1,0 +1,21 @@
+{
+  "nav": "E-mail",
+  "intro": "Connectez votre boîte IMAP pour qu'einring puisse afficher vos derniers e-mails. Utilisez le nom d'utilisateur et le mot de passe de votre compte mail — stockés chiffrés et utilisés uniquement pour la connexion IMAP.",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "url": "Serveur IMAP",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "EinChat peut maintenant répondre aux questions sur votre boîte de réception.",
+  "invalidKey": "Le serveur de messagerie a rejeté ces identifiants.",
+  "error": "Échec de la connexion au serveur de messagerie ({{status}}).",
+  "empty": "Votre boîte de réception est vide.",
+  "noSubject": "(sans objet)",
+  "noContent": "(aucun contenu)",
+  "unknownSender": "Expéditeur inconnu",
+  "delete": "Supprimer",
+  "deleting": "Suppression…"
+}

@@ -19,5 +19,5 @@ export interface AppModule {
   nav?: { i18nKey: string };
   routes: ModuleRoute[];
   /** Locale bundles merged under `modules.<id>` in the default namespace. */
-  i18n?: { de: Record<string, unknown>; en: Record<string, unknown> };
+  i18n?: Partial<Record<"de" | "en" | "ru" | "fr", Record<string, unknown>>>;
 }

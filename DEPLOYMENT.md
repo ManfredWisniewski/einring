@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek
+# MODULES=tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -85,6 +85,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_AUDIOBOOKSHELF_URL=  # same for the other connectors
 # MODULE_NAVIDROME_URL=
 # MODULE_TREK_URL=
+# MODULE_EMAIL_URL=           # default IMAP server, e.g. imaps://imap.example.com:993
 LOG_LEVEL=info
 ```
 
@@ -218,6 +219,7 @@ Connectors share one pattern (D41): each user links their own account in the app
 | `audiobookshelf` | API token (Settings → Users → API Token) | `audiobookshelf_search` (library search → listening progress), `audiobookshelf_in_progress` |
 | `navidrome` | username + password (Subsonic token auth) | `navidrome_search` (artists/albums/songs), `navidrome_albums` (newest/recent/starred/random) |
 | `trek` | API key `trek_…` (Settings → Integrations → API Keys) | `trek_list_trips`, `trek_trip_details`, `trek_bucket_list` |
+| `email` | IMAP username + password + server (`imaps://host:993` or bare host; the `url` field accepts non-HTTP addresses via the connector's `parseUrl` override) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
 
 ## Embedded in Nextcloud (External sites)
 
