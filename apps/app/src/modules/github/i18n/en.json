@@ -1,0 +1,17 @@
+{
+  "nav": "GitHub",
+  "intro": "Connect GitHub so your notifications (mentions, review requests, assignments, CI results) show up in EinHub and here. Create a personal access token in GitHub under Settings → Developer settings → Personal access tokens (scope: notifications).",
+  "apiKey": "Personal access token",
+  "apiKeyPlaceholder": "ghp_…",
+  "url": "GitHub URL",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "connectedAs": "Connected to {{url}}",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "New GitHub notifications now appear in EinHub and EinChat can list them.",
+  "invalidKey": "GitHub rejected this token.",
+  "error": "GitHub request failed ({{status}}).",
+  "empty": "No notifications — all read."
+}

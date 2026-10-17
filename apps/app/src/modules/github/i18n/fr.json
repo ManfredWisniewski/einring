@@ -1,0 +1,17 @@
+{
+  "nav": "GitHub",
+  "intro": "Connectez GitHub pour que vos notifications (mentions, demandes de revue, assignations, résultats CI) apparaissent dans EinHub et ici. Créez un jeton d'accès personnel dans GitHub sous Paramètres → Developer settings → Personal access tokens (portée : notifications).",
+  "apiKey": "Jeton d'accès personnel",
+  "apiKeyPlaceholder": "ghp_…",
+  "url": "URL GitHub",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "connectedAs": "Connecté à {{url}}",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "Les nouvelles notifications GitHub apparaissent dans EinHub et EinChat peut les lister.",
+  "invalidKey": "GitHub a rejeté ce jeton.",
+  "error": "Échec de la requête GitHub ({{status}}).",
+  "empty": "Aucune notification — tout est lu."
+}

@@ -137,3 +137,29 @@
 - `GET /api/gotify/stream` is an SSE endpoint: the BFF opens the upstream WebSocket `/stream?token=` and forwards each message frame — the client token never reaches the browser (EventSource can't send `Authorization`). The app merges streamed messages into the live list.
 - The app `/gotify` page shows the shared connect form until linked, then the message list (app name, priority dot, title, time), expandable to a rendered body (markdown when `contentType` is `text/markdown`, plain otherwise, sanitized), with per-message delete and a delete-all action, plus an applications section (list with token, create, delete) — localized DE + EN + RU + FR.
 - EinChat gets `gotify_recent_messages {limit?}` and `gotify_applications` tools; without a credential they answer `not_connected`.
+
+### A18 EinHub (notification hub, default module)
+
+- `einhub` is the first module: first nav entry and the app index route (`/` redirects to `/einhub`). Like every module it is gated by `MODULES` — when disabled, the next module takes the index slot.
+- `BffModule` may expose `notifications(ctx, config)` → `{poll(sub)}` returning recent upstream items `{sourceId, title, body?, at?}`; disconnected or failing sources return `[]` — a broken source never breaks the hub.
+- `GET /api/einhub/notifications` refreshes all enabled sources for the caller — throttled to `MODULE_EINHUB_REFRESH_SECONDS` (default 60) per `sub` — and answers `{notifications, unread}` newest-first. Items dedupe per user via `UNIQUE(sub, module, source_id)`; the first poll of a module seeds its items as **read** history (no alert storm on first connect).
+- `POST /api/einhub/notifications/<id>/read` marks one notification read (404 for foreign/unknown ids); `POST /api/einhub/read-all` marks all of the caller's notifications read.
+- `gotify` feeds pushed messages (sourceId = upstream message id, title/body/priority time); `email` feeds new INBOX envelopes (sourceId = uid). Both reuse their sealed per-user credentials — notification content reaches only the owning `sub`.
+- The `/einhub` page lists notification cards (module name, title, body, time; unread highlighted) with a mark-all-read action; tapping a card marks it read and links to the source module page when that module is enabled. The nav entry carries an unread-count badge that updates while any page is open. DE + EN + RU + FR.
+- EinChat gets an `einhub_notifications` tool listing the caller's recent notifications.
+
+### A19 GitLab module (connector + notifications)
+
+- `gitlab` uses the shared connector routes with a personal access token: `POST /api/gitlab/credentials {apiKey, url}`; the BFF verifies via `GET /api/v4/user` (`PRIVATE-TOKEN` header) before sealing per `sub`; auth failure → 401, unreachable → 502. `MODULE_GITLAB_URL` may preset the instance.
+- `GET /api/gitlab/todos?limit=` returns the caller's pending GitLab todos (`{id, project, author, action, targetType, title, url, createdAt}`) — GitLab's API-side notification surface; 424 unconnected, 401 token rejected, 502 unreachable.
+- `gitlab` exposes a `notifications` source (D42): pending todos become einhub items (`sourceId` = todo id, title = `<action>: <target title>`, body = `project · author`), so new assignments/mentions/failed pipelines surface in EinHub and the nav badge.
+- The `/gitlab` page shows the shared connect form until linked, then the pending-todo list (action, title, project, time) linking to the upstream `target_url`; DE + EN + RU + FR.
+- EinChat gets a `gitlab_todos` tool; without a credential it answers `not_connected`.
+
+### A20 GitHub module (connector + notifications)
+
+- `github` uses the shared connector routes with a personal access token: `POST /api/github/credentials {apiKey, url}`; `url` is the instance web URL (`https://github.com` default or a GHES host) — the BFF maps it to the REST base (`api.github.com` / `<host>/api/v3`). Verify via `GET /user` before sealing per `sub`; auth failure → 401, unreachable → 502. `MODULE_GITHUB_URL` may preset an instance.
+- `GET /api/github/notifications?limit=` returns the caller's notification threads (`{id, unread, reason, title, type, repo, url, updatedAt}`); `url` is the web link (derived from the API subject URL). 424 unconnected, 401 token rejected, 502 unreachable.
+- `github` exposes a `notifications` source (D42): notification threads become einhub items (`sourceId` = thread id, title = `<reason>: <subject title>`, body = `repo · type`), so mentions/review requests/CI results surface in EinHub and the nav badge.
+- The `/github` page shows the shared connect form until linked, then the unread-thread list (reason, title, repo, time) linking to the upstream subject; DE + EN + RU + FR.
+- EinChat gets a `github_notifications` tool; without a credential it answers `not_connected`.

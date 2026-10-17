@@ -1,0 +1,17 @@
+{
+  "nav": "GitLab",
+  "intro": "Connect GitLab so your pending todos (assignments, mentions, review requests, failed pipelines) show up in EinHub and here. Create a personal access token in GitLab under Settings → Access Tokens (scope: read_api or api).",
+  "apiKey": "Personal access token",
+  "apiKeyPlaceholder": "glpat-…",
+  "url": "GitLab URL",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "connectedAs": "Connected to {{url}}",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "New GitLab todos now appear in EinHub and EinChat can list them.",
+  "invalidKey": "GitLab rejected this token.",
+  "error": "GitLab request failed ({{status}}).",
+  "empty": "No pending todos — all done."
+}

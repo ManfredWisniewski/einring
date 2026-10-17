@@ -2,7 +2,10 @@ import type { Config } from "../config.js";
 import { audiobookshelfModule } from "./audiobookshelf.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
+import { einhubModule } from "./einhub.js";
 import { emailModule } from "./email.js";
+import { githubModule } from "./github.js";
+import { gitlabModule } from "./gitlab.js";
 import { gotifyModule } from "./gotify.js";
 import { monitorModule } from "./monitor.js";
 import { navidromeModule } from "./navidrome.js";
@@ -14,6 +17,7 @@ import { yamtrackModule } from "./yamtrack.js";
 
 /** All modules known to the BFF. App-only modules (no backend part) don't appear here. */
 export const bffModules: BffModule[] = [
+  einhubModule,
   tablesModule,
   monitorModule,
   wikiModule,
@@ -25,6 +29,8 @@ export const bffModules: BffModule[] = [
   trekModule,
   emailModule,
   gotifyModule,
+  gitlabModule,
+  githubModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

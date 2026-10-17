@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { AppContext } from "../app.js";
-import type { Fetch } from "../nextcloud/client.js";
 import {
   type ConnectorOptions,
   connectorCred,
@@ -159,6 +158,29 @@ const options = (config: GotifyConfig): ConnectorOptions => ({
 export const gotifyModule: BffModule<GotifyConfig> = {
   id: "gotify",
   configSchema,
+
+  notifications(ctx) {
+    return {
+      // New pushed messages → einhub items; dedupe by upstream message id.
+      async poll(sub) {
+        const cred = credFor(ctx, sub);
+        if (!cred) return [];
+        const res = await gotifyGet<{ messages?: GotifyMessageRaw[] }>(
+          ctx,
+          cred.url,
+          cred.secret,
+          "/message?limit=10",
+        );
+        if (!res.body) return [];
+        return (res.body.messages ?? []).map((m) => ({
+          sourceId: String(m.id),
+          title: m.title ?? "Gotify",
+          body: m.message.slice(0, 500),
+          at: m.date,
+        }));
+      },
+    };
+  },
 
   chatTools(ctx): ChatTool[] {
     return [

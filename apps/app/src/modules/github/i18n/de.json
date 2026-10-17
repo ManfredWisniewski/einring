@@ -1,0 +1,17 @@
+{
+  "nav": "GitHub",
+  "intro": "Verbinde GitHub, damit deine Benachrichtigungen (Erwähnungen, Review-Anfragen, Zuweisungen, CI-Ergebnisse) in EinHub und hier erscheinen. Erstelle ein persönliches Zugriffstoken in GitHub unter Einstellungen → Developer settings → Personal access tokens (Scope: notifications).",
+  "apiKey": "Persönliches Zugriffstoken",
+  "apiKeyPlaceholder": "ghp_…",
+  "url": "GitHub-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "connectedAs": "Verbunden mit {{url}}",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "Neue GitHub-Benachrichtigungen erscheinen jetzt in EinHub und EinChat kann sie auflisten.",
+  "invalidKey": "GitHub hat dieses Token abgelehnt.",
+  "error": "GitHub-Anfrage fehlgeschlagen ({{status}}).",
+  "empty": "Keine Benachrichtigungen — alles gelesen."
+}

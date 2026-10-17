@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet } from "react-router";
-import { useModuleRegistry } from "@/api/hooks";
+import { useEinHubNotifications, useModuleRegistry } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { useInstanceName } from "@/instance";
@@ -16,6 +16,10 @@ export function Layout() {
   const navModules = resolveAppModules(registry.data?.modules).filter(
     (m) => m.nav != null && m.routes.length > 0,
   );
+  // Global hub poll: the unread badge updates no matter which page is open.
+  const einhubOn = registry.data?.modules.some((m) => m.id === "einhub") ?? false;
+  const hub = useEinHubNotifications(!!user && einhubOn);
+  const unread = hub.data?.unread ?? 0;
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -34,6 +38,7 @@ export function Layout() {
           {navModules.map((m) => (
             <NavLink key={m.id} to={m.routes.at(0)?.path ?? "/"} className="app-nav__link">
               {t(m.nav?.i18nKey ?? "")}
+              {m.id === "einhub" && unread > 0 && <span className="app-nav__badge">{unread}</span>}
             </NavLink>
           ))}
         </nav>

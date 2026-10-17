@@ -16,10 +16,31 @@ export interface ChatTool {
 }
 
 /**
+ * One upstream event for einhub (D42). `sourceId` is the dedupe key —
+ * upstream-unique within the module (Gotify message id, IMAP uid).
+ */
+export interface NotificationItem {
+  sourceId: string;
+  title: string;
+  body?: string;
+  /** Event time (ISO); defaults to insert time. */
+  at?: string;
+}
+
+/**
+ * A module's notification feed for einhub (D42). `poll` returns the user's
+ * recent upstream items — `[]` when unconnected or on failure, never throws.
+ */
+export interface NotificationSource {
+  poll(sub: string): Promise<NotificationItem[]>;
+}
+
+/**
  * BFF half of a module (D32). `register` mounts under `/api/<id>/`.
  * `configSchema` validates this module's `MODULE_<ID>_*` env vars (prefix stripped);
  * it runs at startup only when the module is enabled. `chatTools` optionally
  * exposes tools to the einchat module (collected from all enabled modules).
+ * `notifications` optionally exposes an event feed to the einhub module (D42).
  */
 export interface BffModule<TConfig = unknown> {
   id: string;
@@ -27,5 +48,6 @@ export interface BffModule<TConfig = unknown> {
   requires?: string[];
   configSchema?: z.ZodType<TConfig>;
   chatTools?(ctx: AppContext, config: TConfig): ChatTool[];
+  notifications?(ctx: AppContext, config: TConfig): NotificationSource;
   register(api: FastifyInstance, ctx: AppContext, config: TConfig): void;
 }

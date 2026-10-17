@@ -7,6 +7,7 @@ import { createCompositeVerifier, createSessionVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import { openStore, type Store } from "./db.js";
+import type { ImapOpen } from "./modules/email.js";
 import { fakeFetch, json, TEST_USER, testApp, testEnv } from "./test-utils.js";
 
 describe("auth", () => {
@@ -1518,6 +1519,7 @@ describe("einchat", () => {
     expect(status.json()).toEqual({
       configured: true,
       tools: [
+        "einhub_notifications",
         "wiki_search",
         "yamtrack_search_media",
         "yamtrack_list_media",
@@ -1532,6 +1534,8 @@ describe("einchat", () => {
         "email_read",
         "gotify_recent_messages",
         "gotify_applications",
+        "gitlab_todos",
+        "github_notifications",
       ],
     });
   });
@@ -1649,7 +1653,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(14);
+    expect(all.json().tools.length).toBe(17);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -2116,7 +2120,8 @@ describe("gotify", () => {
         (init?.headers as Record<string, string> | undefined)?.["X-Gotify-Key"] ??
         (init?.headers as Record<string, string> | undefined)?.Authorization;
       calls.push({ method, url, auth });
-      if (over[`${method} ${url}`]) return over[`${method} ${url}`];
+      const o = over[`${method} ${url}`];
+      if (o) return o;
       if (url === `${URL_}/client` && method === "POST") return json(CLIENT);
       if (url.startsWith(`${URL_}/client/`)) return json({}, 200);
       if (url === `${URL_}/current/user`) return json({ id: 3, name: "frodo", admin: true });
@@ -2309,6 +2314,458 @@ describe("gotify", () => {
   });
 });
 
+describe("einhub", () => {
+  const GOTIFY_URL = "https://gotify.test";
+  const hubEnv = () => ({ ...testEnv(), MODULE_EINHUB_REFRESH_SECONDS: "0" });
+
+  function seedGotify(store: Store, secrets: SecretBox) {
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "gotify",
+      url: GOTIFY_URL,
+      secretSealed: secrets.seal(JSON.stringify({ token: "tok", clientId: 1 })),
+    });
+  }
+
+  function seedEmail(store: Store, secrets: SecretBox) {
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "email",
+      url: "imaps://imap.test:993",
+      secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
+    });
+  }
+
+  const gotifyFetch = (messages: unknown[]) =>
+    fakeFetch(async (url) => {
+      if (url.startsWith(`${GOTIFY_URL}/message?`)) return json({ paging: {}, messages });
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+
+  const MSG_1 = {
+    id: 11,
+    appid: 2,
+    title: "Backup done",
+    message: "all good",
+    date: "2026-10-17T10:00:00Z",
+    priority: 5,
+  };
+
+  const get = (app: FastifyInstance, auth: Record<string, string>) =>
+    app.inject({ method: "GET", url: "/api/einhub/notifications", headers: auth });
+
+  it("answers an empty feed with no sources connected", async () => {
+    const { app, auth } = await testApp();
+    const res = await get(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ notifications: [], unread: 0 });
+  });
+
+  it("seeds the first poll as read history, then alerts on new items", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      fetchImpl: gotifyFetch([MSG_1]),
+    });
+    seedGotify(store, secrets);
+    const first = await get(app, auth);
+    expect(first.json()).toEqual({
+      notifications: [
+        {
+          id: 1,
+          module: "gotify",
+          title: "Backup done",
+          body: "all good",
+          at: MSG_1.date,
+          read: true,
+        },
+      ],
+      unread: 0,
+    });
+  });
+
+  it("inserts new upstream items as unread and dedupes by source id", async () => {
+    const messages = [MSG_1];
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      fetchImpl: gotifyFetch(messages),
+    });
+    seedGotify(store, secrets);
+    await get(app, auth); // seed
+    messages.push({ ...MSG_1, id: 12, title: "New push" });
+    const second = await get(app, auth);
+    expect(second.json().unread).toBe(1);
+    expect(second.json().notifications[0]).toMatchObject({
+      module: "gotify",
+      title: "New push",
+      read: false,
+    });
+    // Same upstream state again → no duplicates.
+    const third = await get(app, auth);
+    expect(third.json().notifications).toHaveLength(2);
+    expect(third.json().unread).toBe(1);
+  });
+
+  it("collects email envelopes via the imap source", async () => {
+    const imapOpen: ImapOpen = async () => ({
+      mailbox: { exists: 1 },
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      fetch: async function* () {
+        yield {
+          uid: 42,
+          envelope: {
+            subject: "Invoice",
+            from: [{ name: "Shop" }],
+            date: "2026-10-17T09:00:00Z",
+          },
+        };
+      },
+      fetchOne: async () => false,
+      messageDelete: async () => true,
+    });
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      imapOpen,
+    });
+    seedEmail(store, secrets);
+    const res = await get(app, auth);
+    expect(res.json().notifications[0]).toMatchObject({
+      module: "email",
+      title: "Invoice",
+      body: "Shop",
+    });
+  });
+
+  it("survives a broken source", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      fetchImpl: fakeFetch(() => json({ error: "down" }, 500)),
+    });
+    seedGotify(store, secrets);
+    const res = await get(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ notifications: [], unread: 0 });
+  });
+
+  it("marks one read and all read; foreign ids answer 404", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      fetchImpl: gotifyFetch([
+        { ...MSG_1, id: 21 },
+        { ...MSG_1, id: 22 },
+      ]),
+    });
+    seedGotify(store, secrets);
+    await get(app, auth); // seed both as read
+    store.insertNotification({
+      sub: TEST_USER.sub,
+      module: "gotify",
+      sourceId: "23",
+      title: "fresh",
+      body: null,
+      at: "2026-10-17T11:00:00Z",
+    });
+    const list = await get(app, auth);
+    expect(list.json().unread).toBe(1);
+    const id = list.json().notifications[0].id as number;
+    const read = await app.inject({
+      method: "POST",
+      url: `/api/einhub/notifications/${id}/read`,
+      headers: auth,
+    });
+    expect(read.json()).toEqual({ read: true });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/einhub/notifications/999/read",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
+    // A foreign user's notification id is unreachable.
+    const foreign = store.insertNotification({
+      sub: "other",
+      module: "gotify",
+      sourceId: "9",
+      title: "x",
+      body: null,
+      at: "2026-10-17T11:00:00Z",
+    });
+    expect(foreign).toBe(true);
+    const foreignId = store.listNotifications("other", 1)[0]?.id;
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/api/einhub/notifications/${foreignId}/read`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
+    const all = await app.inject({
+      method: "POST",
+      url: "/api/einhub/read-all",
+      headers: auth,
+    });
+    expect(all.json()).toEqual({ unread: 0 });
+    expect(store.unreadNotificationCount(TEST_USER.sub)).toBe(0);
+  });
+
+  it("throttles upstream refreshes per user", async () => {
+    let upstreamCalls = 0;
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(testEnv()), // default 60s throttle
+      fetchImpl: fakeFetch(async (url) => {
+        upstreamCalls += 1;
+        if (url.startsWith(`${GOTIFY_URL}/message?`))
+          return json({ paging: {}, messages: [MSG_1] });
+        return json({}, 404);
+      }),
+    });
+    seedGotify(store, secrets);
+    await get(app, auth);
+    await get(app, auth); // within the throttle window → no second poll
+    expect(upstreamCalls).toBe(1);
+  });
+});
+
+describe("gitlab", () => {
+  const URL_ = "https://gitlab.test";
+  const TODO = {
+    id: 77,
+    project: { name: "einring", name_with_namespace: "wit / einring" },
+    author: { name: "Sauron" },
+    action_name: "assigned",
+    target_type: "MergeRequest",
+    target: { title: "Add hub" },
+    target_url: `${URL_}/wit/einring/-/merge_requests/4`,
+    state: "pending",
+    created_at: "2026-10-17T12:00:00Z",
+  };
+
+  function fakeGitLab(over: Partial<Record<string, Response>> = {}) {
+    const calls: { method: string; url: string; token?: string }[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      const method = init?.method ?? "GET";
+      const token = (init?.headers as Record<string, string> | undefined)?.["PRIVATE-TOKEN"];
+      calls.push({ method, url, token });
+      const o = over[`${method} ${url}`];
+      if (o) return o;
+      if (url === `${URL_}/api/v4/user`)
+        return token === "good-key" ? json({ username: "frodo" }) : json({}, 401);
+      if (url.startsWith(`${URL_}/api/v4/todos?`)) return json([TODO]);
+      return json({ error: `unexpected ${method} ${url}` }, 404);
+    });
+    return { fetchImpl, calls };
+  }
+
+  const connect = (app: FastifyInstance, auth: Record<string, string>, apiKey = "good-key") =>
+    app.inject({
+      method: "POST",
+      url: "/api/gitlab/credentials",
+      headers: auth,
+      payload: { apiKey, url: URL_ },
+    });
+
+  it("verifies the PAT via /api/v4/user and stores it sealed per sub", async () => {
+    const { fetchImpl, calls } = fakeGitLab();
+    const { app, auth, store } = await testApp({ fetchImpl });
+    const res = await connect(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(calls.find((c) => c.url === `${URL_}/api/v4/user`)?.token).toBe("good-key");
+    const stored = store.getServiceCredential(TEST_USER.sub, "gitlab");
+    expect(stored?.url).toBe(URL_);
+    expect(stored?.secretSealed).not.toContain("good-key");
+  });
+
+  it("rejects a bad token with 401 and stores nothing", async () => {
+    const { app, auth, store } = await testApp({ fetchImpl: fakeGitLab().fetchImpl });
+    expect((await connect(app, auth, "bad")).statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "gitlab")).toBeUndefined();
+  });
+
+  it("lists pending todos, 424s when unconnected, 502s when unreachable", async () => {
+    const { app, auth } = await testApp({ fetchImpl: fakeGitLab().fetchImpl });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/gitlab/todos", headers: auth })).statusCode,
+    ).toBe(424);
+    await connect(app, auth);
+    const res = await app.inject({ method: "GET", url: "/api/gitlab/todos", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      todos: [
+        {
+          id: 77,
+          project: "wit / einring",
+          author: "Sauron",
+          action: "assigned",
+          targetType: "MergeRequest",
+          title: "Add hub",
+          url: `${URL_}/wit/einring/-/merge_requests/4`,
+          createdAt: TODO.created_at,
+        },
+      ],
+    });
+  });
+
+  it("feeds pending todos into einhub notifications", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_EINHUB_REFRESH_SECONDS: "0" }),
+      fetchImpl: fakeGitLab().fetchImpl,
+    });
+    await connect(app, auth);
+    const feed = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    expect(feed.json().notifications[0]).toMatchObject({
+      module: "gitlab",
+      title: "assigned: Add hub",
+      body: "wit / einring · Sauron",
+      at: TODO.created_at,
+    });
+  });
+
+  it("exposes a gitlab_todos tool that answers not_connected without a credential", async () => {
+    const { app, auth } = await testApp({ fetchImpl: fakeGitLab().fetchImpl });
+    const toolsRes = await app.inject({ method: "GET", url: "/api/einchat/tools", headers: auth });
+    const t = toolsRes
+      .json()
+      .tools.filter((x: { module: string }) => x.module === "gitlab")
+      .map((x: { name: string }) => x.name);
+    expect(t).toEqual(["gitlab_todos"]);
+  });
+});
+
+describe("github", () => {
+  const URL_ = "https://github.com";
+  const API = "https://api.github.com";
+  const THREAD = {
+    id: "1507",
+    unread: true,
+    reason: "review_requested",
+    updated_at: "2026-10-17T13:00:00Z",
+    subject: {
+      title: "Wire einhub",
+      url: `${API}/repos/wit/einring/pulls/9`,
+      type: "PullRequest",
+    },
+    repository: { full_name: "wit/einring" },
+  };
+
+  function fakeGitHub(over: Partial<Record<string, Response>> = {}) {
+    const calls: { method: string; url: string; auth?: string }[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      const method = init?.method ?? "GET";
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      calls.push({ method, url, auth });
+      const o = over[`${method} ${url}`];
+      if (o) return o;
+      if (url === `${API}/user`)
+        return auth === "Bearer good-key" ? json({ login: "frodo" }) : json({}, 401);
+      if (url.startsWith(`${API}/notifications?`)) return json([THREAD]);
+      return json({ error: `unexpected ${method} ${url}` }, 404);
+    });
+    return { fetchImpl, calls };
+  }
+
+  const connect = (app: FastifyInstance, auth: Record<string, string>, apiKey = "good-key") =>
+    app.inject({
+      method: "POST",
+      url: "/api/github/credentials",
+      headers: auth,
+      payload: { apiKey, url: URL_ },
+    });
+
+  it("verifies the PAT via /user and stores it sealed per sub", async () => {
+    const { fetchImpl, calls } = fakeGitHub();
+    const { app, auth, store } = await testApp({ fetchImpl });
+    const res = await connect(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(calls.find((c) => c.url === `${API}/user`)?.auth).toBe("Bearer good-key");
+    const stored = store.getServiceCredential(TEST_USER.sub, "github");
+    expect(stored?.url).toBe(URL_);
+    expect(stored?.secretSealed).not.toContain("good-key");
+  });
+
+  it("rejects a bad token with 401 and stores nothing", async () => {
+    const { app, auth, store } = await testApp({ fetchImpl: fakeGitHub().fetchImpl });
+    expect((await connect(app, auth, "bad")).statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "github")).toBeUndefined();
+  });
+
+  it("lists notification threads with web links, 424s when unconnected", async () => {
+    const { app, auth } = await testApp({ fetchImpl: fakeGitHub().fetchImpl });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/github/notifications", headers: auth }))
+        .statusCode,
+    ).toBe(424);
+    await connect(app, auth);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/github/notifications",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      notifications: [
+        {
+          id: "1507",
+          unread: true,
+          reason: "review_requested",
+          title: "Wire einhub",
+          type: "PullRequest",
+          repo: "wit/einring",
+          url: "https://github.com/wit/einring/pulls/9",
+          updatedAt: THREAD.updated_at,
+        },
+      ],
+    });
+  });
+
+  it("feeds notification threads into einhub", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_EINHUB_REFRESH_SECONDS: "0" }),
+      fetchImpl: fakeGitHub().fetchImpl,
+    });
+    await connect(app, auth);
+    const feed = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    expect(feed.json().notifications[0]).toMatchObject({
+      module: "github",
+      title: "review_requested: Wire einhub",
+      body: "wit/einring · PullRequest",
+      at: THREAD.updated_at,
+    });
+  });
+
+  it("maps a GHES instance url to its /api/v3 base", async () => {
+    const ghe = "https://ghe.corp.test";
+    const seen: string[] = [];
+    const { app, auth } = await testApp({
+      fetchImpl: fakeFetch(async (url) => {
+        seen.push(url);
+        if (url === `${ghe}/api/v3/user`) return json({ login: "frodo" });
+        if (url.startsWith(`${ghe}/api/v3/notifications?`)) return json([]);
+        return json({}, 404);
+      }),
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/github/credentials",
+      headers: auth,
+      payload: { apiKey: "k", url: ghe },
+    });
+    expect(seen[0]).toBe(`${ghe}/api/v3/user`);
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -2316,6 +2773,7 @@ describe("module framework", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       modules: [
+        { id: "einhub", requires: [] },
         { id: "tables", requires: ["nextcloud"] },
         { id: "monitor", requires: ["nextcloud"] },
         { id: "wiki", requires: ["nextcloud"] },
@@ -2327,6 +2785,8 @@ describe("module framework", () => {
         { id: "trek", requires: [] },
         { id: "email", requires: [] },
         { id: "gotify", requires: [] },
+        { id: "gitlab", requires: [] },
+        { id: "github", requires: [] },
       ],
     });
   });

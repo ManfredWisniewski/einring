@@ -1,0 +1,12 @@
+{
+  "nav": "EinHub",
+  "title": "Notifications",
+  "empty": "Aucune notification.",
+  "emptyHint": "Les nouveaux événements des modules connectés apparaissent ici.",
+  "markAllRead": "Tout marquer comme lu",
+  "unread_one": "{{count}} non lu",
+  "unread_many": "{{count}} non lus",
+  "unread_other": "{{count}} non lus",
+  "open": "Ouvrir",
+  "error": "Impossible de charger les notifications ({{status}})."
+}

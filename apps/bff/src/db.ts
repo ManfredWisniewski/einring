@@ -65,6 +65,19 @@ export interface ServiceCredential {
   secretSealed: string;
 }
 
+/** A hub notification (D42): one upstream event, deduped by (sub, module, source_id). */
+export interface NotificationRow {
+  id: number;
+  sub: string;
+  module: string;
+  sourceId: string;
+  title: string;
+  body: string | null;
+  /** Upstream event time (ISO). */
+  at: string;
+  read: number;
+}
+
 export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
@@ -127,6 +140,16 @@ export interface Store {
   deleteCsvRow(fileId: number, rowId: number): boolean;
   /** Deletes the file and its rows; false when the sub doesn't own `id`. */
   deleteCsvFile(sub: string, id: number): boolean;
+  /** INSERT OR IGNORE — true when the (sub, module, sourceId) was new. */
+  insertNotification(n: Omit<NotificationRow, "id" | "read"> & { read?: boolean }): boolean;
+  /** Newest-first, capped. */
+  listNotifications(sub: string, limit: number): NotificationRow[];
+  /** Whether the user has any notification rows for a module (seed detection). */
+  hasNotificationsFor(sub: string, module: string): boolean;
+  unreadNotificationCount(sub: string): number;
+  /** Marks one row read; false when foreign/unknown. */
+  markNotificationRead(sub: string, id: number): boolean;
+  markAllNotificationsRead(sub: string): void;
   close(): void;
 }
 
@@ -203,6 +226,19 @@ CREATE TABLE IF NOT EXISTS module_settings (
   data TEXT NOT NULL,
   PRIMARY KEY (sub, module)
 );
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub TEXT NOT NULL,
+  module TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  at TEXT NOT NULL,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(sub, module, source_id)
+);
+CREATE INDEX IF NOT EXISTS notifications_sub ON notifications(sub, id);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -315,6 +351,22 @@ export function openStore(path: string): Store {
   const chunkStats = db.prepare(
     "SELECT COUNT(*) AS chunks, COUNT(DISTINCT path) AS pages FROM wiki_chunks WHERE sub = ?",
   );
+  const putNotification = db.prepare(
+    `INSERT OR IGNORE INTO notifications (sub, module, source_id, title, body, at, read)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const listNotifs = db.prepare(
+    `SELECT id, sub, module, source_id AS sourceId, title, body, at, read
+     FROM notifications WHERE sub = ? ORDER BY id DESC LIMIT ?`,
+  );
+  const countNotifsFor = db.prepare(
+    "SELECT COUNT(*) AS n FROM notifications WHERE sub = ? AND module = ?",
+  );
+  const countUnreadNotifs = db.prepare(
+    "SELECT COUNT(*) AS n FROM notifications WHERE sub = ? AND read = 0",
+  );
+  const markNotif = db.prepare("UPDATE notifications SET read = 1 WHERE id = ? AND sub = ?");
+  const markAllNotifs = db.prepare("UPDATE notifications SET read = 1 WHERE sub = ?");
 
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -436,6 +488,15 @@ export function openStore(path: string): Store {
       if (res.changes > 0) delCsvRowsForFile.run(id);
       return res.changes > 0;
     },
+    insertNotification: (n) =>
+      putNotification.run(n.sub, n.module, n.sourceId, n.title, n.body, n.at, n.read ? 1 : 0)
+        .changes > 0,
+    listNotifications: (sub, limit) => listNotifs.all(sub, limit) as unknown as NotificationRow[],
+    hasNotificationsFor: (sub, module) =>
+      ((countNotifsFor.get(sub, module) as { n: number }).n ?? 0) > 0,
+    unreadNotificationCount: (sub) => (countUnreadNotifs.get(sub) as { n: number }).n,
+    markNotificationRead: (sub, id) => markNotif.run(id, sub).changes > 0,
+    markAllNotificationsRead: (sub) => void markAllNotifs.run(sub),
     close: () => db.close(),
   };
 }

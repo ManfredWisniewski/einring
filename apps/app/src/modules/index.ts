@@ -2,7 +2,10 @@ import type { ModuleInfo } from "@/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
+import { einhubModule } from "./einhub";
 import { emailModule } from "./email";
+import { githubModule } from "./github";
+import { gitlabModule } from "./gitlab";
 import { gotifyModule } from "./gotify";
 import { monitorModule } from "./monitor";
 import { navidromeModule } from "./navidrome";
@@ -16,6 +19,7 @@ export type { AppModule, ModuleRoute } from "./types";
 
 /** All modules bundled in the app. Frontend-only modules never need a BFF counterpart. */
 export const appModules: AppModule[] = [
+  einhubModule,
   tablesModule,
   monitorModule,
   wikiModule,
@@ -27,6 +31,8 @@ export const appModules: AppModule[] = [
   trekModule,
   emailModule,
   gotifyModule,
+  gitlabModule,
+  githubModule,
 ];
 
 /**

@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify
+# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -87,6 +87,9 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_TREK_URL=
 # MODULE_EMAIL_URL=           # default IMAP server, e.g. imaps://imap.example.com:993
 # MODULE_GOTIFY_URL=          # default Gotify server, e.g. https://push.example.com
+# MODULE_GITLAB_URL=          # default GitLab instance, e.g. https://gitlab.example.com
+# MODULE_GITHUB_URL=          # default GitHub instance, e.g. https://github.com or a GHES host
+# MODULE_EINHUB_REFRESH_SECONDS=60  # min seconds between upstream notification polls per user
 LOG_LEVEL=info
 ```
 

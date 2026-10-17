@@ -273,3 +273,57 @@ export interface GotifyUser {
   name: string;
   admin: boolean;
 }
+
+/** One hub notification collected from a source module (D42). */
+export interface EinHubNotification {
+  id: number;
+  /** Source module id (gotify, email, …). */
+  module: string;
+  title: string;
+  body: string | null;
+  /** Upstream event time (ISO). */
+  at: string;
+  read: boolean;
+}
+
+export interface EinHubFeed {
+  notifications: EinHubNotification[];
+  unread: number;
+}
+
+/** One pending GitLab todo — GitLab's API-side notification surface (D43). */
+export interface GitLabTodo {
+  id: number;
+  project: string | null;
+  author: string | null;
+  /** action_name verbatim: assigned, mentioned, approval_required, build_failed, … */
+  action: string;
+  targetType: string;
+  title: string;
+  /** Upstream URL to the target (MR/issue/…). */
+  url: string | null;
+  createdAt: string;
+}
+
+export interface GitLabTodos {
+  todos: GitLabTodo[];
+}
+
+/** One GitHub notification thread (D44). */
+export interface GitHubNotification {
+  id: string;
+  unread: boolean;
+  /** Why notified: mention, review_requested, assigned, ci_activity, … */
+  reason: string;
+  title: string;
+  /** Issue, PullRequest, Commit, Release, Discussion, CheckSuite, … */
+  type: string;
+  repo: string | null;
+  /** Web link to the subject. */
+  url: string | null;
+  updatedAt: string;
+}
+
+export interface GitHubNotifications {
+  notifications: GitHubNotification[];
+}

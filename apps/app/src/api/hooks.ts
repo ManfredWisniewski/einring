@@ -13,8 +13,11 @@ import type {
   EinChatReply,
   EinChatStatus,
   EinChatTools,
+  EinHubFeed,
   EmailList,
   EmailMessage,
+  GitHubNotifications,
+  GitLabTodos,
   GotifyApplication,
   GotifyApplications,
   GotifyMessages,
@@ -63,6 +66,9 @@ export const keys = {
   gotifyMessages: ["gotify", "messages"] as const,
   gotifyApps: ["gotify", "applications"] as const,
   gotifyUser: ["gotify", "user"] as const,
+  einhub: ["einhub", "notifications"] as const,
+  gitlabTodos: ["gitlab", "todos"] as const,
+  githubNotifications: ["github", "notifications"] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -519,6 +525,60 @@ export function useGotifyDeleteApp() {
   return useMutation({
     mutationFn: (id: number) => api.delete(`/gotify/applications/${id}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.gotifyApps }),
+  });
+}
+
+/**
+ * The einhub notification feed (D42). Each fetch lazily refreshes upstream
+ * sources on the BFF (throttled per user) — polling drives the hub.
+ */
+export function useEinHubNotifications(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einhub,
+    queryFn: () => api.get<EinHubFeed>("/einhub/notifications"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useEinHubMarkRead() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post(`/einhub/notifications/${id}/read`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.einhub }),
+  });
+}
+
+export function useEinHubReadAll() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/einhub/read-all"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.einhub }),
+  });
+}
+
+/** The caller's pending GitLab todos (D43) — new ones also land in EinHub. */
+export function useGitLabTodos(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.gitlabTodos,
+    queryFn: () => api.get<GitLabTodos>("/gitlab/todos"),
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The caller's GitHub notification threads (D44) — they also land in EinHub. */
+export function useGitHubNotifications(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.githubNotifications,
+    queryFn: () => api.get<GitHubNotifications>("/github/notifications"),
+    enabled,
+    refetchInterval: 60_000,
   });
 }
 

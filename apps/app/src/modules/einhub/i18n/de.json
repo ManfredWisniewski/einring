@@ -1,0 +1,11 @@
+{
+  "nav": "EinHub",
+  "title": "Benachrichtigungen",
+  "empty": "Keine Benachrichtigungen.",
+  "emptyHint": "Neue Ereignisse aus verbundenen Modulen erscheinen hier.",
+  "markAllRead": "Alle als gelesen markieren",
+  "unread_one": "{{count}} ungelesen",
+  "unread_other": "{{count}} ungelesen",
+  "open": "Öffnen",
+  "error": "Benachrichtigungen konnten nicht geladen werden ({{status}})."
+}

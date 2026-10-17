@@ -203,6 +203,25 @@ export const emailModule: BffModule<EmailConfig> = {
   id: "email",
   configSchema,
 
+  notifications(ctx) {
+    return {
+      // New INBOX envelopes → einhub items; dedupe by uid.
+      async poll(sub) {
+        const res = await listRecent(ctx, sub);
+        if (!Array.isArray(res)) return [];
+        return res.map((m) => {
+          const from = m.from as { name?: string | null; address?: string | null } | null;
+          return {
+            sourceId: String(m.uid),
+            title: m.subject ?? "(no subject)",
+            body: from?.name ?? from?.address ?? undefined,
+            at: m.date ?? undefined,
+          };
+        });
+      },
+    };
+  },
+
   chatTools(ctx): ChatTool[] {
     return [
       {

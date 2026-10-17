@@ -1,0 +1,17 @@
+{
+  "nav": "GitLab",
+  "intro": "Connectez GitLab pour que vos tâches en attente (assignations, mentions, revues, pipelines échoués) apparaissent dans EinHub et ici. Créez un jeton d'accès personnel dans GitLab sous Paramètres → Jetons d'accès (portée : read_api ou api).",
+  "apiKey": "Jeton d'accès personnel",
+  "apiKeyPlaceholder": "glpat-…",
+  "url": "URL GitLab",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "connectedAs": "Connecté à {{url}}",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "Les nouvelles tâches GitLab apparaissent dans EinHub et EinChat peut les lister.",
+  "invalidKey": "GitLab a rejeté ce jeton.",
+  "error": "Échec de la requête GitLab ({{status}}).",
+  "empty": "Aucune tâche en attente — tout est fait."
+}

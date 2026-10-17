@@ -1,0 +1,17 @@
+{
+  "nav": "GitHub",
+  "intro": "Подключите GitHub, чтобы ваши уведомления (упоминания, запросы ревью, назначения, результаты CI) появлялись в EinHub и здесь. Создайте персональный токен доступа в GitHub: Settings → Developer settings → Personal access tokens (scope: notifications).",
+  "apiKey": "Персональный токен доступа",
+  "apiKeyPlaceholder": "ghp_…",
+  "url": "URL GitHub",
+  "connect": "Подключить",
+  "connecting": "Подключение…",
+  "connected": "Подключено к {{url}}.",
+  "connectedAs": "Подключено к {{url}}",
+  "disconnect": "Отключить",
+  "disconnecting": "Отключение…",
+  "hint": "Новые уведомления GitHub теперь появляются в EinHub, а EinChat может их перечислить.",
+  "invalidKey": "GitHub отклонил этот токен.",
+  "error": "Ошибка запроса GitHub ({{status}}).",
+  "empty": "Нет уведомлений — всё прочитано."
+}

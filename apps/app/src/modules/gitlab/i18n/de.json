@@ -1,0 +1,17 @@
+{
+  "nav": "GitLab",
+  "intro": "Verbinde GitLab, damit deine offenen Aufgaben (Zuweisungen, Erwähnungen, Reviews, fehlgeschlagene Pipelines) in EinHub und hier erscheinen. Erstelle ein persönliches Zugriffstoken in GitLab unter Einstellungen → Zugriffstoken (Scope: read_api oder api).",
+  "apiKey": "Persönliches Zugriffstoken",
+  "apiKeyPlaceholder": "glpat-…",
+  "url": "GitLab-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "connectedAs": "Verbunden mit {{url}}",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "Neue GitLab-Aufgaben erscheinen jetzt in EinHub und EinChat kann sie auflisten.",
+  "invalidKey": "GitLab hat dieses Token abgelehnt.",
+  "error": "GitLab-Anfrage fehlgeschlagen ({{status}}).",
+  "empty": "Keine offenen Aufgaben — alles erledigt."
+}
