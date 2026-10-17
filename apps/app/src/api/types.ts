@@ -241,3 +241,35 @@ export interface EmailMessage {
   text: string | null;
   html: string | null;
 }
+
+export interface GotifyMessage {
+  id: number;
+  appId: number;
+  title: string | null;
+  message: string;
+  date: string;
+  priority: number;
+  /** e.g. "text/markdown" — lifted from extras["client::display"]. */
+  contentType: string | null;
+}
+
+export interface GotifyMessages {
+  messages: GotifyMessage[];
+}
+
+export interface GotifyApplication {
+  id: number;
+  name: string;
+  description: string | null;
+  /** The sender token — needed to configure posting clients (curl, scripts). */
+  token: string;
+}
+
+export interface GotifyApplications {
+  applications: GotifyApplication[];
+}
+
+export interface GotifyUser {
+  name: string;
+  admin: boolean;
+}

@@ -1530,6 +1530,8 @@ describe("einchat", () => {
         "trek_bucket_list",
         "email_recent",
         "email_read",
+        "gotify_recent_messages",
+        "gotify_applications",
       ],
     });
   });
@@ -1647,7 +1649,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(12);
+    expect(all.json().tools.length).toBe(14);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -2093,6 +2095,220 @@ describe("email", () => {
   });
 });
 
+describe("gotify", () => {
+  const URL_ = "https://push.test";
+  const CLIENT = { id: 7, token: "Ctok-abc", name: "einring" };
+  const MSG = {
+    id: 11,
+    appid: 2,
+    title: "Backup done",
+    message: "**ok** in 3s",
+    date: "2026-10-16T10:00:00Z",
+    priority: 5,
+    extras: { "client::display": { contentType: "text/markdown" } },
+  };
+
+  function fakeGotify(over: Partial<Record<string, Response>> = {}) {
+    const calls: { method: string; url: string; auth?: string }[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      const method = init?.method ?? "GET";
+      const auth =
+        (init?.headers as Record<string, string> | undefined)?.["X-Gotify-Key"] ??
+        (init?.headers as Record<string, string> | undefined)?.Authorization;
+      calls.push({ method, url, auth });
+      if (over[`${method} ${url}`]) return over[`${method} ${url}`];
+      if (url === `${URL_}/client` && method === "POST") return json(CLIENT);
+      if (url.startsWith(`${URL_}/client/`)) return json({}, 200);
+      if (url === `${URL_}/current/user`) return json({ id: 3, name: "frodo", admin: true });
+      if (url.startsWith(`${URL_}/message?`) || url === `${URL_}/message`) {
+        if (method === "DELETE") return json({}, 200);
+        return json({ paging: {}, messages: [MSG] });
+      }
+      if (url === `${URL_}/message/11` && method === "DELETE") return json({}, 200);
+      if (url === `${URL_}/application`) return json([{ id: 2, name: "backup", token: "Atok" }]);
+      if (url === `${URL_}/application/2` && method === "DELETE") return json({}, 200);
+      return json({ error: `unexpected ${method} ${url}` }, 404);
+    });
+    return { fetchImpl, calls };
+  }
+
+  async function connect(app: FastifyInstance, auth: Record<string, string>) {
+    return app.inject({
+      method: "POST",
+      url: "/api/gotify/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: URL_ },
+    });
+  }
+
+  it("mints a client token via Basic auth and stores only the token", async () => {
+    const { fetchImpl, calls } = fakeGotify();
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    const res = await connect(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ connected: true, url: URL_ });
+    const create = calls.find((c) => c.url === `${URL_}/client` && c.method === "POST");
+    expect(create?.auth).toBe(`Basic ${Buffer.from("frodo:ring").toString("base64")}`);
+    const stored = store.getServiceCredential(TEST_USER.sub, "gotify");
+    expect(stored?.url).toBe(URL_);
+    // Trailing slashes/fragments in the pasted URL are stripped before storage.
+    const dirty = await app.inject({
+      method: "POST",
+      url: "/api/gotify/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: `${URL_}/#` },
+    });
+    expect(dirty.statusCode).toBe(200);
+    expect(store.getServiceCredential(TEST_USER.sub, "gotify")?.url).toBe(URL_);
+    // The sealed secret is the client token — the password is nowhere near storage.
+    expect(JSON.parse(secrets.open(stored?.secretSealed ?? ""))).toEqual({
+      token: "Ctok-abc",
+      clientId: 7,
+    });
+  });
+
+  it("maps a failed upstream login to 401 and stores nothing", async () => {
+    const { fetchImpl } = fakeGotify({ [`POST ${URL_}/client`]: json({}, 401) });
+    const { app, auth, store } = await testApp({ fetchImpl });
+    expect((await connect(app, auth)).statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "gotify")).toBeUndefined();
+  });
+
+  it("lists messages with priority and markdown contentType, authed via X-Gotify-Key", async () => {
+    const { fetchImpl, calls } = fakeGotify();
+    const { app, auth } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    const res = await app.inject({ method: "GET", url: "/api/gotify/messages", headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().messages).toEqual([
+      {
+        id: 11,
+        appId: 2,
+        title: "Backup done",
+        message: "**ok** in 3s",
+        date: "2026-10-16T10:00:00Z",
+        priority: 5,
+        contentType: "text/markdown",
+      },
+    ]);
+    const list = calls.find((c) => c.url === `${URL_}/message?limit=50` && c.method === "GET");
+    expect(list?.auth).toBe("Ctok-abc");
+  });
+
+  it("reports the connected Gotify account via /current/user", async () => {
+    const { fetchImpl } = fakeGotify();
+    const { app, auth } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    const res = await app.inject({ method: "GET", url: "/api/gotify/user", headers: auth });
+    expect(res.json()).toEqual({ name: "frodo", admin: true });
+  });
+
+  it("returns 424 for message routes when not connected", async () => {
+    const { fetchImpl } = fakeGotify();
+    const { app, auth } = await testApp({ fetchImpl });
+    for (const url of [
+      "/api/gotify/messages",
+      "/api/gotify/applications",
+      "/api/gotify/stream",
+      "/api/gotify/user",
+    ]) {
+      expect((await app.inject({ method: "GET", url, headers: auth })).statusCode).toBe(424);
+    }
+    expect(
+      (await app.inject({ method: "DELETE", url: "/api/gotify/messages/1", headers: auth }))
+        .statusCode,
+    ).toBe(424);
+  });
+
+  it("deletes one message and all messages upstream", async () => {
+    const { fetchImpl } = fakeGotify();
+    const { app, auth } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    expect(
+      (
+        await app.inject({ method: "DELETE", url: "/api/gotify/messages/11", headers: auth })
+      ).json(),
+    ).toEqual({ deleted: true });
+    expect(
+      (await app.inject({ method: "DELETE", url: "/api/gotify/messages", headers: auth })).json(),
+    ).toEqual({ deleted: true });
+  });
+
+  it("propagates an upstream 404 for unknown message ids", async () => {
+    const { fetchImpl } = fakeGotify({
+      [`DELETE ${URL_}/message/99`]: json({}, 404),
+    });
+    const { app, auth } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    expect(
+      (await app.inject({ method: "DELETE", url: "/api/gotify/messages/99", headers: auth }))
+        .statusCode,
+    ).toBe(404);
+  });
+
+  it("lists and creates applications", async () => {
+    const { fetchImpl } = fakeGotify({
+      [`POST ${URL_}/application`]: json({ id: 5, name: "new", token: "Atok-new" }, 200),
+    });
+    const { app, auth } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/gotify/applications",
+      headers: auth,
+    });
+    expect(list.json()).toEqual({
+      applications: [{ id: 2, name: "backup", description: null, token: "Atok" }],
+    });
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/gotify/applications",
+      headers: auth,
+      payload: { name: "new" },
+    });
+    expect(create.statusCode).toBe(200);
+    expect(create.json().application.token).toBe("Atok-new");
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/gotify/applications",
+          headers: auth,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+
+  it("disconnect deletes the upstream client before dropping the local row", async () => {
+    const { fetchImpl, calls } = fakeGotify();
+    const { app, auth, store } = await testApp({ fetchImpl });
+    await connect(app, auth);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/api/gotify/credentials",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    const del = calls.find((c) => c.url === `${URL_}/client/7` && c.method === "DELETE");
+    expect(del?.auth).toBe("Ctok-abc");
+    expect(store.getServiceCredential(TEST_USER.sub, "gotify")).toBeUndefined();
+  });
+
+  it("exposes gotify tools that answer not_connected without a credential", async () => {
+    const { fetchImpl } = fakeGotify();
+    const { app, auth } = await testApp({ fetchImpl });
+    const toolsRes = await app.inject({ method: "GET", url: "/api/einchat/tools", headers: auth });
+    const gotifyTools = toolsRes
+      .json()
+      .tools.filter((t: { module: string }) => t.module === "gotify");
+    expect(gotifyTools.map((t: { name: string }) => t.name)).toEqual([
+      "gotify_recent_messages",
+      "gotify_applications",
+    ]);
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -2110,6 +2326,7 @@ describe("module framework", () => {
         { id: "navidrome", requires: [] },
         { id: "trek", requires: [] },
         { id: "email", requires: [] },
+        { id: "gotify", requires: [] },
       ],
     });
   });

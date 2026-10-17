@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { config } from "@/config";
 import { createApi } from "./client";
 import type {
   ConnectionStatus,
@@ -14,6 +15,10 @@ import type {
   EinChatTools,
   EmailList,
   EmailMessage,
+  GotifyApplication,
+  GotifyApplications,
+  GotifyMessages,
+  GotifyUser,
   LoginFlowStart,
   Me,
   ModuleRegistry,
@@ -55,6 +60,9 @@ export const keys = {
   einchatTools: ["einchat", "tools"] as const,
   emailList: ["email", "list"] as const,
   emailMessage: (uid: number) => ["email", "message", uid] as const,
+  gotifyMessages: ["gotify", "messages"] as const,
+  gotifyApps: ["gotify", "applications"] as const,
+  gotifyUser: ["gotify", "user"] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -446,4 +454,119 @@ export function useEmailDelete() {
       void qc.removeQueries({ queryKey: keys.emailMessage(uid) });
     },
   });
+}
+
+export function useGotifyMessages(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.gotifyMessages,
+    queryFn: () => api.get<GotifyMessages>("/gotify/messages"),
+    enabled,
+    // Safety net: if the SSE proxy drops, the list still refreshes periodically.
+    refetchInterval: 30_000,
+  });
+}
+
+export function useGotifyUser(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.gotifyUser,
+    queryFn: () => api.get<GotifyUser>("/gotify/user"),
+    enabled,
+  });
+}
+
+export function useGotifyApplications(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.gotifyApps,
+    queryFn: () => api.get<GotifyApplications>("/gotify/applications"),
+    enabled,
+  });
+}
+
+export function useGotifyDeleteMessage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/gotify/messages/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.gotifyMessages }),
+  });
+}
+
+export function useGotifyDeleteAll() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete("/gotify/messages"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.gotifyMessages }),
+  });
+}
+
+export function useGotifyCreateApp() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; description?: string }) =>
+      api.post<{ application: GotifyApplication }>("/gotify/applications", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.gotifyApps }),
+  });
+}
+
+export function useGotifyDeleteApp() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/gotify/applications/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.gotifyApps }),
+  });
+}
+
+/**
+ * Live message updates: the BFF proxies Gotify's WS stream as SSE (the client
+ * token never leaves the BFF). Fetch-based because EventSource can't send
+ * Authorization. Any incoming data means "new message" → refetch the list.
+ */
+export function useGotifyStream(enabled: boolean) {
+  const { getAccessToken } = useAuth();
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!enabled) return;
+    const ac = new AbortController();
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
+    void (async () => {
+      // Reconnect loop: a dropped stream retries with a short backoff instead of
+      // silently staying dead until the next page load.
+      for (;;) {
+        try {
+          const token = await getAccessToken();
+          const res = await fetch(`${config.apiUrl}/api/gotify/stream`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            signal: ac.signal,
+          });
+          if (res.ok && res.body) {
+            const reader = res.body.getReader();
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value?.length && new TextDecoder().decode(value).includes("data:")) {
+                void qc.invalidateQueries({ queryKey: keys.gotifyMessages });
+              }
+            }
+          }
+        } catch {
+          // aborted or network failure — fall through to the retry delay
+        }
+        if (ac.signal.aborted) return;
+        await new Promise((r) => {
+          reconnect = setTimeout(r, 5_000);
+        });
+        if (ac.signal.aborted) return;
+      }
+    })();
+    return () => {
+      ac.abort();
+      if (reconnect !== undefined) clearTimeout(reconnect);
+    };
+  }, [enabled, getAccessToken, qc]);
 }

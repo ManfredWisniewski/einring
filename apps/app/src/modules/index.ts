@@ -3,6 +3,7 @@ import { audiobookshelfModule } from "./audiobookshelf";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
 import { emailModule } from "./email";
+import { gotifyModule } from "./gotify";
 import { monitorModule } from "./monitor";
 import { navidromeModule } from "./navidrome";
 import { tablesModule } from "./tables";
@@ -25,6 +26,7 @@ export const appModules: AppModule[] = [
   navidromeModule,
   trekModule,
   emailModule,
+  gotifyModule,
 ];
 
 /**

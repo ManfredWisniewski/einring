@@ -22,8 +22,18 @@ export interface ConnectorOptions {
    * null → 400. `raw` is the body's url field.
    */
   parseUrl?(raw: unknown): string | null;
-  /** Probe the upstream service with the would-be secret; return its HTTP status. */
-  verify(fetchImpl: Fetch, url: string, secret: string): Promise<number>;
+  /**
+   * Probe the upstream service with the would-be secret. Return either a bare
+   * HTTP status or `{status, secret}` — the latter replaces what gets sealed
+   * (e.g. Gotify exchanges user+password for a client token).
+   */
+  verify(
+    fetchImpl: Fetch,
+    url: string,
+    secret: string,
+  ): Promise<number | { status: number; secret?: string }>;
+  /** Best-effort upstream cleanup before the local credential row is deleted. */
+  onDisconnect?(fetchImpl: Fetch, url: string, secret: string): Promise<void>;
 }
 
 /** Single API-key body: {apiKey, url?}. */
@@ -89,7 +99,15 @@ export function registerConnectorRoutes(
       return opts.parseUrl((body as { url?: unknown })?.url ?? opts.defaultUrl) ?? "";
     }
     const raw = connectorUrlSchema.safeParse((body as { url?: unknown })?.url);
-    return normalizeBase(raw.success ? raw.data : (opts.defaultUrl ?? ""));
+    if (!raw.success) return normalizeBase(opts.defaultUrl ?? "");
+    // Base URL only: drop query and fragment — they break path concatenation
+    // ("https://host/#" + "/client" would never resolve).
+    try {
+      const u = new URL(raw.data);
+      return normalizeBase(`${u.origin}${u.pathname}`);
+    } catch {
+      return normalizeBase(raw.data);
+    }
   };
 
   api.get("/status", async (req) => {
@@ -102,23 +120,30 @@ export function registerConnectorRoutes(
     if ("error" in secret) return reply.code(400).send({ error: secret.error });
     const url = urlOf(req.body);
     if (!url) return reply.code(400).send({ error: `no ${opts.service} url configured` });
-    const status = await opts.verify(fetchImpl, url, secret.secret);
+    const verified = await opts.verify(fetchImpl, url, secret.secret);
+    const status = typeof verified === "number" ? verified : verified.status;
     if (status === 401 || status === 403)
       return reply.code(401).send({ error: "invalid credential" });
     if (status >= 400) {
       api.log.warn({ url, status }, `${opts.service} credential verify failed`);
       return reply.code(502).send({ error: `${opts.service} unreachable (${status})` });
     }
+    const finalSecret =
+      typeof verified === "object" && verified.secret ? verified.secret : secret.secret;
     store.saveServiceCredential({
       sub: req.user.sub,
       service: opts.service,
       url,
-      secretSealed: secrets.seal(secret.secret),
+      secretSealed: secrets.seal(finalSecret),
     });
     return { connected: true, url };
   });
 
   api.delete("/credentials", async (req) => {
+    if (opts.onDisconnect) {
+      const cred = connectorCred(ctx, req.user.sub, opts.service);
+      if (cred) await opts.onDisconnect(fetchImpl, cred.url, cred.secret).catch(() => {});
+    }
     store.deleteServiceCredential(req.user.sub, opts.service);
     return { connected: false };
   });
