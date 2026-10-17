@@ -182,3 +182,38 @@ export interface TalkStatus {
   /** "all" = server admin, "partial" = group admin sees managed groups only, "none" = no group data. */
   groupsScope: "all" | "partial" | "none";
 }
+
+/** A client-held chat turn — the BFF is stateless, history re-sends each message (D41). */
+export interface EinChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface EinChatStatus {
+  configured: boolean;
+  /** Tool names offered by enabled provider modules (e.g. yamtrack_search_media). */
+  tools: string[];
+}
+
+export interface EinChatReply {
+  reply: string;
+}
+
+/** A provider-module tool, with the user's enabled flag (EinChat data connections). */
+export interface EinChatTool {
+  name: string;
+  /** Owning module id — the app groups and labels tools by it. */
+  module: string;
+  enabled: boolean;
+}
+
+export interface EinChatTools {
+  tools: EinChatTool[];
+}
+
+/** Connector-module connection state (yamtrack, audiobookshelf, navidrome, trek). */
+export interface ConnectorStatus {
+  connected: boolean;
+  /** Connected instance URL, or the deployment default when not yet connected. */
+  url: string | null;
+}

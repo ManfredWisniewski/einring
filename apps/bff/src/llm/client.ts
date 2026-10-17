@@ -11,8 +11,58 @@ export class LlmError extends Error {
 }
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Assistant message: tool calls the model wants executed. */
+  tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[];
+  /** Tool message: the call id this result answers. */
+  tool_call_id?: string;
+}
+
+export interface ToolCallRequest {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ChatToolsResult {
+  /** The assistant message verbatim — append it to history before tool results. */
+  message: ChatMessage;
+  content: string | null;
+  toolCalls: ToolCallRequest[];
+}
+
+/** Resolved shared LLM config (D41) — null when URL or a needed model is unset. */
+export interface LlmService {
+  client: LlmClient;
+  chatModel: string;
+  embedModel: string;
+  topK: number;
+}
+
+export function createLlmService(
+  config: {
+    LLM_URL?: string;
+    LLM_API_KEY?: string;
+    LLM_CHAT_MODEL?: string;
+    LLM_EMBED_MODEL?: string;
+    LLM_TOP_K?: number;
+    LLM_TIMEOUT_S?: number;
+  },
+  fetchImpl: Fetch = fetch,
+): LlmService | null {
+  if (!config.LLM_URL || !config.LLM_CHAT_MODEL || !config.LLM_EMBED_MODEL) return null;
+  return {
+    client: new LlmClient(
+      config.LLM_URL,
+      config.LLM_API_KEY,
+      fetchImpl,
+      (config.LLM_TIMEOUT_S ?? 60) * 1000,
+    ),
+    chatModel: config.LLM_CHAT_MODEL,
+    embedModel: config.LLM_EMBED_MODEL,
+    topK: config.LLM_TOP_K ?? 8,
+  };
 }
 
 /**
@@ -58,6 +108,49 @@ export class LlmClient {
       throw new LlmError(200, "chat completion returned no content");
     }
     return content;
+  }
+
+  /**
+   * One non-streaming chat completion with function tools. Returns the raw
+   * assistant message plus parsed `tool_calls` — the caller drives the loop.
+   */
+  async chatWithTools(
+    model: string,
+    messages: ChatMessage[],
+    tools: { name: string; description: string; parameters: unknown }[],
+  ): Promise<ChatToolsResult> {
+    const data = await this.post<{ choices?: { message?: ChatMessage }[] }>("/chat/completions", {
+      model,
+      messages,
+      stream: false,
+      ...(tools.length > 0
+        ? {
+            tools: tools.map((t) => ({
+              type: "function",
+              function: { name: t.name, description: t.description, parameters: t.parameters },
+            })),
+          }
+        : {}),
+    });
+    const message = data.choices?.[0]?.message ?? { role: "assistant" as const, content: "" };
+    const toolCalls = (message.tool_calls ?? []).flatMap((tc) => {
+      if (!tc.id || !tc.function?.name) return [];
+      let args: Record<string, unknown> = {};
+      try {
+        const parsed: unknown = JSON.parse(tc.function.arguments ?? "{}");
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          args = parsed as Record<string, unknown>;
+        }
+      } catch {
+        /* malformed args -> {} */
+      }
+      return [{ id: tc.id, name: tc.function.name, arguments: args }];
+    });
+    return {
+      message,
+      content: typeof message.content === "string" ? message.content : null,
+      toolCalls,
+    };
   }
 
   /** Embeds a batch; returns one vector per input, restored to input order. */

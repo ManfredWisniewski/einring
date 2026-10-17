@@ -1,0 +1,15 @@
+{
+  "nav": "Audiobookshelf",
+  "intro": "Connect your Audiobookshelf account so EinChat can search your audiobook and podcast library and tell you how far you got. Create an API token in Audiobookshelf under Settings → Users → your user → API Token.",
+  "apiKey": "API token",
+  "apiKeyPlaceholder": "Audiobookshelf API token",
+  "url": "Server URL",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "EinChat can now answer questions like \"am I listening to this audiobook?\"",
+  "invalidKey": "Audiobookshelf rejected this API token.",
+  "error": "Audiobookshelf connection failed ({{status}})."
+}

@@ -8,8 +8,8 @@ import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { Config } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
-import { LlmError } from "./llm/client.js";
-import { resolveModules } from "./modules/registry.js";
+import { createLlmService, LlmError, type LlmService } from "./llm/client.js";
+import { type ResolvedModule, resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
 import { registerNextcloudPublicRoutes, registerNextcloudRoutes } from "./routes/nextcloud.js";
 
@@ -24,6 +24,10 @@ export interface AppDeps {
 
 export interface AppContext extends AppDeps {
   nextcloud: NextcloudClient;
+  /** Resolved enabled modules — lets einchat collect `chatTools` (D41). */
+  modules: ResolvedModule[];
+  /** Shared LLM provider (D41); null when LLM_URL/models are unconfigured. */
+  llm: LlmService | null;
 }
 
 /** Origins Capacitor WebViews use on device, plus the configured public URL and the Vite dev server. */
@@ -72,6 +76,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const ctx: AppContext = {
     ...deps,
     nextcloud: new NextcloudClient(deps.config.NEXTCLOUD_URL, deps.fetchImpl ?? fetch),
+    modules,
+    llm: createLlmService(deps.config, deps.fetchImpl ?? fetch),
   };
 
   await app.register(cors, { origin: allowedOrigins(deps.config), credentials: false });

@@ -1,0 +1,15 @@
+{
+  "nav": "Yamtrack",
+  "intro": "Connect your Yamtrack account so EinChat can answer questions about your watched movies, shows, books and games. Create an API token in Yamtrack under Settings → Integrations.",
+  "apiKey": "API key",
+  "apiKeyPlaceholder": "Yamtrack API token",
+  "url": "Instance URL (optional)",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "EinChat can now answer questions like \"have I watched this movie?\"",
+  "invalidKey": "Yamtrack rejected this API key.",
+  "error": "Yamtrack connection failed ({{status}})."
+}

@@ -1,0 +1,15 @@
+{
+  "nav": "Trek",
+  "intro": "Verbinde dein Trek-Konto, damit EinChat deine Reisen und Reisepläne auflisten kann. Erstelle einen API-Schlüssel in Trek unter Einstellungen → Integrationen → API-Schlüssel (Schlüssel beginnen mit trek_).",
+  "apiKey": "API-Schlüssel",
+  "apiKeyPlaceholder": "trek_…",
+  "url": "Instanz-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "EinChat kann jetzt Fragen wie „Welche Reisen habe ich geplant?“ beantworten.",
+  "invalidKey": "Trek hat diesen API-Schlüssel abgelehnt.",
+  "error": "Trek-Verbindung fehlgeschlagen ({{status}})."
+}

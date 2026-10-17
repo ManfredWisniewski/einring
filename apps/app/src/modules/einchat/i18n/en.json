@@ -1,0 +1,14 @@
+{
+  "nav": "EinChat",
+  "connections": "Data connections",
+  "connectionsError": "The selection could not be saved ({{status}}).",
+  "empty": "Ask anything — connected modules can answer from your data.",
+  "inputLabel": "Message",
+  "placeholder": "e.g. have I watched The Two Towers?",
+  "send": "Send",
+  "sending": "Sending…",
+  "thinking": "Thinking…",
+  "tools": "Available tools: {{tools}}",
+  "notConfigured": "EinChat is not configured on this server.",
+  "error": "The message could not be sent ({{status}})."
+}

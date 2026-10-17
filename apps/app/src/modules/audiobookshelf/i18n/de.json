@@ -1,0 +1,15 @@
+{
+  "nav": "Audiobookshelf",
+  "intro": "Verbinde dein Audiobookshelf-Konto, damit EinChat deine Hörbuch- und Podcast-Bibliothek durchsuchen und dir sagen kann, wie weit du gekommen bist. Erstelle ein API-Token in Audiobookshelf unter Einstellungen → Benutzer → dein Benutzer → API-Token.",
+  "apiKey": "API-Token",
+  "apiKeyPlaceholder": "Audiobookshelf-API-Token",
+  "url": "Server-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "EinChat kann jetzt Fragen wie „Höre ich dieses Hörbuch gerade?“ beantworten.",
+  "invalidKey": "Audiobookshelf hat dieses API-Token abgelehnt.",
+  "error": "Audiobookshelf-Verbindung fehlgeschlagen ({{status}})."
+}

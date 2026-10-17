@@ -1,12 +1,27 @@
 import type { Config } from "../config.js";
+import { audiobookshelfModule } from "./audiobookshelf.js";
 import { csvManagerModule } from "./csv-manager.js";
+import { einchatModule } from "./einchat.js";
 import { monitorModule } from "./monitor.js";
+import { navidromeModule } from "./navidrome.js";
 import { tablesModule } from "./tables.js";
+import { trekModule } from "./trek.js";
 import type { BffModule } from "./types.js";
 import { wikiModule } from "./wiki.js";
+import { yamtrackModule } from "./yamtrack.js";
 
 /** All modules known to the BFF. App-only modules (no backend part) don't appear here. */
-export const bffModules: BffModule[] = [tablesModule, monitorModule, wikiModule, csvManagerModule];
+export const bffModules: BffModule[] = [
+  tablesModule,
+  monitorModule,
+  wikiModule,
+  csvManagerModule,
+  einchatModule,
+  yamtrackModule,
+  audiobookshelfModule,
+  navidromeModule,
+  trekModule,
+];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */
 function envPrefix(id: string): string {

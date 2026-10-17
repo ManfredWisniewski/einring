@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=tables,monitor,wiki,csv-manager
+# MODULES=tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -74,13 +74,17 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 # MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)
 # MODULE_CSV_MANAGER_MAX_ROWS=20000
-# Wiki LLM Q&A — OpenAI-compatible /v1 provider; unset = feature disabled (D39)
-# MODULE_WIKI_LLM_URL=https://openrouter.ai/api/v1
-# MODULE_WIKI_LLM_API_KEY=sk-or-...       # required by OpenRouter; local servers ignore it
-# MODULE_WIKI_LLM_CHAT_MODEL=google/gemini-2.5-flash
-# MODULE_WIKI_LLM_EMBED_MODEL=openai/text-embedding-3-small
-# MODULE_WIKI_LLM_TOP_K=8                 # chunks per answer prompt
-# MODULE_WIKI_LLM_TIMEOUT_S=60
+# Shared LLM provider (D41) — powers wiki Q&A and EinChat; unset = both disabled
+# LLM_URL=https://openrouter.ai/api/v1
+# LLM_API_KEY=sk-or-...       # required by OpenRouter; local servers ignore it
+# LLM_CHAT_MODEL=google/gemini-2.5-flash
+# LLM_EMBED_MODEL=openai/text-embedding-3-small
+# LLM_TOP_K=8                 # wiki: chunks per answer prompt
+# LLM_TIMEOUT_S=60
+# MODULE_YAMTRACK_URL=        # optional default instance for the connect form
+# MODULE_AUDIOBOOKSHELF_URL=  # same for the other connectors
+# MODULE_NAVIDROME_URL=
+# MODULE_TREK_URL=
 LOG_LEVEL=info
 ```
 
@@ -173,20 +177,20 @@ The SPA gets its Authentik issuer/client-id from `GET /api/config` at runtime, s
 
 The wiki module can answer questions over the mirrored Collectives pages via retrieval-augmented generation (D39): the BFF chunks mirrored pages into `wiki_chunks`, embeds them through the configured provider, and on `POST /api/wiki/ask` sends the top-k matching chunks plus the question to the chat model. The answer carries source links into the wiki tree.
 
-Config is all-or-nothing — the feature enables when `MODULE_WIKI_LLM_URL`, `MODULE_WIKI_LLM_CHAT_MODEL` and `MODULE_WIKI_LLM_EMBED_MODEL` are set; unset, the Ask UI stays hidden and the endpoints answer 424. Any OpenAI-compatible `/v1` endpoint works:
+Config is all-or-nothing — the feature enables when `LLM_URL`, `LLM_CHAT_MODEL` and `LLM_EMBED_MODEL` are set; unset, the Ask UI stays hidden and the endpoints answer 424. Any OpenAI-compatible `/v1` endpoint works:
 
 ```dotenv
 # Managed provider (default path): OpenRouter
-MODULE_WIKI_LLM_URL=https://openrouter.ai/api/v1
-MODULE_WIKI_LLM_API_KEY=sk-or-...
-MODULE_WIKI_LLM_CHAT_MODEL=google/gemini-2.5-flash
-MODULE_WIKI_LLM_EMBED_MODEL=openai/text-embedding-3-small
+LLM_URL=https://openrouter.ai/api/v1
+LLM_API_KEY=sk-or-...
+LLM_CHAT_MODEL=google/gemini-2.5-flash
+LLM_EMBED_MODEL=openai/text-embedding-3-small
 
 # Local alternative — same code path, no API key needed
 # (e.g. a llama-server or Ollama sidecar on the docker network)
-# MODULE_WIKI_LLM_URL=http://llama-server:8080/v1
-# MODULE_WIKI_LLM_CHAT_MODEL=local-model
-# MODULE_WIKI_LLM_EMBED_MODEL=local-embed
+# LLM_URL=http://llama-server:8080/v1
+# LLM_CHAT_MODEL=local-model
+# LLM_EMBED_MODEL=local-embed
 ```
 
 - **Privacy**: with a remote provider, the retrieved wiki chunks and the question leave the deployment (to OpenRouter or the configured endpoint). Point `LLM_URL` at a local server to keep content in-house.
@@ -194,6 +198,26 @@ MODULE_WIKI_LLM_EMBED_MODEL=openai/text-embedding-3-small
 - Indexing runs after each successful wiki sync in the background (etag reuse means only changed pages re-embed) and on demand via the "Update index" button / `POST /api/wiki/llm/index`. `GET /api/wiki/llm/status` reports `configured`, `indexing`, `pages`, `indexedPages`, `chunks`.
 - Both chat and embedding calls share `LLM_URL` — the provider must offer `/chat/completions` **and** `/embeddings` (OpenRouter: pick an embedding model from its limited set; llama.cpp serves both).
 - Answers are stateless single-turn and non-streaming; sources cite page paths from the mirror.
+
+## EinChat (chat with module tools)
+
+EinChat is a multi-turn chat page (`/einchat`) where the LLM can call *tools* that enabled provider modules lend it (D41). `POST /api/einchat/message` takes the whole client-side history (`{messages: [{role:"user"|"assistant", content}]}` — stateless, like wiki ask) and returns `{reply}` after a tool-call loop capped at 5 rounds. `GET /api/einchat/status` reports `configured` and the tool names currently offered.
+
+- EinChat shares the global `LLM_*` config — a chat model with tool-calling support is required (OpenRouter: most models; Haiku works).
+- Modules expose tools via the BFF's `chatTools` capability; tools from disabled modules are simply absent. Users can toggle providers per-module in the chat's **Data connections** panel (`GET`/`PUT /api/einchat/tools`, persisted in `module_settings`) — disabled tools never reach the model.
+- **Privacy**: chat messages *and* tool results (which contain the user's data) go to the configured LLM provider.
+
+### Connector modules
+
+Connectors share one pattern (D41): each user links their own account in the app at `/<service>`; the BFF verifies the credential against the instance, then stores it sealed in `service_credentials` — secrets never reach the app, the LLM, or other users' sessions. `MODULE_<ID>_URL` optionally prefills the instance URL. All connectors answer `not_connected` from their tools until the user links an account.
+
+| Module | Credential | Tools for EinChat |
+|---|---|---|
+| `yamtrack` | API token (Settings → Integrations) | `yamtrack_search_media` (title search → watched/completed status — "have I watched X?"), `yamtrack_list_media` |
+| `wiki` | none (uses the wiki index) | `wiki_search` (top-k chunks from the user's indexed collectives) |
+| `audiobookshelf` | API token (Settings → Users → API Token) | `audiobookshelf_search` (library search → listening progress), `audiobookshelf_in_progress` |
+| `navidrome` | username + password (Subsonic token auth) | `navidrome_search` (artists/albums/songs), `navidrome_albums` (newest/recent/starred/random) |
+| `trek` | API key `trek_…` (Settings → Integrations → API Keys) | `trek_list_trips`, `trek_trip_details`, `trek_bucket_list` |
 
 ## Embedded in Nextcloud (External sites)
 

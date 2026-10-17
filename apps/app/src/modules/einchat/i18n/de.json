@@ -1,0 +1,14 @@
+{
+  "nav": "EinChat",
+  "connections": "Datenverbindungen",
+  "connectionsError": "Die Auswahl konnte nicht gespeichert werden ({{status}}).",
+  "empty": "Frag mich etwas — verbundene Module können aus deinen Daten antworten.",
+  "inputLabel": "Nachricht",
+  "placeholder": "z. B. Habe ich Die zwei Türme gesehen?",
+  "send": "Senden",
+  "sending": "Senden…",
+  "thinking": "Denke nach…",
+  "tools": "Verfügbare Werkzeuge: {{tools}}",
+  "notConfigured": "EinChat ist auf diesem Server nicht konfiguriert.",
+  "error": "Die Nachricht konnte nicht gesendet werden ({{status}})."
+}

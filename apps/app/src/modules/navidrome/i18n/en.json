@@ -1,0 +1,15 @@
+{
+  "nav": "Navidrome",
+  "intro": "Connect your Navidrome account so EinChat can search your music library. Use your Navidrome username and password — the password is stored encrypted and only used to build Subsonic API tokens.",
+  "username": "Username",
+  "password": "Password",
+  "url": "Server URL",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "EinChat can now answer questions like \"do I have this album?\"",
+  "invalidKey": "Navidrome rejected these credentials.",
+  "error": "Navidrome connection failed ({{status}})."
+}

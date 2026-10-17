@@ -34,6 +34,18 @@ const schema = z.object({
   PUBLIC_URL: z.url().default("http://localhost:5173"),
   STATIC_DIR: z.string().optional(),
   LOG_LEVEL: z.string().default("info"),
+  /**
+   * Shared LLM provider (D41): OpenAI-compatible `/v1` — OpenRouter default,
+   * llama-server/LM Studio/Ollama `/v1` as local alternatives. Features needing
+   * the LLM are disabled unless URL + the models they use are set; API_KEY is
+   * optional (local servers ignore it).
+   */
+  LLM_URL: z.url().optional(),
+  LLM_API_KEY: z.string().min(1).optional(),
+  LLM_CHAT_MODEL: z.string().min(1).optional(),
+  LLM_EMBED_MODEL: z.string().min(1).optional(),
+  LLM_TOP_K: z.coerce.number().int().min(1).max(50).default(8),
+  LLM_TIMEOUT_S: z.coerce.number().int().min(1).max(600).default(60),
 });
 
 /** A named theme: einring CSS variable maps per color scheme. */

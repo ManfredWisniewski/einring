@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
 import { createCompositeVerifier, createSessionVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
@@ -1308,10 +1309,10 @@ describe("csv-manager", () => {
 describe("wiki llm", () => {
   const llmEnv = (extra: Record<string, string> = {}) => ({
     ...testEnv(),
-    MODULE_WIKI_LLM_URL: "https://llm.test/v1",
-    MODULE_WIKI_LLM_API_KEY: "sk-secret",
-    MODULE_WIKI_LLM_CHAT_MODEL: "chat-m",
-    MODULE_WIKI_LLM_EMBED_MODEL: "embed-m",
+    LLM_URL: "https://llm.test/v1",
+    LLM_API_KEY: "sk-secret",
+    LLM_CHAT_MODEL: "chat-m",
+    LLM_EMBED_MODEL: "embed-m",
     ...extra,
   });
 
@@ -1374,7 +1375,7 @@ describe("wiki llm", () => {
   it("indexes pages, answers with top-k chunks and cites sources", async () => {
     let chatBody: { messages?: { role: string; content: string }[] } | undefined;
     const { app, auth, store } = await testApp({
-      config: loadConfig(llmEnv({ MODULE_WIKI_LLM_TOP_K: "2" })),
+      config: loadConfig(llmEnv({ LLM_TOP_K: "2" })),
       fetchImpl: llmFake({ onChat: (b) => (chatBody = b as typeof chatBody) }),
     });
     seedPage(store, TEST_USER.sub, "Handbook/Ring.md", "Ring", "# Ring\n\nHidden in Mordor.");
@@ -1458,6 +1459,505 @@ describe("wiki llm", () => {
   });
 });
 
+describe("einchat", () => {
+  const chatEnv = (extra: Record<string, string> = {}) => ({
+    ...testEnv(),
+    LLM_URL: "https://llm.test/v1",
+    LLM_CHAT_MODEL: "chat-m",
+    LLM_EMBED_MODEL: "embed-m",
+    ...extra,
+  });
+
+  /** Wraps a sequence of chat-completion responses; records each request body. */
+  const chatFake = (
+    turns: object[],
+    calls: { body: { messages?: { role: string }[] } }[] = [],
+    extra?: (url: string, init?: RequestInit) => Response | null | Promise<Response | null>,
+  ) =>
+    fakeFetch(async (url, init) => {
+      const viaExtra = await extra?.(url, init);
+      if (viaExtra) return viaExtra;
+      if (url === "https://llm.test/v1/chat/completions") {
+        const body = JSON.parse(String(init?.body)) as { messages?: { role: string }[] };
+        calls.push({ body });
+        return json(turns[Math.min(calls.length - 1, turns.length - 1)]);
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+
+  const toolCall = (name: string, args: object, id = "call-1") => ({
+    choices: [
+      {
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id, type: "function", function: { name, arguments: JSON.stringify(args) } },
+          ],
+        },
+      },
+    ],
+  });
+  const reply = (content: string) => ({ choices: [{ message: { role: "assistant", content } }] });
+
+  const post = (app: FastifyInstance, auth: Record<string, string>, payload: object) =>
+    app.inject({ method: "POST", url: "/api/einchat/message", headers: auth, payload });
+
+  it("reports configured=false and 424s when the LLM is unset", async () => {
+    const { app, auth } = await testApp();
+    const status = await app.inject({ method: "GET", url: "/api/einchat/status", headers: auth });
+    expect(status.json().configured).toBe(false);
+    expect(
+      (await post(app, auth, { messages: [{ role: "user", content: "hi" }] })).statusCode,
+    ).toBe(424);
+  });
+
+  it("lists enabled provider tools in status", async () => {
+    const { app, auth } = await testApp({ config: loadConfig(chatEnv()) });
+    const status = await app.inject({ method: "GET", url: "/api/einchat/status", headers: auth });
+    expect(status.json()).toEqual({
+      configured: true,
+      tools: [
+        "wiki_search",
+        "yamtrack_search_media",
+        "yamtrack_list_media",
+        "audiobookshelf_search",
+        "audiobookshelf_in_progress",
+        "navidrome_search",
+        "navidrome_albums",
+        "trek_list_trips",
+        "trek_trip_details",
+        "trek_bucket_list",
+      ],
+    });
+  });
+
+  it("returns the reply directly when the model makes no tool calls", async () => {
+    const calls: { body: { messages?: { role: string }[] } }[] = [];
+    const { app, auth } = await testApp({
+      config: loadConfig(chatEnv()),
+      fetchImpl: chatFake([reply("Hello there.")], calls),
+    });
+    const res = await post(app, auth, { messages: [{ role: "user", content: "hi" }] });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ reply: "Hello there." });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body.messages?.[0]?.role).toBe("system");
+  });
+
+  it("rejects malformed histories", async () => {
+    const { app, auth } = await testApp({ config: loadConfig(chatEnv()) });
+    expect((await post(app, auth, {})).statusCode).toBe(400);
+    expect((await post(app, auth, { messages: [] })).statusCode).toBe(400);
+    expect(
+      (await post(app, auth, { messages: [{ role: "system", content: "x" }] })).statusCode,
+    ).toBe(400);
+  });
+
+  it("runs the tool loop: call → result message → final answer", async () => {
+    const calls: {
+      body: { messages?: { role: string; content?: string; tool_call_id?: string }[] };
+    }[] = [];
+    const yt = (url: string) => {
+      if (url === "https://yt.test/api/v1/media/movie/?limit=200&offset=0") {
+        return json([{ title: "The Ring", media_id: 1, media_type: "movie", status: 3 }]);
+      }
+      if (url.startsWith("https://yt.test/")) return json({ error: `unexpected ${url}` }, 404);
+      return null; // not ours — fall through to the LLM fake
+    };
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(chatEnv()),
+      fetchImpl: chatFake(
+        [toolCall("yamtrack_search_media", { query: "ring" }), reply("Yes — watched.")],
+        calls,
+        yt,
+      ),
+    });
+    // Connect the user's yamtrack account directly in the store.
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "yamtrack",
+      url: "https://yt.test",
+      secretSealed: secrets.seal("yt-key"),
+    });
+    const res = await post(app, auth, {
+      messages: [{ role: "user", content: "have I watched The Ring?" }],
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reply).toBe("Yes — watched.");
+    expect(calls).toHaveLength(2);
+    const toolMsg = calls[1]?.body.messages?.find((m) => m.role === "tool");
+    expect(toolMsg?.tool_call_id).toBe("call-1");
+    expect(toolMsg?.content).toContain("The Ring");
+    expect(toolMsg?.content).toContain('"watched":true');
+    // The stored key never reaches the model.
+    expect(toolMsg?.content).not.toContain("yt-key");
+  });
+
+  it("tells the model the service is not connected when the user has no credential", async () => {
+    const calls: { body: { messages?: { role: string; content?: string }[] } }[] = [];
+    const { app, auth } = await testApp({
+      config: loadConfig(chatEnv()),
+      fetchImpl: chatFake(
+        [toolCall("yamtrack_search_media", { query: "ring" }), reply("Connect Yamtrack first.")],
+        calls,
+      ),
+    });
+    const res = await post(app, auth, {
+      messages: [{ role: "user", content: "have I watched The Ring?" }],
+    });
+    expect(res.json().reply).toBe("Connect Yamtrack first.");
+    const toolMsg = calls[1]?.body.messages?.find((m) => m.role === "tool");
+    expect(toolMsg?.content).toContain("not_connected");
+  });
+
+  it("caps the loop at 5 tool rounds, then forces a final answer", async () => {
+    const calls: { body: unknown }[] = [];
+    const { app, auth } = await testApp({
+      config: loadConfig(chatEnv()),
+      fetchImpl: chatFake(
+        [
+          toolCall("nope_tool", {}),
+          toolCall("nope_tool", {}),
+          toolCall("nope_tool", {}),
+          toolCall("nope_tool", {}),
+          toolCall("nope_tool", {}),
+          reply("summary"),
+        ],
+        calls as never,
+      ),
+    });
+    const res = await post(app, auth, { messages: [{ role: "user", content: "go" }] });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reply).toBe("summary");
+    expect(calls).toHaveLength(6); // 5 tool rounds + 1 forced final
+  });
+
+  it("lists tools per module with enabled flags; PUT persists the selection", async () => {
+    const { app, auth, store } = await testApp({ config: loadConfig(chatEnv()) });
+    const all = await app.inject({ method: "GET", url: "/api/einchat/tools", headers: auth });
+    expect(
+      all
+        .json()
+        .tools.filter((t: { module: string }) => t.module === "wiki" || t.module === "yamtrack"),
+    ).toEqual([
+      { name: "wiki_search", module: "wiki", enabled: true },
+      { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
+      { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
+    ]);
+    expect(all.json().tools.length).toBe(10);
+    const put = await app.inject({
+      method: "PUT",
+      url: "/api/einchat/tools",
+      headers: auth,
+      payload: { disabled: ["yamtrack_search_media", "yamtrack_list_media"] },
+    });
+    expect(put.statusCode).toBe(200);
+    const after = await app.inject({ method: "GET", url: "/api/einchat/tools", headers: auth });
+    expect(after.json().tools.find((t: { name: string }) => t.name === "wiki_search").enabled).toBe(
+      true,
+    );
+    expect(
+      after.json().tools.filter((t: { module: string }) => t.module === "yamtrack"),
+    ).toHaveLength(2);
+    expect(
+      after
+        .json()
+        .tools.every((t: { enabled: boolean; module: string }) =>
+          t.module === "yamtrack" ? !t.enabled : t.enabled,
+        ),
+    ).toBe(true);
+    // Per-user: another sub keeps the default (all enabled).
+    expect(store.getModuleSettings("other-user", "einchat")).toBeUndefined();
+    // Bad payloads
+    expect(
+      (
+        await app.inject({
+          method: "PUT",
+          url: "/api/einchat/tools",
+          headers: auth,
+          payload: { disabled: "x" },
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+
+  it("disabled tools are not offered to the model (and status reflects it)", async () => {
+    const calls: { body: { tools?: { function: { name: string } }[] } }[] = [];
+    const { app, auth } = await testApp({
+      config: loadConfig(chatEnv()),
+      fetchImpl: chatFake([reply("ok")], calls as never),
+    });
+    const all = await app.inject({ method: "GET", url: "/api/einchat/tools", headers: auth });
+    await app.inject({
+      method: "PUT",
+      url: "/api/einchat/tools",
+      headers: auth,
+      payload: { disabled: all.json().tools.map((t: { name: string }) => t.name) },
+    });
+    const status = await app.inject({ method: "GET", url: "/api/einchat/status", headers: auth });
+    expect(status.json().tools).toEqual([]);
+    const res = await post(app, auth, { messages: [{ role: "user", content: "hi" }] });
+    expect(res.statusCode).toBe(200);
+    // No tools offered — the field is omitted entirely.
+    expect(calls[0]?.body.tools).toBeUndefined();
+  });
+});
+
+describe("yamtrack", () => {
+  const ytEnv = { ...testEnv(), MODULE_YAMTRACK_URL: "https://yt.test" };
+
+  const ytFake = (behaviour?: (url: string, init?: RequestInit) => Response | null) =>
+    fakeFetch(async (url, init) => {
+      const custom = behaviour?.(url, init);
+      if (custom) return custom;
+      if (url.startsWith("https://yt.test/api/v1/media/")) return json([]);
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+
+  it("connects, verifies the key, reports status and disconnects per user", async () => {
+    let sawKey: string | undefined;
+    const { app, auth, store } = await testApp({
+      config: loadConfig(ytEnv),
+      fetchImpl: ytFake((_url, init) => {
+        sawKey = (init?.headers as Record<string, string> | undefined)?.["X-API-Key"];
+        return null;
+      }),
+    });
+    const status = await app.inject({ method: "GET", url: "/api/yamtrack/status", headers: auth });
+    expect(status.json()).toEqual({ connected: false, url: "https://yt.test" });
+
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/yamtrack/credentials",
+      headers: auth,
+      payload: { apiKey: "yt-secret" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(conn.json()).toEqual({ connected: true, url: "https://yt.test" });
+    expect(sawKey).toBe("yt-secret");
+    // Stored sealed — never in clear, never in a response.
+    const row = store.getServiceCredential(TEST_USER.sub, "yamtrack");
+    expect(row?.secretSealed).not.toContain("yt-secret");
+    expect(JSON.stringify(conn.json())).not.toContain("yt-secret");
+
+    const after = await app.inject({ method: "GET", url: "/api/yamtrack/status", headers: auth });
+    expect(after.json()).toEqual({ connected: true, url: "https://yt.test" });
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/yamtrack/credentials",
+      headers: auth,
+    });
+    expect(del.json()).toEqual({ connected: false });
+    expect(store.getServiceCredential(TEST_USER.sub, "yamtrack")).toBeUndefined();
+  });
+
+  it("rejects a bad api key and a missing url", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig(ytEnv),
+      fetchImpl: fakeFetch(() => json({ detail: "no" }, 401)),
+    });
+    const bad = await app.inject({
+      method: "POST",
+      url: "/api/yamtrack/credentials",
+      headers: auth,
+      payload: { apiKey: "nope" },
+    });
+    expect(bad.statusCode).toBe(401);
+    const noUrl = await app.inject({
+      method: "POST",
+      url: "/api/yamtrack/credentials",
+      headers: auth,
+      payload: { apiKey: "x" },
+    });
+    expect(noUrl.statusCode).toBe(401); // still fails at yamtrack — url came from env
+    // Without MODULE_YAMTRACK_URL and no body url → 400.
+    const { app: bare, auth: bareAuth } = await testApp();
+    const missing = await bare.inject({
+      method: "POST",
+      url: "/api/yamtrack/credentials",
+      headers: bareAuth,
+      payload: { apiKey: "x" },
+    });
+    expect(missing.statusCode).toBe(400);
+  });
+});
+
+describe("connectors (audiobookshelf, navidrome, trek)", () => {
+  const llm = {
+    LLM_URL: "https://llm.test/v1",
+    LLM_CHAT_MODEL: "chat-m",
+    LLM_EMBED_MODEL: "embed-m",
+  };
+
+  it("audiobookshelf: verifies via /api/me, searches libraries with progress", async () => {
+    let sawAuth: string | undefined;
+    const fetches: string[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      fetches.push(url);
+      sawAuth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url === "https://abs.test/api/libraries") {
+        return json({ libraries: [{ id: "l1", name: "Books" }] });
+      }
+      if (url === "https://abs.test/api/libraries/l1/search?q=ring") {
+        return json({
+          book: [
+            {
+              libraryItem: {
+                id: "i1",
+                media: { metadata: { title: "Ring Audio", authorName: "Tolkien" } },
+              },
+            },
+          ],
+        });
+      }
+      if (url === "https://abs.test/api/me") {
+        return json({ mediaProgress: [{ libraryItemId: "i1", progress: 0.5, isFinished: false }] });
+      }
+      if (url === "https://llm.test/v1/chat/completions") {
+        const body = JSON.parse(String(init?.body)) as { messages: unknown[] };
+        return json(
+          (body.messages ?? []).some((m) => (m as { role: string }).role === "tool")
+            ? { choices: [{ message: { role: "assistant", content: "half done" } }] }
+            : {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "c1",
+                          type: "function",
+                          function: {
+                            name: "audiobookshelf_search",
+                            arguments: JSON.stringify({ query: "ring" }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+        );
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), ...llm }),
+      fetchImpl,
+    });
+    // Bad key → 401.
+    const { app: badApp, auth: badAuth } = await testApp({
+      config: loadConfig(testEnv()),
+      fetchImpl: fakeFetch(() => json({}, 401)),
+    });
+    expect(
+      (
+        await badApp.inject({
+          method: "POST",
+          url: "/api/audiobookshelf/credentials",
+          headers: badAuth,
+          payload: { apiKey: "x", url: "https://abs.test" },
+        })
+      ).statusCode,
+    ).toBe(401);
+
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/audiobookshelf/credentials",
+      headers: auth,
+      payload: { apiKey: "abs-token", url: "https://abs.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(sawAuth).toBe("Bearer abs-token");
+
+    // Tool call: the LLM calls audiobookshelf_search, gets progress-annotated hits.
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/einchat/message",
+      headers: auth,
+      payload: { messages: [{ role: "user", content: "did I start Ring Audio?" }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reply).toBe("half done");
+    expect(fetches).toContain("https://abs.test/api/libraries/l1/search?q=ring");
+  });
+
+  it("navidrome: subsonic token auth, ping verify, search3 tool", async () => {
+    let pingQuery = "";
+    const fetchImpl = fakeFetch(async (url) => {
+      if (url.startsWith("https://nd.test/rest/ping.view?")) {
+        pingQuery = url;
+        return json({ "subsonic-response": { status: "ok", version: "1.16.1" } });
+      }
+      if (url.startsWith("https://nd.test/rest/search3.view?")) {
+        return json({
+          "subsonic-response": {
+            status: "ok",
+            searchResult3: {
+              artist: [{ name: "Rammstein" }],
+              album: [{ name: "Mutter", artist: "Rammstein", year: 2001 }],
+              song: [],
+            },
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth } = await testApp({ config: loadConfig(testEnv()), fetchImpl });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/navidrome/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring-bearer", url: "https://nd.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(pingQuery).toContain("u=frodo");
+    expect(pingQuery).toMatch(/t=[0-9a-f]{32}/); // md5 token, never the password
+    expect(pingQuery).not.toContain("ring-bearer");
+  });
+
+  it("trek: bearer key verify, list trips + details tools", async () => {
+    let sawAuth: string | undefined;
+    const fetchImpl = fakeFetch(async (url, init) => {
+      sawAuth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url === "https://trek.test/api/v1/trips") {
+        return json({
+          trips: [{ id: 12, title: "Tuscany", start_date: "2026-06-14", archived: false }],
+        });
+      }
+      if (url === "https://trek.test/api/v1/trips/12") {
+        return json({
+          trip: {
+            id: 12,
+            title: "Tuscany",
+            days: [{ date: "2026-06-14", title: "Arrival", places: [{ name: "Siena" }] }],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store } = await testApp({ config: loadConfig(testEnv()), fetchImpl });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/trek/credentials",
+      headers: auth,
+      payload: { apiKey: "trek_abc", url: "https://trek.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(sawAuth).toBe("Bearer trek_abc");
+    expect(store.getServiceCredential(TEST_USER.sub, "trek")?.url).toBe("https://trek.test");
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/trek/credentials",
+      headers: auth,
+    });
+    expect(del.json()).toEqual({ connected: false });
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -1469,6 +1969,11 @@ describe("module framework", () => {
         { id: "monitor", requires: ["nextcloud"] },
         { id: "wiki", requires: ["nextcloud"] },
         { id: "csv-manager", requires: [] },
+        { id: "einchat", requires: [] },
+        { id: "yamtrack", requires: [] },
+        { id: "audiobookshelf", requires: [] },
+        { id: "navidrome", requires: [] },
+        { id: "trek", requires: [] },
       ],
     });
   });

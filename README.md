@@ -168,7 +168,7 @@ Set `VITE_API_URL` in `apps/app/.env.local` to the BFF URL for device builds (`h
 Feature modules are bundled in the app and enabled at deployment level via the BFF env (D32–D35). The BFF is the source of truth: `GET /api/modules` tells the app which routes and nav entries to build.
 
 ```dotenv
-MODULES=tables,monitor,wiki     # comma-separated; unset = all registered modules enabled
+MODULES=tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek  # comma-separated; unset = all enabled
 MODULE_TABLES_APPLICATION_ID=3  # per-module settings use MODULE_<ID>_<KEY> (id uppercased, - → _)
                                 # tables: Tables application (context) id from its /app/<id> URL
 MODULE_WIKI_SYNC_TTL_S=300      # wiki: seconds a sync result is cached before /tree re-syncs
@@ -179,7 +179,9 @@ MODULE_WIKI_SYNC_TTL_S=300      # wiki: seconds a sync result is cached before /
                                 # instead of WebDAV
 ```
 
-Module ids today: `tables` (fixed Nextcloud Tables view), `monitor` (Nextcloud server health + Talk user status), `wiki` (read-only mirror of Nextcloud Collectives markdown via WebDAV). Monitor degrades by account rights: server info needs a server admin account, the Talk group filter works for server admins and group admins (managed groups only). With a regular account, Talk still shows statuses and resolved display names. Wiki resolves each user's collectives mount folder via the Collectives settings API (`user_folder`) — covering custom per-user folders — then syncs `.md` files under it into the BFF's SQLite store and serves tree, page and search endpoints — no write-back to Nextcloud.
+Module ids today: `tables` (Nextcloud Tables application — lists the context's views/tables, edits rows through view-scoped APIs), `monitor` (Nextcloud server health + Talk user status), `wiki` (read-only mirror of Nextcloud Collectives markdown via WebDAV, plus "Ask the wiki" RAG when `LLM_*` is set), `csv-manager` (SQLite CSV lists with inline editing), `einchat` (chat with tools lent by other modules, D41 — providers toggleable per user in the chat's Data connections panel), plus connector modules that lend tools to EinChat from per-user accounts: `yamtrack` (tracked media → "have I watched X?"), `audiobookshelf` (library search + listening progress), `navidrome` (music library via Subsonic auth), `trek` (trips and itineraries). Monitor degrades by account rights: server info needs a server admin account, the Talk group filter works for server admins and group admins (managed groups only). With a regular account, Talk still shows statuses and resolved display names. Wiki resolves each user's collectives mount folder via the Collectives settings API (`user_folder`) — covering custom per-user folders — then syncs `.md` files under it into the BFF's SQLite store and serves tree, page and search endpoints — no write-back to Nextcloud.
+
+`LLM_URL`/`LLM_API_KEY`/`LLM_CHAT_MODEL`/`LLM_EMBED_MODEL` (any OpenAI-compatible `/v1`, OpenRouter or local) power wiki Q&A and EinChat — unset disables both. Connector modules (`yamtrack`, `audiobookshelf`, `navidrome`, `trek`, `wiki`) store per-user service credentials sealed in the BFF (`service_credentials`) and expose `chatTools` to EinChat; each has a small connect page in the app (`/<service>`), and `MODULE_<ID>_URL` optionally prefills the instance URL.
 
 ## Deploy
 

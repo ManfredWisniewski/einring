@@ -1,0 +1,15 @@
+{
+  "nav": "Navidrome",
+  "intro": "Verbinde dein Navidrome-Konto, damit EinChat deine Musikbibliothek durchsuchen kann. Nutze deinen Navidrome-Benutzernamen und dein Passwort — das Passwort wird verschlüsselt gespeichert und nur zum Erzeugen von Subsonic-API-Tokens verwendet.",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "url": "Server-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "EinChat kann jetzt Fragen wie „Habe ich dieses Album?“ beantworten.",
+  "invalidKey": "Navidrome hat diese Zugangsdaten abgelehnt.",
+  "error": "Navidrome-Verbindung fehlgeschlagen ({{status}})."
+}

@@ -35,6 +35,12 @@ export function createApi(getToken: TokenProvider) {
         body: body === undefined ? undefined : JSON.stringify(body),
         headers: body === undefined ? {} : { "Content-Type": "application/json" },
       }),
+    put: <T>(path: string, body?: unknown) =>
+      request<T>(path, {
+        method: "PUT",
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      }),
     patch: <T>(path: string, body?: unknown) =>
       request<T>(path, {
         method: "PATCH",

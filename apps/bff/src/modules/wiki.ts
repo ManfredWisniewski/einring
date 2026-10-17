@@ -2,9 +2,9 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { z } from "zod";
 import type { AppContext } from "../app.js";
-import { LlmClient } from "../llm/client.js";
+import type { LlmClient } from "../llm/client.js";
 import { type AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
-import type { BffModule } from "./types.js";
+import type { BffModule, ChatTool } from "./types.js";
 
 export interface WikiPageMeta {
   path: string;
@@ -285,37 +285,66 @@ const configSchema = z.object({
    * instead of Nextcloud WebDAV.
    */
   SOURCE_DIR: z.string().min(1).optional(),
-  /**
-   * LLM Q&A (D39): OpenAI-compatible `/v1` provider — OpenRouter default,
-   * llama-server/LM Studio/Ollama `/v1` as local alternatives. Feature disabled
-   * unless URL + both models are set; API_KEY is optional (local servers ignore it).
-   */
-  LLM_URL: z.url().optional(),
-  LLM_API_KEY: z.string().min(1).optional(),
-  LLM_CHAT_MODEL: z.string().min(1).optional(),
-  LLM_EMBED_MODEL: z.string().min(1).optional(),
-  LLM_TOP_K: z.coerce.number().int().min(1).max(50).default(8),
-  LLM_TIMEOUT_S: z.coerce.number().int().min(1).max(600).default(60),
 });
 
 export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
   id: "wiki",
   requires: ["nextcloud"],
   configSchema,
+
+  /** Lends EinChat RAG retrieval over the mirrored pages (D41). Absent without LLM_*. */
+  chatTools(ctx): ChatTool[] {
+    const llm = ctx.llm;
+    if (!llm) return [];
+    return [
+      {
+        name: "wiki_search",
+        description:
+          "Search the user's mirrored Nextcloud wiki/collectives pages. Returns the most relevant passages with page path and title. Use for questions about the user's notes and knowledge base.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "What to look for, as a short phrase" },
+          },
+          required: ["query"],
+        },
+        async call(args, sub) {
+          const q = typeof args.query === "string" ? args.query.trim() : "";
+          if (!q) return { error: "empty_query" };
+          const chunks = ctx.store.listWikiChunks(sub).filter((c) => c.embedding);
+          if (chunks.length === 0) {
+            return {
+              error: "not_indexed",
+              hint: "User must run 'Update index' in the Wiki module",
+            };
+          }
+          const [qv] = await llm.client.embed(llm.embedModel, [q]);
+          const ranked = chunks
+            .map((c) => ({ c, score: cosine(qv ?? [], fromF32(c.embedding as Buffer)) }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, llm.topK);
+          return {
+            matches: ranked.map(({ c }) => ({
+              path: c.path,
+              title: metaFromPath(c.path).title,
+              text: c.text,
+            })),
+          };
+        },
+      },
+    ];
+  },
+
   register(api, ctx, config) {
     const { store, secrets, nextcloud } = ctx;
     // One sync per user at a time — concurrent callers share the in-flight promise.
     const inflight = new Map<string, Promise<WikiSyncResult>>();
     const indexInflight = new Map<string, Promise<WikiIndexResult>>();
-    const llm =
-      config.LLM_URL && config.LLM_CHAT_MODEL && config.LLM_EMBED_MODEL
-        ? new LlmClient(
-            config.LLM_URL,
-            config.LLM_API_KEY,
-            ctx.fetchImpl ?? fetch,
-            config.LLM_TIMEOUT_S * 1000,
-          )
-        : null;
+    // Shared LLM provider (D41) — null when LLM_URL/models are unconfigured.
+    const llm = ctx.llm?.client ?? null;
+    const llmEmbed = ctx.llm?.embedModel;
+    const llmChat = ctx.llm?.chatModel;
+    const llmTopK = ctx.llm?.topK ?? 8;
 
     const runIndex = (sub: string): Promise<WikiIndexResult> => {
       const running = indexInflight.get(sub);
@@ -342,7 +371,7 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
         const parts = chunkMarkdown(full.content);
         // The title is part of the embedding input so title-bearing queries rank well.
         const vectors = llm
-          ? await embedAll(llm, config.LLM_EMBED_MODEL as string, [
+          ? await embedAll(llm, llmEmbed as string, [
               ...parts.map((part) => `${full.title}\n\n${part}`),
             ])
           : [];
@@ -458,13 +487,13 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
       if (chunks.length === 0) {
         return reply.code(409).send({ error: "wiki not indexed" });
       }
-      const [qv] = await llm.embed(config.LLM_EMBED_MODEL as string, [q]);
+      const [qv] = await llm.embed(llmEmbed as string, [q]);
       const ranked = chunks
         .map((c) => ({ c, score: cosine(qv ?? [], fromF32(c.embedding as Buffer)) }))
         .sort((a, b) => b.score - a.score)
-        .slice(0, config.LLM_TOP_K);
+        .slice(0, llmTopK);
       const context = ranked.map(({ c }) => `### ${c.path}\n${c.text}`).join("\n\n");
-      const answer = await llm.chat(config.LLM_CHAT_MODEL as string, [
+      const answer = await llm.chat(llmChat as string, [
         { role: "system", content: ASK_SYSTEM_PROMPT },
         { role: "user", content: `Context:\n\n${context}\n\nQuestion: ${q}` },
       ]);

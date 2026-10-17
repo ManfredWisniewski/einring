@@ -57,10 +57,25 @@ export type CsvRowRow = {
   done: number;
 };
 
+/** A per-user credential for an external service connector (D41) — `service` is the module id. */
+export interface ServiceCredential {
+  sub: string;
+  service: string;
+  url: string | null;
+  secretSealed: string;
+}
+
 export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
   deleteCredential(sub: string): void;
+  /** Connector-module credentials, sealed like Nextcloud app passwords. */
+  getServiceCredential(sub: string, service: string): ServiceCredential | undefined;
+  saveServiceCredential(cred: ServiceCredential): void;
+  deleteServiceCredential(sub: string, service: string): void;
+  /** Per-user JSON blob a module owns (e.g. einchat's tool selection). */
+  getModuleSettings(sub: string, module: string): string | undefined;
+  saveModuleSettings(sub: string, module: string, data: string): void;
   /** Pending flows expire after 10 min — stale rows read as "no pending flow". */
   getPendingFlow(sub: string): PendingLoginFlow | undefined;
   savePendingFlow(flow: PendingLoginFlow): void;
@@ -174,6 +189,20 @@ CREATE TABLE IF NOT EXISTS wiki_chunks (
   PRIMARY KEY (sub, path, chunk_idx)
 );
 CREATE INDEX IF NOT EXISTS wiki_chunks_sub ON wiki_chunks(sub);
+CREATE TABLE IF NOT EXISTS service_credentials (
+  sub TEXT NOT NULL,
+  service TEXT NOT NULL,
+  url TEXT,
+  secret_sealed TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (sub, service)
+);
+CREATE TABLE IF NOT EXISTS module_settings (
+  sub TEXT NOT NULL,
+  module TEXT NOT NULL,
+  data TEXT NOT NULL,
+  PRIMARY KEY (sub, module)
+);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -204,6 +233,22 @@ export function openStore(path: string): Store {
        app_password_sealed = excluded.app_password_sealed, created_at = datetime('now')`,
   );
   const delCred = db.prepare("DELETE FROM nextcloud_credentials WHERE sub = ?");
+  const getSvcCred = db.prepare(
+    "SELECT sub, service, url, secret_sealed AS secretSealed FROM service_credentials WHERE sub = ? AND service = ?",
+  );
+  const putSvcCred = db.prepare(
+    `INSERT INTO service_credentials (sub, service, url, secret_sealed) VALUES (?, ?, ?, ?)
+     ON CONFLICT(sub, service) DO UPDATE SET url = excluded.url,
+       secret_sealed = excluded.secret_sealed, created_at = datetime('now')`,
+  );
+  const delSvcCred = db.prepare("DELETE FROM service_credentials WHERE sub = ? AND service = ?");
+  const getModSettings = db.prepare(
+    "SELECT data FROM module_settings WHERE sub = ? AND module = ?",
+  );
+  const putModSettings = db.prepare(
+    `INSERT INTO module_settings (sub, module, data) VALUES (?, ?, ?)
+     ON CONFLICT(sub, module) DO UPDATE SET data = excluded.data`,
+  );
   const getFlow = db.prepare(
     `SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint FROM login_flows
      WHERE sub = ? AND created_at > datetime('now', '-10 minutes')`,
@@ -291,6 +336,13 @@ export function openStore(path: string): Store {
     saveCredential: (c) =>
       void putCred.run(c.sub, c.server, c.loginName, c.displayName ?? null, c.appPasswordSealed),
     deleteCredential: (sub) => void delCred.run(sub),
+    getServiceCredential: (sub, service) =>
+      getSvcCred.get(sub, service) as ServiceCredential | undefined,
+    saveServiceCredential: (c) => void putSvcCred.run(c.sub, c.service, c.url, c.secretSealed),
+    deleteServiceCredential: (sub, service) => void delSvcCred.run(sub, service),
+    getModuleSettings: (sub, module) =>
+      (getModSettings.get(sub, module) as { data: string } | undefined)?.data,
+    saveModuleSettings: (sub, module, data) => void putModSettings.run(sub, module, data),
     getPendingFlow: (sub) => getFlow.get(sub) as PendingLoginFlow | undefined,
     savePendingFlow: (f) => void putFlow.run(f.sub, f.pollToken, f.pollEndpoint),
     deletePendingFlow: (sub) => void delFlow.run(sub),

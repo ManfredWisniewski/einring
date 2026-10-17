@@ -4,9 +4,14 @@ import { useAuth } from "@/auth/AuthProvider";
 import { createApi } from "./client";
 import type {
   ConnectionStatus,
+  ConnectorStatus,
   CsvFile,
   CsvFileMeta,
   CsvRow,
+  EinChatMessage,
+  EinChatReply,
+  EinChatStatus,
+  EinChatTools,
   LoginFlowStart,
   Me,
   ModuleRegistry,
@@ -44,6 +49,8 @@ export const keys = {
   wikiSearch: (q: string) => ["wiki", "search", q] as const,
   csvFiles: ["csv-manager", "files"] as const,
   csvFile: (id: number) => ["csv-manager", "file", id] as const,
+  einchatStatus: ["einchat", "status"] as const,
+  einchatTools: ["einchat", "tools"] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -332,5 +339,76 @@ export function useCsvDeleteRow(fileId: number) {
           : old,
       );
     },
+  });
+}
+
+/** EinChat availability + the tool names enabled provider modules expose. */
+export function useEinChatStatus(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einchatStatus,
+    queryFn: () => api.get<EinChatStatus>("/einchat/status"),
+    enabled,
+  });
+}
+
+/** Stateless chat turn — the caller owns the history and re-sends it (D41). */
+export function useEinChatMessage() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (messages: EinChatMessage[]) =>
+      api.post<EinChatReply>("/einchat/message", { messages }),
+  });
+}
+
+/** All collected provider tools + the user's enabled flags — the connections UI. */
+export function useEinChatTools(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einchatTools,
+    queryFn: () => api.get<EinChatTools>("/einchat/tools"),
+    enabled,
+  });
+}
+
+export function useEinChatSetTools() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (disabled: string[]) =>
+      api.put<{ disabled: string[] }>("/einchat/tools", { disabled }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.einchatTools });
+      void qc.invalidateQueries({ queryKey: keys.einchatStatus });
+    },
+  });
+}
+
+/** Generic connector-module hooks — the credential routes share one shape (D41). */
+export function useConnectorStatus(service: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["connector", service],
+    queryFn: () => api.get<ConnectorStatus>(`/${service}/status`),
+    enabled,
+  });
+}
+
+export function useConnectorConnect(service: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { apiKey?: string; username?: string; password?: string; url?: string }) =>
+      api.post<ConnectorStatus>(`/${service}/credentials`, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["connector", service] }),
+  });
+}
+
+export function useConnectorDisconnect(service: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<ConnectorStatus>(`/${service}/credentials`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["connector", service] }),
   });
 }

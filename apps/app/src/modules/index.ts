@@ -1,14 +1,29 @@
 import type { ModuleInfo } from "@/api/types";
+import { audiobookshelfModule } from "./audiobookshelf";
 import { csvManagerModule } from "./csv-manager";
+import { einchatModule } from "./einchat";
 import { monitorModule } from "./monitor";
+import { navidromeModule } from "./navidrome";
 import { tablesModule } from "./tables";
+import { trekModule } from "./trek";
 import type { AppModule } from "./types";
 import { wikiModule } from "./wiki";
+import { yamtrackModule } from "./yamtrack";
 
 export type { AppModule, ModuleRoute } from "./types";
 
 /** All modules bundled in the app. Frontend-only modules never need a BFF counterpart. */
-export const appModules: AppModule[] = [tablesModule, monitorModule, wikiModule, csvManagerModule];
+export const appModules: AppModule[] = [
+  tablesModule,
+  monitorModule,
+  wikiModule,
+  csvManagerModule,
+  einchatModule,
+  yamtrackModule,
+  audiobookshelfModule,
+  navidromeModule,
+  trekModule,
+];
 
 /**
  * Active modules for this deployment: frontend-only modules are always active,

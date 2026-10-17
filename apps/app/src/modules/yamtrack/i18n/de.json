@@ -1,0 +1,15 @@
+{
+  "nav": "Yamtrack",
+  "intro": "Verbinde dein Yamtrack-Konto, damit EinChat Fragen zu gesehenen Filmen, Serien, Büchern und Spielen beantworten kann. Erstelle ein API-Token in Yamtrack unter Einstellungen → Integrationen.",
+  "apiKey": "API-Schlüssel",
+  "apiKeyPlaceholder": "Yamtrack-API-Token",
+  "url": "Instanz-URL (optional)",
+  "connect": "Verbinden",
+  "connecting": "Verbinde…",
+  "connected": "Verbunden mit {{url}}.",
+  "disconnect": "Trennen",
+  "disconnecting": "Trennen…",
+  "hint": "EinChat kann jetzt Fragen wie „Habe ich diesen Film gesehen?“ beantworten.",
+  "invalidKey": "Yamtrack hat diesen API-Schlüssel abgelehnt.",
+  "error": "Yamtrack-Verbindung fehlgeschlagen ({{status}})."
+}
