@@ -1,11 +1,12 @@
 import type { Config } from "../config.js";
+import { csvManagerModule } from "./csv-manager.js";
 import { monitorModule } from "./monitor.js";
 import { tablesModule } from "./tables.js";
 import type { BffModule } from "./types.js";
 import { wikiModule } from "./wiki.js";
 
 /** All modules known to the BFF. App-only modules (no backend part) don't appear here. */
-export const bffModules: BffModule[] = [tablesModule, monitorModule, wikiModule];
+export const bffModules: BffModule[] = [tablesModule, monitorModule, wikiModule, csvManagerModule];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */
 function envPrefix(id: string): string {

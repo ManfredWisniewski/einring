@@ -90,3 +90,11 @@
 - `DELETE /api/nextcloud/connection` removes the credential AND the user's sessions — the dead token gets 401.
 - Standalone deployments (`?embedded` absent) are unchanged: Authentik login, user-scoped flows, no session minted on poll.
 - The served `index.html` carries `Content-Security-Policy: frame-ancestors 'self' <NEXTCLOUD origin>` so only the configured cloud may frame the app.
+
+### A12 CSV Manager
+
+- `POST /api/csv-manager/files` imports a CSV document (JSON `{name, csv}`; delimiter `,`/`;`/tab auto-detected; quoted fields with `""` escapes, CRLF/LF and BOM handled). The first record becomes the header row; data rows are padded/truncated to header width. Missing name/csv, empty documents, unbalanced quotes and over-limit uploads (`MODULE_CSV_MANAGER_MAX_ROWS`, `MODULE_CSV_MANAGER_MAX_BYTES`) are rejected.
+- `GET /api/csv-manager/files` lists the caller's imported files (id, name, headers, row count, createdAt); `GET /api/csv-manager/files/:id` returns headers and rows including the per-row `done` flag. Files and rows are scoped to the authenticated `sub` — another user's id answers 404.
+- `PATCH /api/csv-manager/files/:id/rows/:rowId` updates a row's cells and/or `done` flag; `POST /api/csv-manager/files/:id/rows` appends a row; `DELETE` removes single rows and whole files. All endpoints require auth.
+- The app lists imported files, opens one as an interactive table — per-row "done" checkbox, inline-editable cells, −/+ steppers on numeric cells, add-row and row/file delete — in DE + EN, light + dark, token variables only.
+- A frontend-roundtrip works end to end: import → listed file → edited cell/done flag/add row persists on reload.

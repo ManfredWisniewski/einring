@@ -29,6 +29,23 @@ export interface WikiPageRow {
   syncedAt: string;
 }
 
+/** An imported CSV file; `headers` is a JSON array of column names. */
+export interface CsvFileRow {
+  id: number;
+  sub: string;
+  name: string;
+  headers: string;
+  createdAt: string;
+}
+
+/** A CSV data row; `cells` is a JSON array aligned to the file's headers. `done` is einring-level row state. */
+export type CsvRowRow = {
+  id: number;
+  fileId: number;
+  cells: string;
+  done: number;
+};
+
 export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
@@ -54,6 +71,21 @@ export interface Store {
   searchWiki(sub: string, query: string): Pick<WikiPageRow, "path" | "title" | "content">[];
   getWikiSyncedAt(sub: string): string | undefined;
   setWikiSyncedAt(sub: string, at: string): void;
+  listCsvFiles(sub: string): (Omit<CsvFileRow, "sub"> & { rowCount: number })[];
+  getCsvFile(sub: string, id: number): Omit<CsvFileRow, "sub"> | undefined;
+  /** Returns the created row. */
+  createCsvFile(sub: string, name: string, headers: string[]): Omit<CsvFileRow, "sub">;
+  /** Bulk insert at import time; atomic. */
+  insertCsvRows(fileId: number, rows: string[][]): void;
+  listCsvRows(fileId: number): CsvRowRow[];
+  getCsvRow(fileId: number, rowId: number): CsvRowRow | undefined;
+  /** Returns the new row id. Cells are padded/truncated by the caller. */
+  addCsvRow(fileId: number, cells: string[]): number;
+  /** Only the provided fields are updated. False when nothing changed or the row doesn't exist. */
+  updateCsvRow(fileId: number, rowId: number, patch: { cells?: string[]; done?: boolean }): boolean;
+  deleteCsvRow(fileId: number, rowId: number): boolean;
+  /** Deletes the file and its rows; false when the sub doesn't own `id`. */
+  deleteCsvFile(sub: string, id: number): boolean;
   close(): void;
 }
 
@@ -91,6 +123,21 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS csv_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  headers TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS csv_files_sub ON csv_files(sub);
+CREATE TABLE IF NOT EXISTS csv_rows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_id INTEGER NOT NULL,
+  cells TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS csv_rows_file ON csv_rows(file_id);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -157,6 +204,25 @@ export function openStore(path: string): Store {
   const putSync = db.prepare(
     `INSERT INTO wiki_sync (sub, at) VALUES (?, ?) ON CONFLICT(sub) DO UPDATE SET at = excluded.at`,
   );
+  const listCsv = db.prepare(
+    `SELECT f.id, f.name, f.headers, f.created_at AS createdAt,
+       (SELECT COUNT(*) FROM csv_rows r WHERE r.file_id = f.id) AS rowCount
+     FROM csv_files f WHERE f.sub = ? ORDER BY f.id DESC`,
+  );
+  const getCsv = db.prepare(
+    "SELECT id, name, headers, created_at AS createdAt FROM csv_files WHERE sub = ? AND id = ?",
+  );
+  const putCsv = db.prepare("INSERT INTO csv_files (sub, name, headers) VALUES (?, ?, ?)");
+  const putCsvRow = db.prepare("INSERT INTO csv_rows (file_id, cells, done) VALUES (?, ?, ?)");
+  const listRows = db.prepare(
+    "SELECT id, file_id AS fileId, cells, done FROM csv_rows WHERE file_id = ? ORDER BY id",
+  );
+  const getRow = db.prepare(
+    "SELECT id, file_id AS fileId, cells, done FROM csv_rows WHERE file_id = ? AND id = ?",
+  );
+  const delCsvRow = db.prepare("DELETE FROM csv_rows WHERE file_id = ? AND id = ?");
+  const delCsvFile = db.prepare("DELETE FROM csv_files WHERE sub = ? AND id = ?");
+  const delCsvRowsForFile = db.prepare("DELETE FROM csv_rows WHERE file_id = ?");
 
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -200,6 +266,50 @@ export function openStore(path: string): Store {
       >[],
     getWikiSyncedAt: (sub) => (getSync.get(sub) as { at: string } | undefined)?.at,
     setWikiSyncedAt: (sub, at) => void putSync.run(sub, at),
+    listCsvFiles: (sub) => listCsv.all(sub) as (Omit<CsvFileRow, "sub"> & { rowCount: number })[],
+    getCsvFile: (sub, id) => getCsv.get(sub, id) as Omit<CsvFileRow, "sub"> | undefined,
+    createCsvFile: (sub, name, headers) => {
+      const id = Number(putCsv.run(sub, name, JSON.stringify(headers)).lastInsertRowid);
+      return getCsv.get(sub, id) as Omit<CsvFileRow, "sub">;
+    },
+    insertCsvRows: (fileId, rows) => {
+      db.exec("BEGIN");
+      try {
+        for (const cells of rows) putCsvRow.run(fileId, JSON.stringify(cells), 0);
+        db.exec("COMMIT");
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+    listCsvRows: (fileId) => listRows.all(fileId) as CsvRowRow[],
+    getCsvRow: (fileId, rowId) => getRow.get(fileId, rowId) as CsvRowRow | undefined,
+    addCsvRow: (fileId, cells) =>
+      Number(putCsvRow.run(fileId, JSON.stringify(cells), 0).lastInsertRowid),
+    updateCsvRow: (fileId, rowId, patch) => {
+      const sets: string[] = [];
+      const args: (string | number)[] = [];
+      if (patch.cells !== undefined) {
+        sets.push("cells = ?");
+        args.push(JSON.stringify(patch.cells));
+      }
+      if (patch.done !== undefined) {
+        sets.push("done = ?");
+        args.push(patch.done ? 1 : 0);
+      }
+      if (sets.length === 0) return false;
+      args.push(rowId, fileId);
+      const res = db
+        .prepare(`UPDATE csv_rows SET ${sets.join(", ")} WHERE id = ? AND file_id = ?`)
+        .run(...args);
+      return res.changes > 0;
+    },
+    deleteCsvRow: (fileId, rowId) => delCsvRow.run(fileId, rowId).changes > 0,
+    deleteCsvFile: (sub, id) => {
+      const res = delCsvFile.run(sub, id);
+      if (res.changes > 0) delCsvRowsForFile.run(id);
+      return res.changes > 0;
+    },
     close: () => db.close(),
   };
 }

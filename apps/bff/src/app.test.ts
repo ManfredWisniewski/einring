@@ -930,6 +930,208 @@ describe("wiki", () => {
   });
 });
 
+describe("csv-manager", () => {
+  const CSV = 'Name;Amount;Note\nRing;3;"one ring"\nBread;10;plain\n';
+
+  const importFile = async (
+    app: Awaited<ReturnType<typeof testApp>>["app"],
+    auth: { authorization: string },
+  ) =>
+    await app.inject({
+      method: "POST",
+      url: "/api/csv-manager/files",
+      headers: auth,
+      payload: { name: "list.csv", csv: CSV },
+    });
+
+  it("requires auth on all endpoints", async () => {
+    const { app } = await testApp();
+    for (const [method, url] of [
+      ["GET", "/api/csv-manager/files"],
+      ["POST", "/api/csv-manager/files"],
+      ["GET", "/api/csv-manager/files/1"],
+      ["DELETE", "/api/csv-manager/files/1"],
+      ["POST", "/api/csv-manager/files/1/rows"],
+      ["PATCH", "/api/csv-manager/files/1/rows/1"],
+      ["DELETE", "/api/csv-manager/files/1/rows/1"],
+    ] as const) {
+      expect((await app.inject({ method, url })).statusCode).toBe(401);
+    }
+  });
+
+  it("imports a semicolon CSV, lists it and serves padded rows", async () => {
+    const { app, auth } = await testApp();
+    const res = await importFile(app, auth);
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      name: "list.csv",
+      headers: ["Name", "Amount", "Note"],
+      rowCount: 2,
+    });
+    const id = res.json().id;
+
+    const list = await app.inject({ method: "GET", url: "/api/csv-manager/files", headers: auth });
+    expect(list.json().files).toEqual([
+      expect.objectContaining({ id, name: "list.csv", rowCount: 2 }),
+    ]);
+
+    const file = await app.inject({
+      method: "GET",
+      url: `/api/csv-manager/files/${id}`,
+      headers: auth,
+    });
+    expect(file.statusCode).toBe(200);
+    expect(file.json().rows).toEqual([
+      { id: expect.any(Number), cells: ["Ring", "3", "one ring"], done: false },
+      { id: expect.any(Number), cells: ["Bread", "10", "plain"], done: false },
+    ]);
+  });
+
+  it("parses quoted commas, escaped quotes and embedded newlines", async () => {
+    const { app, auth } = await testApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/csv-manager/files",
+      headers: auth,
+      payload: { name: "q.csv", csv: 'A,B\n"x,y","he said ""hi""\nline2"' },
+    });
+    expect(res.statusCode).toBe(201);
+    const file = await app.inject({
+      method: "GET",
+      url: `/api/csv-manager/files/${res.json().id}`,
+      headers: auth,
+    });
+    expect(file.json().rows[0].cells).toEqual(["x,y", 'he said "hi"\nline2']);
+  });
+
+  it("edits cells and the done flag, adds and deletes rows", async () => {
+    const { app, auth } = await testApp();
+    const fileId = (await importFile(app, auth)).json().id;
+    const file = await app.inject({
+      method: "GET",
+      url: `/api/csv-manager/files/${fileId}`,
+      headers: auth,
+    });
+    const rowId = file.json().rows[0].id;
+
+    const patched = await app.inject({
+      method: "PATCH",
+      url: `/api/csv-manager/files/${fileId}/rows/${rowId}`,
+      headers: auth,
+      payload: { cells: ["Ring", "4", "kept"], done: true },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json()).toEqual({ id: rowId, cells: ["Ring", "4", "kept"], done: true });
+
+    const added = await app.inject({
+      method: "POST",
+      url: `/api/csv-manager/files/${fileId}/rows`,
+      headers: auth,
+      payload: { cells: ["Lembas"] },
+    });
+    expect(added.statusCode).toBe(201);
+    expect(added.json()).toEqual({
+      id: expect.any(Number),
+      cells: ["Lembas", "", ""],
+      done: false,
+    });
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/csv-manager/files/${fileId}/rows/${rowId}`,
+      headers: auth,
+    });
+    expect(del.statusCode).toBe(204);
+
+    const after = await app.inject({
+      method: "GET",
+      url: `/api/csv-manager/files/${fileId}`,
+      headers: auth,
+    });
+    expect(after.json().rows.map((r: { id: number }) => r.id)).not.toContain(rowId);
+    expect(after.json().rows).toHaveLength(2);
+  });
+
+  it("deletes a file with its rows", async () => {
+    const { app, auth } = await testApp();
+    const fileId = (await importFile(app, auth)).json().id;
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: `/api/csv-manager/files/${fileId}`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(204);
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/csv-manager/files/${fileId}`,
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(404);
+    const list = await app.inject({ method: "GET", url: "/api/csv-manager/files", headers: auth });
+    expect(list.json().files).toHaveLength(0);
+  });
+
+  it("rejects bad imports and updates", async () => {
+    const { app, auth } = await testApp();
+    const post = (payload: unknown) =>
+      app.inject({
+        method: "POST",
+        url: "/api/csv-manager/files",
+        headers: auth,
+        payload: payload as Record<string, unknown>,
+      });
+    expect((await post({ name: "x.csv" })).statusCode).toBe(400); // no csv
+    expect((await post({ name: "", csv: "a,b" })).statusCode).toBe(400); // no name
+    expect((await post({ name: "x.csv", csv: "\n\n" })).statusCode).toBe(400); // no header
+    expect((await post({ name: "x.csv", csv: 'a,b\n"unclosed' })).statusCode).toBe(400); // quotes
+    expect(
+      (await app.inject({ method: "GET", url: "/api/csv-manager/files/999", headers: auth }))
+        .statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          method: "PATCH",
+          url: "/api/csv-manager/files/999/rows/1",
+          headers: auth,
+          payload: { done: true },
+        })
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it("scopes files and rows to the owning sub", async () => {
+    const { app, auth } = await testApp({
+      verifyToken: async (token) => (token === "other-token" ? { sub: "other-user" } : TEST_USER),
+    });
+    const fileId = (await importFile(app, auth)).json().id;
+    const other = { authorization: "Bearer other-token" };
+    for (const [method, url] of [
+      ["GET", `/api/csv-manager/files/${fileId}`],
+      ["DELETE", `/api/csv-manager/files/${fileId}`],
+      ["POST", `/api/csv-manager/files/${fileId}/rows`],
+      ["PATCH", `/api/csv-manager/files/${fileId}/rows/1`],
+      ["DELETE", `/api/csv-manager/files/${fileId}/rows/1`],
+    ] as const) {
+      const res = await app.inject({ method, url, headers: other });
+      expect(res.statusCode).toBe(404);
+    }
+    const list = await app.inject({ method: "GET", url: "/api/csv-manager/files", headers: other });
+    expect(list.json().files).toHaveLength(0);
+  });
+
+  it("refuses files beyond MODULE_CSV_MANAGER_MAX_ROWS", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_CSV_MANAGER_MAX_ROWS: "1" }),
+    });
+    const res = await importFile(app, auth);
+    expect(res.statusCode).toBe(413);
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -940,6 +1142,7 @@ describe("module framework", () => {
         { id: "tables", requires: ["nextcloud"] },
         { id: "monitor", requires: ["nextcloud"] },
         { id: "wiki", requires: ["nextcloud"] },
+        { id: "csv-manager", requires: [] },
       ],
     });
   });

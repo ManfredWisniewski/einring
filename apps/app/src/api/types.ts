@@ -122,6 +122,24 @@ export interface WikiSyncResult {
   pages: number;
 }
 
+export interface CsvFileMeta {
+  id: number;
+  name: string;
+  headers: string[];
+  rowCount: number;
+  createdAt: string;
+}
+
+export interface CsvRow {
+  id: number;
+  cells: string[];
+  done: boolean;
+}
+
+export interface CsvFile extends CsvFileMeta {
+  rows: CsvRow[];
+}
+
 export interface TalkStatus {
   users: TalkUserStatus[];
   groups: string[];

@@ -476,3 +476,20 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- CSV manager ---------------------------------------------------------- */
+
+.csv-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.csv-row--done {
+  color: var(--text-secondary);
+}
+
+.csv-row--done .csv-cell__input {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}

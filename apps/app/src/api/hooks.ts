@@ -4,6 +4,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { createApi } from "./client";
 import type {
   ConnectionStatus,
+  CsvFile,
+  CsvFileMeta,
+  CsvRow,
   LoginFlowStart,
   Me,
   ModuleRegistry,
@@ -31,6 +34,8 @@ export const keys = {
   wikiTree: ["wiki", "tree"] as const,
   wikiPage: (path: string) => ["wiki", "page", path] as const,
   wikiSearch: (q: string) => ["wiki", "search", q] as const,
+  csvFiles: ["csv-manager", "files"] as const,
+  csvFile: (id: number) => ["csv-manager", "file", id] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -156,5 +161,91 @@ export function useWikiSearch(query: string, enabled: boolean) {
         .get<{ results: WikiSearchResult[] }>(`/wiki/search?q=${encodeURIComponent(query)}`)
         .then((r) => r.results),
     enabled: enabled && query.length > 0,
+  });
+}
+
+export function useCsvFiles(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.csvFiles,
+    queryFn: () => api.get<{ files: CsvFileMeta[] }>("/csv-manager/files").then((r) => r.files),
+    enabled,
+  });
+}
+
+export function useCsvFile(id: number | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.csvFile(id ?? 0),
+    queryFn: () => api.get<CsvFile>(`/csv-manager/files/${id}`),
+    enabled: enabled && id !== null,
+  });
+}
+
+export function useCsvImport() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; csv: string }) =>
+      api.post<CsvFileMeta>("/csv-manager/files", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.csvFiles }),
+  });
+}
+
+export function useCsvDeleteFile() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/csv-manager/files/${id}`),
+    onSuccess: (_data, id) => {
+      qc.removeQueries({ queryKey: keys.csvFile(id) });
+      void qc.invalidateQueries({ queryKey: keys.csvFiles });
+    },
+  });
+}
+
+export function useCsvAddRow(fileId: number) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<CsvRow>(`/csv-manager/files/${fileId}/rows`),
+    onSuccess: (row) => {
+      qc.setQueryData<CsvFile>(keys.csvFile(fileId), (old) =>
+        old ? { ...old, rows: [...old.rows, row], rowCount: old.rowCount + 1 } : old,
+      );
+    },
+  });
+}
+
+export function useCsvUpdateRow(fileId: number) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rowId: number; cells?: string[]; done?: boolean }) =>
+      api.patch<CsvRow>(`/csv-manager/files/${fileId}/rows/${input.rowId}`, {
+        cells: input.cells,
+        done: input.done,
+      }),
+    // setQueryData (not invalidate): keeps inline editing responsive.
+    onSuccess: (row) => {
+      qc.setQueryData<CsvFile>(keys.csvFile(fileId), (old) =>
+        old ? { ...old, rows: old.rows.map((r) => (r.id === row.id ? row : r)) } : old,
+      );
+    },
+  });
+}
+
+export function useCsvDeleteRow(fileId: number) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rowId: number) => api.delete<void>(`/csv-manager/files/${fileId}/rows/${rowId}`),
+    onSuccess: (_data, rowId) => {
+      qc.setQueryData<CsvFile>(keys.csvFile(fileId), (old) =>
+        old
+          ? { ...old, rows: old.rows.filter((r) => r.id !== rowId), rowCount: old.rowCount - 1 }
+          : old,
+      );
+    },
   });
 }

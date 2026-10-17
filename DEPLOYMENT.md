@@ -65,11 +65,13 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=tables,monitor,wiki
+# MODULES=tables,monitor,wiki,csv-manager
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_TABLE_ID=10
 # MODULE_WIKI_SYNC_TTL_S=300
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
+# MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)
+# MODULE_CSV_MANAGER_MAX_ROWS=20000
 LOG_LEVEL=info
 ```
 
@@ -88,7 +90,7 @@ docker run -d --name einring \
   ghcr.io/manfredwisniewski/einring:sha-<commit>
 ```
 
-The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials + wiki mirror) — it is the only state.
+The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials, wiki mirror, csv-manager files) — it is the only state.
 
 ### docker-compose equivalent
 
@@ -207,4 +209,4 @@ The Docker image is web-only. To build an Android APK that talks to the deployed
 | Login redirects back but nothing loads | `PUBLIC_URL` doesn't match the browser origin (CORS), or the production redirect URI is missing in Authentik |
 | Nextcloud connect flow fails | `NEXTCLOUD_URL` unreachable from the container, or a forward-auth layer intercepts Nextcloud's API paths (D25) |
 | 424 on module endpoints | Expected when the user hasn't connected Nextcloud yet — not an error |
-| BFF refuses to start with "Unknown module" | `MODULES` lists an id that isn't registered; check `GET /api/modules` names (`tables`, `monitor`, `wiki`) |
+| BFF refuses to start with "Unknown module" | `MODULES` lists an id that isn't registered; check `GET /api/modules` names (`tables`, `monitor`, `wiki`, `csv-manager`) |

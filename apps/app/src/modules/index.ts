@@ -1,4 +1,5 @@
 import type { ModuleInfo } from "@/api/types";
+import { csvManagerModule } from "./csv-manager";
 import { monitorModule } from "./monitor";
 import { tablesModule } from "./tables";
 import type { AppModule } from "./types";
@@ -7,7 +8,7 @@ import { wikiModule } from "./wiki";
 export type { AppModule, ModuleRoute } from "./types";
 
 /** All modules bundled in the app. Frontend-only modules never need a BFF counterpart. */
-export const appModules: AppModule[] = [tablesModule, monitorModule, wikiModule];
+export const appModules: AppModule[] = [tablesModule, monitorModule, wikiModule, csvManagerModule];
 
 /**
  * Active modules for this deployment: frontend-only modules are always active,
