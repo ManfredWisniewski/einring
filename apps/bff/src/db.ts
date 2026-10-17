@@ -29,6 +29,17 @@ export interface WikiPageRow {
   syncedAt: string;
 }
 
+/** An embedded chunk of a mirrored wiki page (RAG index, D39). `embedding` is a Float32 blob. */
+export type WikiChunkRow = {
+  sub: string;
+  path: string;
+  chunkIdx: number;
+  text: string;
+  embedding: Buffer | null;
+  /** Page etag at embed time — stale chunks are re-embedded on the next index run. */
+  etag: string;
+};
+
 /** An imported CSV file; `headers` is a JSON array of column names. */
 export interface CsvFileRow {
   id: number;
@@ -71,6 +82,21 @@ export interface Store {
   searchWiki(sub: string, query: string): Pick<WikiPageRow, "path" | "title" | "content">[];
   getWikiSyncedAt(sub: string): string | undefined;
   setWikiSyncedAt(sub: string, at: string): void;
+  /** All chunks of a user, ordered by path + position — the RAG retrieval corpus. */
+  listWikiChunks(sub: string): WikiChunkRow[];
+  /** path→etag of pages with indexed chunks, for change detection during indexing. */
+  wikiChunkEtags(sub: string): Map<string, string>;
+  /** Replaces all chunks of a page atomically (delete + insert). */
+  replaceWikiChunks(
+    sub: string,
+    path: string,
+    etag: string,
+    chunks: { text: string; embedding: Buffer | null }[],
+  ): void;
+  /** Deletes all chunks of `sub` not in `keepPaths` (empty = delete all). */
+  pruneWikiChunks(sub: string, keepPaths: string[]): void;
+  /** Chunk count + distinct indexed pages. */
+  wikiChunkStats(sub: string): { chunks: number; pages: number };
   listCsvFiles(sub: string): (Omit<CsvFileRow, "sub"> & { rowCount: number })[];
   getCsvFile(sub: string, id: number): Omit<CsvFileRow, "sub"> | undefined;
   /** Returns the created row. */
@@ -138,6 +164,16 @@ CREATE TABLE IF NOT EXISTS csv_rows (
   done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS csv_rows_file ON csv_rows(file_id);
+CREATE TABLE IF NOT EXISTS wiki_chunks (
+  sub TEXT NOT NULL,
+  path TEXT NOT NULL,
+  chunk_idx INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  embedding BLOB,
+  etag TEXT NOT NULL,
+  PRIMARY KEY (sub, path, chunk_idx)
+);
+CREATE INDEX IF NOT EXISTS wiki_chunks_sub ON wiki_chunks(sub);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -223,8 +259,32 @@ export function openStore(path: string): Store {
   const delCsvRow = db.prepare("DELETE FROM csv_rows WHERE file_id = ? AND id = ?");
   const delCsvFile = db.prepare("DELETE FROM csv_files WHERE sub = ? AND id = ?");
   const delCsvRowsForFile = db.prepare("DELETE FROM csv_rows WHERE file_id = ?");
+  const listChunks = db.prepare(
+    "SELECT sub, path, chunk_idx AS chunkIdx, text, embedding, etag FROM wiki_chunks WHERE sub = ? ORDER BY path, chunk_idx",
+  );
+  const chunkEtags = db.prepare("SELECT path, etag FROM wiki_chunks WHERE sub = ? GROUP BY path");
+  const delChunksForPage = db.prepare("DELETE FROM wiki_chunks WHERE sub = ? AND path = ?");
+  const putChunk = db.prepare(
+    "INSERT INTO wiki_chunks (sub, path, chunk_idx, text, embedding, etag) VALUES (?, ?, ?, ?, ?, ?)",
+  );
+  const chunkStats = db.prepare(
+    "SELECT COUNT(*) AS chunks, COUNT(DISTINCT path) AS pages FROM wiki_chunks WHERE sub = ?",
+  );
 
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+  /** Shared by wiki_pages and wiki_chunks — `table` is a fixed string, never user input. */
+  const pruneNotIn = (table: "wiki_pages" | "wiki_chunks", sub: string, keepPaths: string[]) => {
+    if (keepPaths.length === 0) {
+      db.prepare(`DELETE FROM ${table} WHERE sub = ?`).run(sub);
+      return;
+    }
+    const placeholders = keepPaths.map(() => "?").join(", ");
+    db.prepare(`DELETE FROM ${table} WHERE sub = ? AND path NOT IN (${placeholders})`).run(
+      sub,
+      ...keepPaths,
+    );
+  };
 
   return {
     getCredential: (sub) => getCred.get(sub) as NextcloudCredential | undefined,
@@ -248,17 +308,7 @@ export function openStore(path: string): Store {
       ),
     upsertWikiPage: (p) =>
       void putPage.run(p.sub, p.path, p.title, p.content, p.etag, p.mtime, p.syncedAt),
-    pruneWikiPages: (sub, keepPaths) => {
-      if (keepPaths.length === 0) {
-        db.prepare("DELETE FROM wiki_pages WHERE sub = ?").run(sub);
-        return;
-      }
-      const placeholders = keepPaths.map(() => "?").join(", ");
-      db.prepare(`DELETE FROM wiki_pages WHERE sub = ? AND path NOT IN (${placeholders})`).run(
-        sub,
-        ...keepPaths,
-      );
-    },
+    pruneWikiPages: (sub, keepPaths) => pruneNotIn("wiki_pages", sub, keepPaths),
     searchWiki: (sub, query) =>
       searchPages.all(sub, `%${escapeLike(query)}%`, `%${escapeLike(query)}%`) as Pick<
         WikiPageRow,
@@ -266,6 +316,30 @@ export function openStore(path: string): Store {
       >[],
     getWikiSyncedAt: (sub) => (getSync.get(sub) as { at: string } | undefined)?.at,
     setWikiSyncedAt: (sub, at) => void putSync.run(sub, at),
+    listWikiChunks: (sub) => listChunks.all(sub) as WikiChunkRow[],
+    wikiChunkEtags: (sub) =>
+      new Map(
+        (chunkEtags.all(sub) as { path: string; etag: string }[]).map((r) => [r.path, r.etag]),
+      ),
+    replaceWikiChunks: (sub, path, etag, chunks) => {
+      db.exec("BEGIN");
+      try {
+        delChunksForPage.run(sub, path);
+        for (const [i, c] of chunks.entries()) {
+          putChunk.run(sub, path, i, c.text, c.embedding, etag);
+        }
+        db.exec("COMMIT");
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+    pruneWikiChunks: (sub, keepPaths) => pruneNotIn("wiki_chunks", sub, keepPaths),
+    wikiChunkStats: (sub) =>
+      (chunkStats.get(sub) as { chunks: number; pages: number } | undefined) ?? {
+        chunks: 0,
+        pages: 0,
+      },
     listCsvFiles: (sub) => listCsv.all(sub) as (Omit<CsvFileRow, "sub"> & { rowCount: number })[],
     getCsvFile: (sub, id) => getCsv.get(sub, id) as Omit<CsvFileRow, "sub"> | undefined,
     createCsvFile: (sub, name, headers) => {

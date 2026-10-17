@@ -13,6 +13,9 @@ import type {
   ServerHealthResponse,
   TableView,
   TalkStatus,
+  WikiAskResult,
+  WikiIndexResult,
+  WikiLlmStatus,
   WikiPage,
   WikiSearchResult,
   WikiSyncResult,
@@ -161,6 +164,34 @@ export function useWikiSearch(query: string, enabled: boolean) {
         .get<{ results: WikiSearchResult[] }>(`/wiki/search?q=${encodeURIComponent(query)}`)
         .then((r) => r.results),
     enabled: enabled && query.length > 0,
+  });
+}
+
+export function useWikiLlmStatus(enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["wiki", "llm-status"],
+    queryFn: () => api.get<WikiLlmStatus>("/wiki/llm/status"),
+    enabled,
+    // Poll while a background index run is in flight.
+    refetchInterval: (q) => (q.state.data?.indexing ? 2000 : false),
+  });
+}
+
+export function useWikiLlmIndex() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<WikiIndexResult>("/wiki/llm/index"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["wiki", "llm-status"] }),
+  });
+}
+
+/** Stateless single-turn ask (D39) — the result stays local to the caller, nothing cached. */
+export function useWikiAsk() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (question: string) => api.post<WikiAskResult>("/wiki/ask", { question }),
   });
 }
 

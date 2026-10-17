@@ -122,6 +122,25 @@ export interface WikiSyncResult {
   pages: number;
 }
 
+export interface WikiLlmStatus {
+  configured: boolean;
+  indexing: boolean;
+  pages: number;
+  indexedPages: number;
+  chunks: number;
+}
+
+export interface WikiIndexResult {
+  pages: number;
+  embeddedPages: number;
+  chunks: number;
+}
+
+export interface WikiAskResult {
+  answer: string;
+  sources: { path: string; title: string }[];
+}
+
 export interface CsvFileMeta {
   id: number;
   name: string;

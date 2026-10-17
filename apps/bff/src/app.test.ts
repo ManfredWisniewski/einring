@@ -1132,6 +1132,159 @@ describe("csv-manager", () => {
   });
 });
 
+describe("wiki llm", () => {
+  const llmEnv = (extra: Record<string, string> = {}) => ({
+    ...testEnv(),
+    MODULE_WIKI_LLM_URL: "https://llm.test/v1",
+    MODULE_WIKI_LLM_API_KEY: "sk-secret",
+    MODULE_WIKI_LLM_CHAT_MODEL: "chat-m",
+    MODULE_WIKI_LLM_EMBED_MODEL: "embed-m",
+    ...extra,
+  });
+
+  const seedPage = (store: Store, sub: string, path: string, title: string, content: string) =>
+    store.upsertWikiPage({
+      sub,
+      path,
+      title,
+      content,
+      etag: `e-${path}`,
+      mtime: null,
+      syncedAt: "2025-01-01T00:00:00Z",
+    });
+
+  /** Vectors rank by lexical overlap with "ring": [1,0,0] ring-ish, else [0,1,0]. */
+  const embedFor = (text: string) => (text.toLowerCase().includes("ring") ? [1, 0, 0] : [0, 1, 0]);
+
+  const llmFake = (opts: { onChat?: (body: unknown) => void; failEmbeds?: boolean } = {}) =>
+    fakeFetch(async (url, init) => {
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      expect(auth).toBe("Bearer sk-secret");
+      const body = JSON.parse(String(init?.body)) as { model?: string; input?: string[] };
+      if (url === "https://llm.test/v1/embeddings") {
+        if (opts.failEmbeds) return json({ error: "boom" }, 500);
+        expect(body.model).toBe("embed-m");
+        const inputs = body.input ?? [];
+        return json({ data: inputs.map((t, i) => ({ index: i, embedding: embedFor(t) })) });
+      }
+      if (url === "https://llm.test/v1/chat/completions") {
+        expect(body.model).toBe("chat-m");
+        opts.onChat?.(body);
+        return json({ choices: [{ message: { content: "It lies in Mordor." } }] });
+      }
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+
+  it("answers 424 and reports configured=false when LLM is unset", async () => {
+    const { app, auth } = await testApp();
+    expect(
+      (await app.inject({ method: "POST", url: "/api/wiki/llm/index", headers: auth })).statusCode,
+    ).toBe(424);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/wiki/ask",
+          headers: auth,
+          payload: { question: "hi" },
+        })
+      ).statusCode,
+    ).toBe(424);
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/wiki/llm/status",
+      headers: auth,
+    });
+    expect(status.json()).toMatchObject({ configured: false, chunks: 0 });
+  });
+
+  it("indexes pages, answers with top-k chunks and cites sources", async () => {
+    let chatBody: { messages?: { role: string; content: string }[] } | undefined;
+    const { app, auth, store } = await testApp({
+      config: loadConfig(llmEnv({ MODULE_WIKI_LLM_TOP_K: "2" })),
+      fetchImpl: llmFake({ onChat: (b) => (chatBody = b as typeof chatBody) }),
+    });
+    seedPage(store, TEST_USER.sub, "Handbook/Ring.md", "Ring", "# Ring\n\nHidden in Mordor.");
+    seedPage(store, TEST_USER.sub, "Handbook/Bread.md", "Bread", "# Bread\n\nLembas is filling.");
+    // Another user's indexed chunk that would rank first must not leak into the prompt.
+    store.replaceWikiChunks("other-user", "Secret/Ring.md", "e-other", [
+      { text: "ring secret", embedding: Buffer.from(new Float32Array([1, 0, 0]).buffer) },
+    ]);
+
+    const index = await app.inject({ method: "POST", url: "/api/wiki/llm/index", headers: auth });
+    expect(index.statusCode).toBe(200);
+    expect(index.json()).toMatchObject({ pages: 2, embeddedPages: 2 });
+    // Indexing only touched the caller's chunks — the other user's row is untouched.
+    expect(store.listWikiChunks("other-user")).toHaveLength(1);
+    // Indexing only affects the caller's chunks.
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/wiki/llm/status",
+      headers: auth,
+    });
+    expect(status.json()).toMatchObject({ configured: true, indexedPages: 2, chunks: 2 });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/wiki/ask",
+      headers: auth,
+      payload: { question: "where is the ring?" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      answer: "It lies in Mordor.",
+      sources: [
+        { path: "Handbook/Ring.md", title: "Ring" },
+        { path: "Handbook/Bread.md", title: "Bread" },
+      ],
+    });
+    expect(JSON.stringify(res.json())).not.toContain("sk-secret");
+    // TOP_K=2: both own chunks enter the prompt; the other user's chunk must not.
+    const prompt = chatBody?.messages?.[1]?.content ?? "";
+    expect(prompt).toContain("### Handbook/Ring.md");
+    expect(prompt).toContain("### Handbook/Bread.md");
+    expect(prompt).not.toContain("Secret/Ring.md");
+    // Ranking: the ring-matching chunk precedes the bread chunk in the context.
+    expect(prompt.indexOf("Ring.md")).toBeLessThan(prompt.indexOf("Bread.md"));
+
+    // A second index run reuses etags — nothing re-embedded.
+    const again = await app.inject({
+      method: "POST",
+      url: "/api/wiki/llm/index",
+      headers: auth,
+    });
+    expect(again.json()).toMatchObject({ pages: 2, embeddedPages: 0 });
+  });
+
+  it("answers 409 on an empty index and 400 on a bad question", async () => {
+    const { app, auth } = await testApp({ config: loadConfig(llmEnv()) });
+    const ask = (question: unknown) =>
+      app.inject({ method: "POST", url: "/api/wiki/ask", headers: auth, payload: { question } });
+    expect((await ask("anything")).statusCode).toBe(409); // not indexed
+    expect((await ask("")).statusCode).toBe(400);
+    expect((await ask("   ")).statusCode).toBe(400);
+    expect((await ask("x".repeat(2001))).statusCode).toBe(400);
+  });
+
+  it("surfaces provider failures as 502", async () => {
+    const { app, auth, store } = await testApp({
+      config: loadConfig(llmEnv()),
+      fetchImpl: llmFake({ failEmbeds: true }),
+    });
+    store.replaceWikiChunks(TEST_USER.sub, "Handbook/Ring.md", "e1", [
+      { text: "ring text", embedding: Buffer.from(new Float32Array([1, 0, 0]).buffer) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/wiki/ask",
+      headers: auth,
+      payload: { question: "where?" },
+    });
+    expect(res.statusCode).toBe(502);
+    expect(res.json().error).toBe("llm");
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();

@@ -3,7 +3,15 @@ import { marked } from "marked";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
-import { useWikiPage, useWikiSearch, useWikiSync, useWikiTree } from "@/api/hooks";
+import {
+  useWikiAsk,
+  useWikiLlmIndex,
+  useWikiLlmStatus,
+  useWikiPage,
+  useWikiSearch,
+  useWikiSync,
+  useWikiTree,
+} from "@/api/hooks";
 import type { WikiPageMeta } from "@/api/types";
 import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
@@ -157,6 +165,7 @@ function WikiContent() {
           })}
         </div>
       )}
+      <AskPanel onSelectPage={setSelected} />
       <div className="wiki">
         <nav className="wiki__nav" aria-label={t("modules.wiki.nav")}>
           {collectives.size === 0 ? (
@@ -193,6 +202,98 @@ function WikiContent() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Stateless Q&A over the mirrored pages (D39). Hidden unless the BFF reports LLM configured. */
+function AskPanel({ onSelectPage }: { onSelectPage: (path: string) => void }) {
+  const { t } = useTranslation();
+  const askId = useId();
+  const [question, setQuestion] = useState("");
+  const status = useWikiLlmStatus(true);
+  const index = useWikiLlmIndex();
+  const ask = useWikiAsk();
+
+  if (!status.data?.configured) return null;
+
+  const submit = () => {
+    const q = question.trim();
+    if (q) ask.mutate(q);
+  };
+  const answerHtml = ask.data ? DOMPurify.sanitize(marked.parse(ask.data.answer) as string) : null;
+  const askStatus = ask.error instanceof ApiError ? ask.error.status : null;
+
+  return (
+    <section className="wiki-ask stack" aria-label={t("modules.wiki.askTitle")}>
+      <div className="row">
+        <div className="flex flex-col gap-1 grow">
+          <Label htmlFor={askId}>{t("modules.wiki.askTitle")}</Label>
+          <Input
+            id={askId}
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder={t("modules.wiki.askPlaceholder")}
+            aria-label={t("modules.wiki.askTitle")}
+          />
+        </div>
+        <Button onClick={submit} disabled={ask.isPending || !question.trim()}>
+          {ask.isPending ? t("modules.wiki.asking") : t("modules.wiki.ask")}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => index.mutate()}
+          disabled={index.isPending || status.data.indexing}
+        >
+          {index.isPending || status.data.indexing
+            ? t("modules.wiki.indexing")
+            : t("modules.wiki.indexNow")}
+        </Button>
+      </div>
+      <span className="muted">
+        {t("modules.wiki.indexStatus", {
+          indexed: status.data.indexedPages,
+          pages: status.data.pages,
+          chunks: status.data.chunks,
+        })}
+      </span>
+      {index.isError && (
+        <div className="alert alert--danger">
+          {t("modules.wiki.indexError", {
+            status: index.error instanceof ApiError ? index.error.status : "?",
+          })}
+        </div>
+      )}
+      {ask.isError && (
+        <div className="alert alert--danger">
+          {askStatus === 409
+            ? t("modules.wiki.notIndexed")
+            : t("modules.wiki.askError", { status: askStatus ?? "?" })}
+        </div>
+      )}
+      {answerHtml && (
+        <article className="wiki__doc stack">
+          {/* Sanitized by DOMPurify; source is the configured LLM provider's answer. */}
+          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: markdown rendered through DOMPurify */}
+          <div dangerouslySetInnerHTML={{ __html: answerHtml }} />
+          {ask.data && ask.data.sources.length > 0 && (
+            <div className="row">
+              <span className="muted">{t("modules.wiki.sources")}</span>
+              {ask.data.sources.map((s) => (
+                <Button
+                  key={s.path}
+                  variant="link"
+                  size="clear"
+                  onClick={() => onSelectPage(s.path)}
+                >
+                  {s.title}
+                </Button>
+              ))}
+            </div>
+          )}
+        </article>
+      )}
+    </section>
   );
 }
 

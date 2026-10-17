@@ -423,6 +423,17 @@ a {
   min-width: 0;
 }
 
+.wiki-ask {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  padding: var(--space-4);
+}
+
+.wiki-ask .row {
+  align-items: end;
+}
+
 .wiki__doc {
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-md);

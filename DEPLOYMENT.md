@@ -72,6 +72,13 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 # MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)
 # MODULE_CSV_MANAGER_MAX_ROWS=20000
+# Wiki LLM Q&A — OpenAI-compatible /v1 provider; unset = feature disabled (D39)
+# MODULE_WIKI_LLM_URL=https://openrouter.ai/api/v1
+# MODULE_WIKI_LLM_API_KEY=sk-or-...       # required by OpenRouter; local servers ignore it
+# MODULE_WIKI_LLM_CHAT_MODEL=google/gemini-2.5-flash
+# MODULE_WIKI_LLM_EMBED_MODEL=openai/text-embedding-3-small
+# MODULE_WIKI_LLM_TOP_K=8                 # chunks per answer prompt
+# MODULE_WIKI_LLM_TIMEOUT_S=60
 LOG_LEVEL=info
 ```
 
@@ -159,6 +166,32 @@ MODULES=wiki                                       # restrict the module set per
 - `MODULES` — limits which modules the instance exposes (BFF registry is the source of truth)
 
 The SPA gets its Authentik issuer/client-id from `GET /api/config` at runtime, so each container uses its own `AUTHENTIK_ISSUER`/`AUTHENTIK_CLIENT_ID` env — the `VITE_AUTHENTIK_*` build args are only a fallback. A whitelabel instance can therefore sign in via its own Authentik provider on the same image. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.
+
+## Wiki LLM Q&A (Ask the wiki)
+
+The wiki module can answer questions over the mirrored Collectives pages via retrieval-augmented generation (D39): the BFF chunks mirrored pages into `wiki_chunks`, embeds them through the configured provider, and on `POST /api/wiki/ask` sends the top-k matching chunks plus the question to the chat model. The answer carries source links into the wiki tree.
+
+Config is all-or-nothing — the feature enables when `MODULE_WIKI_LLM_URL`, `MODULE_WIKI_LLM_CHAT_MODEL` and `MODULE_WIKI_LLM_EMBED_MODEL` are set; unset, the Ask UI stays hidden and the endpoints answer 424. Any OpenAI-compatible `/v1` endpoint works:
+
+```dotenv
+# Managed provider (default path): OpenRouter
+MODULE_WIKI_LLM_URL=https://openrouter.ai/api/v1
+MODULE_WIKI_LLM_API_KEY=sk-or-...
+MODULE_WIKI_LLM_CHAT_MODEL=google/gemini-2.5-flash
+MODULE_WIKI_LLM_EMBED_MODEL=openai/text-embedding-3-small
+
+# Local alternative — same code path, no API key needed
+# (e.g. a llama-server or Ollama sidecar on the docker network)
+# MODULE_WIKI_LLM_URL=http://llama-server:8080/v1
+# MODULE_WIKI_LLM_CHAT_MODEL=local-model
+# MODULE_WIKI_LLM_EMBED_MODEL=local-embed
+```
+
+- **Privacy**: with a remote provider, the retrieved wiki chunks and the question leave the deployment (to OpenRouter or the configured endpoint). Point `LLM_URL` at a local server to keep content in-house.
+- The API key stays in the BFF — it is never sent to the app, same rule as Nextcloud credentials.
+- Indexing runs after each successful wiki sync in the background (etag reuse means only changed pages re-embed) and on demand via the "Update index" button / `POST /api/wiki/llm/index`. `GET /api/wiki/llm/status` reports `configured`, `indexing`, `pages`, `indexedPages`, `chunks`.
+- Both chat and embedding calls share `LLM_URL` — the provider must offer `/chat/completions` **and** `/embeddings` (OpenRouter: pick an embedding model from its limited set; llama.cpp serves both).
+- Answers are stateless single-turn and non-streaming; sources cite page paths from the mirror.
 
 ## Embedded in Nextcloud (External sites)
 

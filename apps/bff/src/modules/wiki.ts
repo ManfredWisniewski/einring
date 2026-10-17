@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { z } from "zod";
 import type { AppContext } from "../app.js";
+import { LlmClient } from "../llm/client.js";
 import { type AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
 import type { BffModule } from "./types.js";
 
@@ -29,6 +30,93 @@ export interface WikiSyncResult {
   syncedAt: string;
   pages: number;
 }
+
+export interface WikiLlmStatus {
+  configured: boolean;
+  indexing: boolean;
+  pages: number;
+  indexedPages: number;
+  chunks: number;
+}
+
+export interface WikiIndexResult {
+  pages: number;
+  /** Pages whose etag changed since their last embedding (re-indexed now). */
+  embeddedPages: number;
+  chunks: number;
+}
+
+export interface WikiAskResult {
+  answer: string;
+  sources: { path: string; title: string }[];
+}
+
+/** ~1–2 kB markdown chunks; heading sections are kept together where possible (D39). */
+const CHUNK_MAX_CHARS = 1800;
+
+/** Splits markdown into ≤maxChars chunks: heading sections pack until the limit, oversized ones split on paragraph/line/space boundaries. */
+export function chunkMarkdown(content: string, maxChars = CHUNK_MAX_CHARS): string[] {
+  const sections = content.split(/(?=^#{1,6} )/m);
+  const out: string[] = [];
+  let current = "";
+  const flush = () => {
+    const t = current.trim();
+    if (t) out.push(t);
+    current = "";
+  };
+  for (const section of sections) {
+    for (const piece of splitLong(section, maxChars)) {
+      if (current && current.length + piece.length + 2 > maxChars) flush();
+      current = current ? `${current}\n\n${piece}` : piece;
+    }
+  }
+  flush();
+  return out;
+}
+
+/** Hard-splits text longer than maxChars — prefers paragraph, then line, then word boundaries. */
+function splitLong(text: string, maxChars: number): string[] {
+  const parts: string[] = [];
+  let rest = text.trim();
+  while (rest.length > maxChars) {
+    let cut = rest.lastIndexOf("\n\n", maxChars);
+    if (cut < maxChars / 2) cut = rest.lastIndexOf("\n", maxChars);
+    if (cut < maxChars / 2) cut = rest.lastIndexOf(" ", maxChars);
+    if (cut <= 0) cut = maxChars;
+    parts.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
+const toF32 = (v: number[]) => Buffer.from(new Float32Array(v).buffer);
+const fromF32 = (b: Buffer) => new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
+
+function cosine(a: number[], b: Float32Array): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
+  return na > 0 && nb > 0 ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
+
+const ASK_SYSTEM_PROMPT = [
+  "You answer questions about the user's wiki using only the context excerpts provided.",
+  "If the context does not contain the answer, say so plainly — do not guess or use outside knowledge.",
+  "Keep answers concise and in the same language as the question.",
+  "When you use information from a page, mention its path (### path) as the source.",
+].join(" ");
+
+/** Provider calls batch this many inputs per /embeddings request. */
+const EMBED_BATCH = 32;
 
 /** "Handbook/Onboarding.md" → collective "Handbook", title "Onboarding". */
 export function metaFromPath(path: string): { collective: string; title: string } {
@@ -174,6 +262,11 @@ export async function syncWiki(
     sub,
     files.map((f) => f.relPath),
   );
+  // Chunk index is derived data — prune it in lockstep with the mirror.
+  store.pruneWikiChunks(
+    sub,
+    files.map((f) => f.relPath),
+  );
   store.setWikiSyncedAt(sub, syncedAt);
   return { syncedAt, pages: files.length };
 }
@@ -192,6 +285,17 @@ const configSchema = z.object({
    * instead of Nextcloud WebDAV.
    */
   SOURCE_DIR: z.string().min(1).optional(),
+  /**
+   * LLM Q&A (D39): OpenAI-compatible `/v1` provider — OpenRouter default,
+   * llama-server/LM Studio/Ollama `/v1` as local alternatives. Feature disabled
+   * unless URL + both models are set; API_KEY is optional (local servers ignore it).
+   */
+  LLM_URL: z.url().optional(),
+  LLM_API_KEY: z.string().min(1).optional(),
+  LLM_CHAT_MODEL: z.string().min(1).optional(),
+  LLM_EMBED_MODEL: z.string().min(1).optional(),
+  LLM_TOP_K: z.coerce.number().int().min(1).max(50).default(8),
+  LLM_TIMEOUT_S: z.coerce.number().int().min(1).max(600).default(60),
 });
 
 export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
@@ -202,6 +306,57 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
     const { store, secrets, nextcloud } = ctx;
     // One sync per user at a time — concurrent callers share the in-flight promise.
     const inflight = new Map<string, Promise<WikiSyncResult>>();
+    const indexInflight = new Map<string, Promise<WikiIndexResult>>();
+    const llm =
+      config.LLM_URL && config.LLM_CHAT_MODEL && config.LLM_EMBED_MODEL
+        ? new LlmClient(
+            config.LLM_URL,
+            config.LLM_API_KEY,
+            ctx.fetchImpl ?? fetch,
+            config.LLM_TIMEOUT_S * 1000,
+          )
+        : null;
+
+    const runIndex = (sub: string): Promise<WikiIndexResult> => {
+      const running = indexInflight.get(sub);
+      if (running) return running;
+      const p = doIndex(sub).finally(() => indexInflight.delete(sub));
+      indexInflight.set(sub, p);
+      return p;
+    };
+
+    /** Re-embeds pages whose etag changed and prunes chunks of deleted pages. */
+    const doIndex = async (sub: string): Promise<WikiIndexResult> => {
+      const pages = store.listWikiPages(sub);
+      store.pruneWikiChunks(
+        sub,
+        pages.map((p) => p.path),
+      );
+      const chunkEtags = store.wikiChunkEtags(sub);
+      let embeddedPages = 0;
+      let chunks = 0;
+      for (const page of pages) {
+        if (chunkEtags.get(page.path) === page.etag) continue; // already indexed
+        const full = store.getWikiPage(sub, page.path);
+        if (!full) continue;
+        const parts = chunkMarkdown(full.content);
+        // The title is part of the embedding input so title-bearing queries rank well.
+        const vectors = llm
+          ? await embedAll(llm, config.LLM_EMBED_MODEL as string, [
+              ...parts.map((part) => `${full.title}\n\n${part}`),
+            ])
+          : [];
+        store.replaceWikiChunks(
+          sub,
+          page.path,
+          page.etag,
+          parts.map((text, i) => ({ text, embedding: vectors[i] ? toF32(vectors[i]) : null })),
+        );
+        embeddedPages += 1;
+        chunks += parts.length;
+      }
+      return { pages: pages.length, embeddedPages, chunks };
+    };
 
     const sync = (sub: string): Promise<WikiSyncResult> => {
       const running = inflight.get(sub);
@@ -216,6 +371,12 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
           );
       const p = syncWiki(source, ctx, sub).finally(() => inflight.delete(sub));
       inflight.set(sub, p);
+      // Index in the background after a successful sync — never blocks the mirror.
+      if (llm) {
+        void p
+          .then(() => runIndex(sub))
+          .catch((e) => api.log.warn({ err: e }, "wiki llm index failed"));
+      }
       return p;
     };
 
@@ -269,8 +430,61 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
       }));
       return { results };
     });
+
+    api.get("/llm/status", async (request) => {
+      const stats = store.wikiChunkStats(request.user.sub);
+      return {
+        configured: llm !== null,
+        indexing: indexInflight.has(request.user.sub),
+        pages: store.listWikiPages(request.user.sub).length,
+        indexedPages: stats.pages,
+        chunks: stats.chunks,
+      } satisfies WikiLlmStatus;
+    });
+
+    api.post("/llm/index", async (request, reply) => {
+      if (!llm) return reply.code(424).send({ error: "llm not configured" });
+      return runIndex(request.user.sub);
+    });
+
+    api.post("/ask", async (request, reply) => {
+      if (!llm) return reply.code(424).send({ error: "llm not configured" });
+      const { question } = (request.body ?? {}) as { question?: unknown };
+      const q = typeof question === "string" ? question.trim() : "";
+      if (!q || q.length > 2000) {
+        return reply.code(400).send({ error: "question must be 1-2000 characters" });
+      }
+      const chunks = store.listWikiChunks(request.user.sub).filter((c) => c.embedding);
+      if (chunks.length === 0) {
+        return reply.code(409).send({ error: "wiki not indexed" });
+      }
+      const [qv] = await llm.embed(config.LLM_EMBED_MODEL as string, [q]);
+      const ranked = chunks
+        .map((c) => ({ c, score: cosine(qv ?? [], fromF32(c.embedding as Buffer)) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, config.LLM_TOP_K);
+      const context = ranked.map(({ c }) => `### ${c.path}\n${c.text}`).join("\n\n");
+      const answer = await llm.chat(config.LLM_CHAT_MODEL as string, [
+        { role: "system", content: ASK_SYSTEM_PROMPT },
+        { role: "user", content: `Context:\n\n${context}\n\nQuestion: ${q}` },
+      ]);
+      const sources = [...new Set(ranked.map(({ c }) => c.path))].map((path) => ({
+        path,
+        title: metaFromPath(path).title,
+      }));
+      return { answer, sources } satisfies WikiAskResult;
+    });
   },
 };
+
+/** Embeds texts in batches — one request per EMBED_BATCH inputs keeps payloads sane. */
+async function embedAll(client: LlmClient, model: string, texts: string[]): Promise<number[][]> {
+  const out: number[][] = [];
+  for (let i = 0; i < texts.length; i += EMBED_BATCH) {
+    out.push(...(await client.embed(model, texts.slice(i, i + EMBED_BATCH))));
+  }
+  return out;
+}
 
 /** ~160 chars of context around the first case-insensitive match. */
 function snippet(content: string, needle: string): string {

@@ -10,5 +10,16 @@
   "noResults": "Keine passenden Seiten.",
   "error": "Das Wiki konnte nicht geladen werden ({{status}}).",
   "pageError": "Die Seite konnte nicht geladen werden ({{status}}).",
-  "retry": "Erneut versuchen"
+  "retry": "Erneut versuchen",
+  "askTitle": "Wiki fragen",
+  "askPlaceholder": "Stelle eine Frage zu deinen Seiten…",
+  "ask": "Fragen",
+  "asking": "Wird beantwortet…",
+  "askError": "Die Frage konnte nicht beantwortet werden ({{status}}).",
+  "notIndexed": "Das Wiki ist noch nicht indexiert — starte zuerst die Indexierung.",
+  "indexNow": "Index aktualisieren",
+  "indexing": "Indexiere…",
+  "indexStatus": "{{indexed}} von {{pages}} Seiten indexiert ({{chunks}} Abschnitte)",
+  "indexError": "Indexierung fehlgeschlagen ({{status}}).",
+  "sources": "Quellen:"
 }

@@ -8,6 +8,7 @@ import { requireAuth, type TokenVerifier } from "./auth.js";
 import type { Config } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
+import { LlmError } from "./llm/client.js";
 import { resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
 import { registerNextcloudPublicRoutes, registerNextcloudRoutes } from "./routes/nextcloud.js";
@@ -82,6 +83,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       return reply
         .code(code)
         .send({ error: "nextcloud", detail: err.message, upstreamStatus: err.status });
+    }
+    if (err instanceof LlmError) {
+      request.log.warn({ status: err.status, msg: err.message }, "llm error");
+      return reply
+        .code(502)
+        .send({ error: "llm", detail: err.message, upstreamStatus: err.status });
     }
     request.log.error({ err }, "unhandled error");
     return reply.code(err.statusCode ?? 500).send({ error: err.message });

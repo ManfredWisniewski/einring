@@ -98,3 +98,11 @@
 - `PATCH /api/csv-manager/files/:id/rows/:rowId` updates a row's cells and/or `done` flag; `POST /api/csv-manager/files/:id/rows` appends a row; `DELETE` removes single rows and whole files. All endpoints require auth.
 - The app lists imported files, opens one as an interactive table — per-row "done" checkbox, inline-editable cells, −/+ steppers on numeric cells, add-row and row/file delete — in DE + EN, light + dark, token variables only.
 - A frontend-roundtrip works end to end: import → listed file → edited cell/done flag/add row persists on reload.
+
+### A13 Wiki LLM Q&A (RAG over the mirror)
+
+- When `MODULE_WIKI_LLM_URL`/`_API_KEY`/`_CHAT_MODEL`/`_EMBED_MODEL` are configured, `POST /api/wiki/llm/index` chunks the caller's mirrored pages into `wiki_chunks` (heading-aware ~1–2 kB chunks, `Float32` embedding blobs) via `POST <LLM_URL>/embeddings`; unchanged pages reuse embeddings via the sync etag. `GET /api/wiki/llm/status` reports indexed chunk/page counts and whether LLM is configured.
+- `POST /api/wiki/ask {question}` embeds the question, cosine-ranks the caller's chunks, prompts `<LLM_URL>/chat/completions` with the top-k chunks (`MODULE_WIKI_LLM_TOP_K`) and returns `{answer, sources: [{path, title}]}`. Provider requests carry `Authorization: Bearer <LLM_API_KEY>` when configured; **the API key never appears in any response**.
+- The system prompt instructs the model to answer only from the supplied context and to say when the context lacks the answer; an empty index produces a localized "index first / not indexed" state, not a hallucinated answer.
+- All LLM endpoints require auth, are scoped to the caller's `sub`, and answer **424** when LLM config is missing (the wiki mirror itself keeps working); provider errors surface as a localized error state, not a crash. The question body is validated (non-empty, length-capped).
+- The wiki module shows a localized "Ask" input (DE + EN); the answer renders through the existing marked+DOMPurify pipeline and each source links to its mirrored page. When LLM is unconfigured the Ask UI is hidden or shows the localized disabled state.

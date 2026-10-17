@@ -10,5 +10,16 @@
   "noResults": "No matching pages.",
   "error": "The wiki could not be loaded ({{status}}).",
   "pageError": "The page could not be loaded ({{status}}).",
-  "retry": "Retry"
+  "retry": "Retry",
+  "askTitle": "Ask the wiki",
+  "askPlaceholder": "Ask a question about your pages…",
+  "ask": "Ask",
+  "asking": "Answering…",
+  "askError": "The question could not be answered ({{status}}).",
+  "notIndexed": "The wiki is not indexed yet — run the index first.",
+  "indexNow": "Update index",
+  "indexing": "Indexing…",
+  "indexStatus": "{{indexed}} of {{pages}} pages indexed ({{chunks}} chunks)",
+  "indexError": "Indexing failed ({{status}}).",
+  "sources": "Sources:"
 }
