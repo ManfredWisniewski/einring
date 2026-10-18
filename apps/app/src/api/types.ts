@@ -615,3 +615,24 @@ export interface EinDavFileEntry {
   size: number | null;
   mtime: string | null;
 }
+
+// -- Recipes (D55) ------------------------------------------------------------
+
+export interface RecipeListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  hasImage: boolean;
+  keywords: string[];
+  category: string | null;
+  cuisine: string | null;
+  servings: string | null;
+  totalTime: string | null;
+  ingredients: string[];
+}
+
+export interface Recipe extends RecipeListItem {
+  prepTime: string | null;
+  cookTime: string | null;
+  instructions: string[];
+}

@@ -1,0 +1,15 @@
+{
+  "nav": "Recipes",
+  "search": "Search recipes…",
+  "back": "← Recipes",
+  "empty": "No recipes found.",
+  "servings": "{{count}} servings",
+  "prep": "Prep",
+  "cook": "Cook",
+  "total": "Total",
+  "days": "{{count}} d",
+  "hours": "{{count}} h",
+  "minutes": "{{count}} min",
+  "ingredients": "Ingredients",
+  "instructions": "Instructions"
+}

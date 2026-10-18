@@ -7,5 +7,8 @@
   "unread_one": "{{count}} unread",
   "unread_other": "{{count}} unread",
   "open": "Open",
-  "error": "Notifications could not be loaded ({{status}})."
+  "error": "Notifications could not be loaded ({{status}}).",
+  "filterUnread": "Unread",
+  "filterAll": "All",
+  "emptyUnread": "No unread notifications."
 }

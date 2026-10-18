@@ -1,0 +1,15 @@
+{
+  "nav": "Rezepte",
+  "search": "Rezepte suchen…",
+  "back": "← Rezepte",
+  "empty": "Keine Rezepte gefunden.",
+  "servings": "{{count}} Portionen",
+  "prep": "Vorbereitung",
+  "cook": "Kochen",
+  "total": "Gesamt",
+  "days": "{{count}} T",
+  "hours": "{{count}} Std.",
+  "minutes": "{{count}} Min.",
+  "ingredients": "Zutaten",
+  "instructions": "Zubereitung"
+}

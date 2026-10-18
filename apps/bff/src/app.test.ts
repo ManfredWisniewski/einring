@@ -1542,6 +1542,7 @@ describe("einchat", () => {
         "authentik_status",
         "matrix_rooms",
         "eindav_contacts",
+        "recipes_search",
       ],
     });
   });
@@ -1659,7 +1660,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(21);
+    expect(all.json().tools.length).toBe(22);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -3958,6 +3959,120 @@ ${bodies}</d:multistatus>`;
   });
 });
 
+describe("recipes", () => {
+  const NC = "https://cloud.test";
+  const FILES = "/remote.php/dav/files/frodo";
+  const RECIPE = (name: string, extra = "") =>
+    JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name,
+      description: `${name} desc`,
+      keywords: "cake, dessert",
+      recipeCategory: "Dessert",
+      recipeYield: "8",
+      totalTime: "PT1H10M",
+      recipeIngredient: ["200g flour", "3 eggs"],
+      recipeInstructions: [
+        "Mix.",
+        { "@type": "HowToStep", text: "Bake." },
+        { "@type": "HowToSection", itemListElement: [{ "@type": "HowToStep", text: "Cool." }] },
+      ],
+      image: "full.jpg",
+      ...JSON.parse(extra || "{}"),
+    });
+
+  const MS2 = (bodies: string) => `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+${bodies}</d:multistatus>`;
+
+  /** PROPFIND of Recipes/ with two recipe folders (Bolo has an image, Pasta none). */
+  const recipesPropfind = MS2(`
+<d:response><d:href>${FILES}/Recipes/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+<d:response><d:href>${FILES}/Recipes/Bolo/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+<d:response><d:href>${FILES}/Recipes/Pasta/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`);
+
+  const recipesFake = fakeFetch((url, init) => {
+    if (url === `${NC}${FILES}/Recipes` && init?.method === "PROPFIND") {
+      return new Response(recipesPropfind, { status: 207 });
+    }
+    if (url === `${NC}${FILES}/Recipes/Bolo/recipe.json` && !init?.method) {
+      return new Response(RECIPE("Bolo"), { status: 200 });
+    }
+    if (url === `${NC}${FILES}/Recipes/Pasta/recipe.json` && !init?.method) {
+      return new Response(RECIPE("Pasta", '{"image":null}'), { status: 200 });
+    }
+    if (url === `${NC}${FILES}/Recipes/Bolo/full.jpg` && !init?.method) {
+      return new Response("jpeg-bytes", {
+        status: 200,
+        headers: { "content-type": "image/jpeg" },
+      });
+    }
+    return new Response(`unexpected ${url}`, { status: 404 });
+  });
+
+  it("424s when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    for (const url of ["/api/recipes", "/api/recipes/Bolo", "/api/recipes/Bolo/image"]) {
+      expect((await app.inject({ method: "GET", url, headers: auth })).statusCode).toBe(424);
+    }
+  });
+
+  it("lists recipes from the Cookbook folder, detail flattens instructions", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: recipesFake });
+    connect(store, secrets);
+    const list = await app.inject({ method: "GET", url: "/api/recipes", headers: auth });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().recipes).toEqual([
+      expect.objectContaining({
+        id: "Bolo",
+        name: "Bolo",
+        hasImage: true,
+        keywords: ["cake", "dessert"],
+      }),
+      expect.objectContaining({ id: "Pasta", name: "Pasta", hasImage: false }),
+    ]);
+    const detail = await app.inject({ method: "GET", url: "/api/recipes/Bolo", headers: auth });
+    expect(detail.json().recipe).toMatchObject({
+      name: "Bolo",
+      servings: "8",
+      totalTime: "PT1H10M",
+      ingredients: ["200g flour", "3 eggs"],
+      instructions: ["Mix.", "Bake.", "Cool."],
+    });
+  });
+
+  it("proxies the recipe image and 404s unknown ids", async () => {
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: recipesFake });
+    connect(store, secrets);
+    const img = await app.inject({ method: "GET", url: "/api/recipes/Bolo/image", headers: auth });
+    expect(img.statusCode).toBe(200);
+    expect(img.headers["content-type"]).toContain("image/jpeg");
+    expect(img.body).toBe("jpeg-bytes");
+    expect(
+      (await app.inject({ method: "GET", url: "/api/recipes/Nope", headers: auth })).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/recipes/..%2Fsecret",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+
+  it("answers an empty list when the recipes folder does not exist", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl: fakeFetch(() => new Response("missing", { status: 404 })),
+    });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/recipes", headers: auth });
+    expect(res.json()).toEqual({ recipes: [] });
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -3987,6 +4102,7 @@ describe("module framework", () => {
         { id: "talk", requires: ["nextcloud"] },
         { id: "matrix", requires: [] },
         { id: "eindav", requires: ["nextcloud"] },
+        { id: "recipes", requires: ["nextcloud"] },
       ],
     });
   });

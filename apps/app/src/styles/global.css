@@ -859,3 +859,35 @@ a {
   gap: var(--spacing-1);
   flex-wrap: wrap;
 }
+
+/* --- Recipes (D55) --- */
+.recipes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+.recipes-row__main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-1);
+  min-width: 0;
+  text-align: start;
+}
+.recipes-image {
+  max-width: 100%;
+  max-height: 20rem;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+.recipes-ingredients,
+.recipes-steps {
+  margin: 0;
+  padding-inline-start: var(--spacing-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}

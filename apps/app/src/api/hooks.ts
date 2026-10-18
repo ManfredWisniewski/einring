@@ -47,6 +47,8 @@ import type {
   NextcloudSettingsResponse,
   PassmanVaultDetail,
   PassmanVaults,
+  Recipe,
+  RecipeListItem,
   ServerHealthResponse,
   TableNode,
   TableNodeType,
@@ -1092,3 +1094,34 @@ export function useDownloadEinDavFile() {
 }
 
 const dirOf = (path: string) => path.split("/").slice(0, -1).join("/");
+
+// --- Recipes (D55) ----------------------------------------------------------
+
+export function useRecipes(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["recipes"],
+    queryFn: () => api.get<{ recipes: RecipeListItem[] }>("/recipes"),
+    enabled,
+  });
+}
+
+export function useRecipe(id: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["recipes", id],
+    queryFn: () => api.get<{ recipe: Recipe }>(`/recipes/${encodeURIComponent(id ?? "")}`),
+    enabled: id !== null,
+  });
+}
+
+/** Authenticated blob fetch of the recipe photo for <img src> (D48 pattern). */
+export function useRecipeImage(id: string | null, hasImage: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["recipes", id, "image"],
+    queryFn: () => api.blob(`/recipes/${encodeURIComponent(id ?? "")}/image`),
+    enabled: id !== null && hasImage,
+    staleTime: 5 * 60_000,
+  });
+}

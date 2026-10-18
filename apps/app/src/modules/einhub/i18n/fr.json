@@ -8,5 +8,8 @@
   "unread_many": "{{count}} non lus",
   "unread_other": "{{count}} non lus",
   "open": "Ouvrir",
-  "error": "Impossible de charger les notifications ({{status}})."
+  "error": "Impossible de charger les notifications ({{status}}).",
+  "filterUnread": "Non lues",
+  "filterAll": "Toutes",
+  "emptyUnread": "Aucune notification non lue."
 }

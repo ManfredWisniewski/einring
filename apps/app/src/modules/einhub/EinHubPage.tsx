@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { ApiError } from "@/api/client";
@@ -59,11 +60,29 @@ export function EinHubPage() {
   const prefDisabled = new Set(prefs.data?.disabled ?? []);
   const notifications = (feed.data?.notifications ?? []).filter((n) => !prefDisabled.has(n.module));
   const unread = notifications.filter((n) => !n.read).length;
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? notifications.slice(0, 20) : notifications.filter((n) => !n.read);
 
   return (
     <div className="stack">
       <div className="row einhub-header">
-        <h2 className="text-lg">{t("modules.einhub.title")}</h2>
+        <div className="row">
+          <h2 className="text-lg">{t("modules.einhub.title")}</h2>
+          <Button
+            variant={showAll ? "outline" : "default"}
+            size="sm"
+            onClick={() => setShowAll(false)}
+          >
+            {t("modules.einhub.filterUnread")}
+          </Button>
+          <Button
+            variant={showAll ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowAll(true)}
+          >
+            {t("modules.einhub.filterAll")}
+          </Button>
+        </div>
         {unread > 0 && (
           <Button
             variant="outline"
@@ -84,12 +103,14 @@ export function EinHubPage() {
           })}
         </div>
       )}
-      {notifications.length === 0 && !feed.isPending && !feed.isError && (
+      {visible.length === 0 && !feed.isPending && !feed.isError && (
         <p className="muted">
-          {t("modules.einhub.empty")} {t("modules.einhub.emptyHint")}
+          {showAll || notifications.length === 0
+            ? `${t("modules.einhub.empty")} ${t("modules.einhub.emptyHint")}`
+            : t("modules.einhub.emptyUnread")}
         </p>
       )}
-      {notifications.map((n) => (
+      {visible.map((n) => (
         <NotificationRow key={n.id} n={n} enabled={enabledModules.has(n.module)} />
       ))}
     </div>
