@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type { AppContext } from "../app.js";
 import { type AuthenticatedNextcloud, parsePropResponses, propText } from "../nextcloud/client.js";
-import type { BffModule } from "./types.js";
+import type { BffModule, ChatTool } from "./types.js";
 
 /** Hrefs returned by REPORT/PROPFIND are absolute DAV paths — only these may be touched. */
 const DAV_PREFIX = "/remote.php/dav/";
@@ -203,6 +203,42 @@ const eventSchema = z.object({
   end: z.string().max(30).optional(),
 });
 
+/** CardDAV addressbook discovery under the user's addressbook home. */
+async function listAddressbooks(nc: AuthenticatedNextcloud) {
+  const xml = await nc.davPropfindAbs(
+    `${nc.davHome("addressbooks")}/`,
+    1,
+    "<d:resourcetype/><d:displayname/><cs:getctag xmlns:cs='http://calendarserver.org/ns/'/>",
+  );
+  return parsePropResponses(xml)
+    .filter(
+      (r) =>
+        typeof r.props.resourcetype === "object" &&
+        r.props.resourcetype !== null &&
+        "addressbook" in (r.props.resourcetype as object),
+    )
+    .map((r) => ({ href: r.href, name: propText(r.props.displayname) ?? r.href }));
+}
+
+/** All contacts in one addressbook via addressbook-query REPORT. */
+async function listContacts(nc: AuthenticatedNextcloud, book: string) {
+  const xml = await nc.davReport(
+    book,
+    `<?xml version="1.0"?>
+<card:addressbook-query xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">
+  <d:prop><d:getetag/><card:address-data/></d:prop>
+</card:addressbook-query>`,
+  );
+  return parsePropResponses(xml)
+    .map((r) => {
+      const data = propText(r.props["address-data"]);
+      return data
+        ? parseVcard(r.href, propText(r.props.getetag)?.replaceAll('"', "") ?? null, data)
+        : null;
+    })
+    .filter((c): c is ParsedContact => c !== null);
+}
+
 /**
  * EinDAV (D54): CardDAV contacts + CalDAV events + WebDAV files, two-way,
  * through the stored Nextcloud credential. Parsing/composition happens here so
@@ -213,24 +249,57 @@ export const eindavModule: BffModule = {
   id: "eindav",
   requires: ["nextcloud"],
 
+  chatTools(ctx): ChatTool[] {
+    return [
+      {
+        name: "eindav_contacts",
+        description:
+          "Search the user's CardDAV address books (Nextcloud contacts) by name, email or phone number. Returns matching contacts with display name, email addresses and phone numbers.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Optional case-insensitive filter over name, emails and phone numbers.",
+            },
+          },
+        },
+        async call(args, sub) {
+          const nc = ncFor(ctx, sub);
+          if (!nc) return { error: "nextcloud is not connected" };
+          const q = typeof args.query === "string" ? args.query.toLowerCase() : "";
+          const contacts: {
+            book: string;
+            fn: string;
+            emails: string[];
+            tels: string[];
+            note: string | null;
+          }[] = [];
+          for (const book of await listAddressbooks(nc)) {
+            for (const c of await listContacts(nc, book.href)) {
+              const hay = `${c.fn} ${c.emails.join(" ")} ${c.tels.join(" ")}`.toLowerCase();
+              if (!q || hay.includes(q)) {
+                contacts.push({
+                  book: book.name,
+                  fn: c.fn,
+                  emails: c.emails,
+                  tels: c.tels,
+                  note: c.note,
+                });
+              }
+            }
+          }
+          return { contacts: contacts.slice(0, 50) };
+        },
+      },
+    ];
+  },
+
   register(api, ctx) {
     api.get("/addressbooks", async (req, reply) => {
       const nc = ncFor(ctx, req.user.sub);
       if (!nc) return reply.code(424).send({ error: "nextcloud is not connected" });
-      const xml = await nc.davPropfindAbs(
-        `${nc.davHome("addressbooks")}/`,
-        1,
-        "<d:resourcetype/><d:displayname/><cs:getctag xmlns:cs='http://calendarserver.org/ns/'/>",
-      );
-      const books = parsePropResponses(xml)
-        .filter(
-          (r) =>
-            typeof r.props.resourcetype === "object" &&
-            r.props.resourcetype !== null &&
-            "addressbook" in (r.props.resourcetype as object),
-        )
-        .map((r) => ({ href: r.href, name: propText(r.props.displayname) ?? r.href }));
-      return { addressbooks: books };
+      return { addressbooks: await listAddressbooks(nc) };
     });
 
     api.get("/contacts", async (req, reply) => {
@@ -238,22 +307,7 @@ export const eindavModule: BffModule = {
       if (!nc) return reply.code(424).send({ error: "nextcloud is not connected" });
       const book = (req.query as { book?: string }).book ?? "";
       if (!safeHref(book)) return reply.code(400).send({ error: "invalid book href" });
-      const xml = await nc.davReport(
-        book,
-        `<?xml version="1.0"?>
-<card:addressbook-query xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">
-  <d:prop><d:getetag/><card:address-data/></d:prop>
-</card:addressbook-query>`,
-      );
-      const contacts = parsePropResponses(xml)
-        .map((r) => {
-          const data = propText(r.props["address-data"]);
-          return data
-            ? parseVcard(r.href, propText(r.props.getetag)?.replaceAll('"', "") ?? null, data)
-            : null;
-        })
-        .filter((c): c is ParsedContact => c !== null);
-      return { contacts };
+      return { contacts: await listContacts(nc, book) };
     });
 
     api.put("/contact", async (req, reply) => {

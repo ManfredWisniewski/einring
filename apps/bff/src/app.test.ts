@@ -1541,6 +1541,7 @@ describe("einchat", () => {
         "github_notifications",
         "authentik_status",
         "matrix_rooms",
+        "eindav_contacts",
       ],
     });
   });
@@ -1658,7 +1659,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(20);
+    expect(all.json().tools.length).toBe(21);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -3878,6 +3879,82 @@ ${bodies}</d:multistatus>`;
       headers: auth,
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("exposes addressbook contacts to EinChat via the eindav_contacts tool", async () => {
+    const VCARD =
+      "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ulrike Kaiser\r\nEMAIL;TYPE=INTERNET:ulrike@example.org\r\nTEL;TYPE=CELL:+49 30 123\r\nEND:VCARD\r\n";
+    const calls: {
+      body: { messages?: { role: string; content?: string; tool_call_id?: string }[] };
+    }[] = [];
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig({
+        ...testEnv(),
+        LLM_URL: "https://llm.test/v1",
+        LLM_API_KEY: "sk-secret",
+        LLM_CHAT_MODEL: "chat-m",
+        LLM_EMBED_MODEL: "embed-m",
+      }),
+      fetchImpl: fakeFetch((url, init) => {
+        if (url === "https://llm.test/v1/chat/completions") {
+          const body = JSON.parse(String(init?.body));
+          calls.push({ body });
+          if (calls.length === 1) {
+            return json({
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: "call-1",
+                        type: "function",
+                        function: {
+                          name: "eindav_contacts",
+                          arguments: JSON.stringify({ query: "ulrike" }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            });
+          }
+          return json({ choices: [{ message: { role: "assistant", content: "+49 30 123" } }] });
+        }
+        if (url === `${NC}${ABHOME}` && init?.method === "PROPFIND") {
+          return new Response(
+            MS(
+              `<d:response><d:href>${ABS}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Contacts</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+            ),
+            { status: 207 },
+          );
+        }
+        if (url === `${NC}${ABS}` && init?.method === "REPORT") {
+          return new Response(
+            MS(
+              `<d:response><d:href>${ABS}u1.vcf</d:href><d:propstat><d:prop><d:getetag>"e1"</d:getetag><card:address-data>${VCARD}</card:address-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+            ),
+            { status: 207 },
+          );
+        }
+        return new Response(`unexpected ${url}`, { status: 404 });
+      }),
+    });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/einchat/message",
+      headers: auth,
+      payload: { messages: [{ role: "user", content: "Ulrike Kaiser's number?" }] },
+    });
+    expect(res.statusCode).toBe(200);
+    const toolMsg = calls[1]?.body.messages?.find((m) => m.role === "tool");
+    expect(toolMsg?.tool_call_id).toBe("call-1");
+    expect(toolMsg?.content).toContain("Ulrike Kaiser");
+    expect(toolMsg?.content).toContain("+49 30 123");
+    expect(toolMsg?.content).not.toContain("app-pw-secret");
   });
 });
 
