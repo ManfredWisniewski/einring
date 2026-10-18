@@ -224,9 +224,8 @@
 - The `/matrix` page: `ConnectorPage` until connected; then room list → drill-in chat pane (sender localpart, timestamp, images inline via authenticated blob, other events collapsed to system lines), composer with text + file attach. Polls rooms 30 s / messages 4 s. DE + EN + RU + FR.
 - EinHub gets a Matrix unread item from `unread_notifications` (D42); `matrix_rooms` lists room names to EinChat (no message content, D52).
 
-### A29 Accordion module navigation with search
+### A29 Module navigation: search + tag filter
 
-- Every `AppModule` with a nav entry declares `nav.group` (a `nav.group.*` i18n key); the Layout groups the nav into collapsible accordion sections in `appModules` order: core (einhub, einchat), data (tables, wiki, csv-manager, pdf, passman), media (audiobookshelf, navidrome, einmusic), communication (email, gotify, talk, matrix), integrations (yamtrack, trek, gitlab, github), system (monitor, authentik, nextcloud).
-- A search input at the top of the nav filters module links by their translated name (case-insensitive substring); while searching, matching groups are expanded and empty groups hidden; a "no matches" hint shows when nothing matches.
-- One section is open at a time; the section containing the current route opens automatically on navigation and stays open while its link is `.active`. The EinHub unread badge keeps rendering on its nav link.
-- All filtering honours the existing visibility rules (MODULES registry, D46 Nextcloud toggles, D47 per-user disablement); labels and hints are translated DE + EN + RU + FR.
+- Every `AppModule` with a nav entry declares `nav.group` (a `nav.group.*` i18n key) used as its filter tag: core (einhub, einchat), data (tables, wiki, csv-manager, pdf, passman), media (audiobookshelf, navidrome, einmusic), communication (email, gotify, talk, matrix), integrations (yamtrack, trek, gitlab, github), system (monitor, authentik, nextcloud).
+- The nav renders a flat alphabetical list of module links — EinHub always first, the rest ordered by translated name. A search input filters by name (case-insensitive substring); a **Tags** button to its right opens a multi-select dropdown of the group tags and restricts the list to modules carrying any selected tag. Filters combine (search AND tag selection); a "no matches" hint shows when nothing fits.
+- The EinHub unread badge keeps rendering on its nav link. All filtering honours the existing visibility rules (MODULES registry, D46 Nextcloud toggles, D47 per-user disablement); labels and hints are translated DE + EN + RU + FR.

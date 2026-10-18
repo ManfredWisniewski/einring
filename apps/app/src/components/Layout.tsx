@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { Button, MenuTrigger, Popover } from "react-aria-components";
 import { useTranslation } from "react-i18next";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { NavLink, Outlet } from "react-router";
 import {
   useEinHubNotifications,
   useModulePrefs,
@@ -8,19 +9,19 @@ import {
   useNextcloudSettings,
 } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/button";
+import { buttonVariants, Button as UiButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useInstanceName } from "@/instance";
 import { resolveAppModules } from "@/modules";
-import type { AppModule } from "@/modules/types";
 import { AppMenu } from "./AppMenu";
 import { LanguageSelect, ThemeSelect } from "./Settings";
 
 export function Layout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const name = useInstanceName();
   const { user, logout } = useAuth();
-  const { pathname } = useLocation();
   const registry = useModuleRegistry(!!user);
   // Per-user Nextcloud feature toggles (D46) hide whole modules from the nav.
   const ncSettings = useNextcloudSettings(!!user);
@@ -44,28 +45,31 @@ export function Layout() {
   const hub = useEinHubNotifications(!!user && einhubOn);
   const unread = hub.data?.unread ?? 0;
 
-  // Accordion nav (D53): one group open at a time, search expands all matches.
+  // Nav filters (D53): search by name + multi-select tag dropdown; alphabetical, EinHub first.
   const [query, setQuery] = useState("");
-  const searching = query.trim().length > 0;
-  const matches = (m: AppModule) =>
-    !searching ||
-    t(m.nav?.i18nKey ?? "")
-      .toLowerCase()
-      .includes(query.trim().toLowerCase());
-  const visible = navModules.filter(matches);
-  const groups: { group: string; modules: AppModule[] }[] = [];
-  for (const m of visible) {
-    const g = m.nav?.group ?? "";
-    const last = groups.at(-1);
-    if (last && last.group === g) last.modules.push(m);
-    else groups.push({ group: g, modules: [m] });
-  }
-
-  const [open, setOpen] = useState<string | null>(null);
-  useEffect(() => {
-    const g = navModules.find((m) => m.routes.some((r) => pathname.startsWith(r.path)))?.nav?.group;
-    if (g) setOpen(g);
-  }, [pathname, navModules]);
+  const [tags, setTags] = useState<Set<string>>(new Set());
+  const allTags = useMemo(() => {
+    const seen: string[] = [];
+    for (const m of navModules) {
+      const g = m.nav?.group;
+      if (g && !seen.includes(g)) seen.push(g);
+    }
+    return seen;
+  }, [navModules]);
+  const q = query.trim().toLowerCase();
+  const visible = navModules.filter(
+    (m) =>
+      (q === "" ||
+        t(m.nav?.i18nKey ?? "")
+          .toLowerCase()
+          .includes(q)) &&
+      (tags.size === 0 || tags.has(m.nav?.group ?? "")),
+  );
+  const sorted = [...visible].sort((a, b) => {
+    if (a.id === "einhub") return -1;
+    if (b.id === "einhub") return 1;
+    return t(a.nav?.i18nKey ?? "").localeCompare(t(b.nav?.i18nKey ?? ""), i18n.language);
+  });
 
   return (
     <div className="app-shell">
@@ -75,57 +79,64 @@ export function Layout() {
         <LanguageSelect />
         <AppMenu />
         {user && (
-          <Button variant="ghost" onClick={() => void logout()}>
+          <UiButton variant="ghost" onClick={() => void logout()}>
             {t("nav.logout")}
-          </Button>
+          </UiButton>
         )}
       </header>
       {user && navModules.length > 0 && (
         <nav className="app-nav" aria-label={t("nav.label")}>
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={t("nav.search")}
-            aria-label={t("nav.search")}
-            className="app-nav__search"
-          />
-          {groups.length === 0 && <p className="muted app-nav__empty">{t("nav.noMatches")}</p>}
-          {groups.map(({ group, modules }) => {
-            const expanded = searching || open === group;
-            return (
-              <section key={group} className="app-nav__group">
-                <button
-                  type="button"
-                  className="app-nav__grouptitle"
-                  aria-expanded={expanded}
-                  onClick={() => setOpen(expanded && !searching ? null : group)}
-                >
-                  <span className="app-nav__chevron" aria-hidden>
-                    {expanded ? "▾" : "▸"}
-                  </span>
-                  {t(`nav.group.${group}`)}
-                  <span className="muted">({modules.length})</span>
-                </button>
-                {expanded && (
-                  <div className="app-nav__links">
-                    {modules.map((m) => (
-                      <NavLink
-                        key={m.id}
-                        to={m.routes.at(0)?.path ?? "/"}
-                        className="app-nav__link"
-                      >
-                        {t(m.nav?.i18nKey ?? "")}
-                        {m.id === "einhub" && unread > 0 && (
-                          <span className="app-nav__badge">{unread}</span>
-                        )}
-                      </NavLink>
-                    ))}
-                  </div>
+          <div className="app-nav__controls">
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+              placeholder={t("nav.search")}
+              aria-label={t("nav.search")}
+              className="app-nav__search"
+            />
+            <MenuTrigger>
+              <Button
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+                aria-label={t("nav.tags")}
+              >
+                {t("nav.tags")}
+                {tags.size > 0 ? ` (${tags.size})` : ""}
+              </Button>
+              <Popover placement="bottom start">
+                <fieldset className="app-menu--tags" aria-label={t("nav.tags")}>
+                  {allTags.map((g) => (
+                    <div key={g} className="app-menu__item">
+                      <Checkbox
+                        id={`nav-tag-${g}`}
+                        checked={tags.has(g)}
+                        onCheckedChange={(checked) =>
+                          setTags((prev) => {
+                            const next = new Set(prev);
+                            if (checked === true) next.add(g);
+                            else next.delete(g);
+                            return next;
+                          })
+                        }
+                      />
+                      <Label htmlFor={`nav-tag-${g}`}>{t(`nav.group.${g}`)}</Label>
+                    </div>
+                  ))}
+                </fieldset>
+              </Popover>
+            </MenuTrigger>
+          </div>
+          {sorted.length === 0 && <p className="muted app-nav__empty">{t("nav.noMatches")}</p>}
+          <div className="app-nav__links">
+            {sorted.map((m) => (
+              <NavLink key={m.id} to={m.routes.at(0)?.path ?? "/"} className="app-nav__link">
+                {t(m.nav?.i18nKey ?? "")}
+                {m.id === "einhub" && unread > 0 && (
+                  <span className="app-nav__badge">{unread}</span>
                 )}
-              </section>
-            );
-          })}
+              </NavLink>
+            ))}
+          </div>
         </nav>
       )}
       <main className="app-main">

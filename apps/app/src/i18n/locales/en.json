@@ -7,6 +7,7 @@
     "label": "Modules",
     "logout": "Sign out",
     "search": "Search modules…",
+    "tags": "Tags",
     "noMatches": "No modules match.",
     "group": {
       "core": "Core",

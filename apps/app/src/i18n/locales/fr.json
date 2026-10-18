@@ -7,6 +7,7 @@
     "label": "Modules",
     "logout": "Se déconnecter",
     "search": "Rechercher des modules…",
+    "tags": "Étiquettes",
     "noMatches": "Aucun module ne correspond.",
     "group": {
       "core": "Central",
