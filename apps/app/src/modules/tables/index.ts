@@ -10,7 +10,7 @@ const TablesPage = lazy(() => import("./TablesPage").then((m) => ({ default: m.T
 export const tablesModule: AppModule = {
   id: "tables",
   hasBackend: true,
-  nav: { i18nKey: "modules.tables.nav" },
+  nav: { i18nKey: "modules.tables.nav", group: "data" },
   routes: [{ path: "/tables", Component: TablesPage }],
   i18n: { de, en, fr, ru },
 };

@@ -10,7 +10,7 @@ const GitHubPage = lazy(() => import("./GitHubPage").then((m) => ({ default: m.G
 export const githubModule: AppModule = {
   id: "github",
   hasBackend: true,
-  nav: { i18nKey: "modules.github.nav" },
+  nav: { i18nKey: "modules.github.nav", group: "integrations" },
   routes: [{ path: "/github", Component: GitHubPage }],
   i18n: { de, en, fr, ru },
 };

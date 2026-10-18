@@ -1,0 +1,17 @@
+{
+  "nav": "Passman",
+  "empty": "Keine Tresore gefunden.",
+  "notConnected": "Nextcloud ist nicht verbunden — verbinde dich auf der Nextcloud-Seite.",
+  "error": "Passman konnte nicht geladen werden ({{status}}).",
+  "vaultPassword": "Tresor-Passwort",
+  "unlock": "Entsperren",
+  "badPassword": "Falsches Passwort — dieser Schlüssel entsperrt den Tresor nicht.",
+  "lock": "Sperren",
+  "search": "Suchen …",
+  "noResults": "Keine Einträge gefunden.",
+  "untitled": "(ohne Titel)",
+  "copyPassword": "Passwort kopieren",
+  "copyUrl": "URL kopieren",
+  "copyField": "Kopieren",
+  "copied": "Kopiert!"
+}

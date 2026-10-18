@@ -1,15 +1,22 @@
 import type { ModuleInfo } from "@/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
+import { authentikModule } from "./authentik";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
 import { einhubModule } from "./einhub";
+import { einmusicModule } from "./einmusic";
 import { emailModule } from "./email";
 import { githubModule } from "./github";
 import { gitlabModule } from "./gitlab";
 import { gotifyModule } from "./gotify";
+import { matrixModule } from "./matrix";
 import { monitorModule } from "./monitor";
 import { navidromeModule } from "./navidrome";
+import { nextcloudModule } from "./nextcloud";
+import { passmanModule } from "./passman";
+import { pdfModule } from "./pdf";
 import { tablesModule } from "./tables";
+import { talkModule } from "./talk";
 import { trekModule } from "./trek";
 import type { AppModule } from "./types";
 import { wikiModule } from "./wiki";
@@ -33,6 +40,13 @@ export const appModules: AppModule[] = [
   gotifyModule,
   gitlabModule,
   githubModule,
+  authentikModule,
+  nextcloudModule,
+  einmusicModule,
+  pdfModule,
+  passmanModule,
+  talkModule,
+  matrixModule,
 ];
 
 /**

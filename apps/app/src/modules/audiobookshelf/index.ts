@@ -12,7 +12,7 @@ const AudiobookshelfPage = lazy(() =>
 export const audiobookshelfModule: AppModule = {
   id: "audiobookshelf",
   hasBackend: true,
-  nav: { i18nKey: "modules.audiobookshelf.nav" },
+  nav: { i18nKey: "modules.audiobookshelf.nav", group: "media" },
   routes: [{ path: "/audiobookshelf", Component: AudiobookshelfPage }],
   i18n: { de, en, fr, ru },
 };

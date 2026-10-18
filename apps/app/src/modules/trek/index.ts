@@ -10,7 +10,7 @@ const TrekPage = lazy(() => import("./TrekPage").then((m) => ({ default: m.TrekP
 export const trekModule: AppModule = {
   id: "trek",
   hasBackend: true,
-  nav: { i18nKey: "modules.trek.nav" },
+  nav: { i18nKey: "modules.trek.nav", group: "integrations" },
   routes: [{ path: "/trek", Component: TrekPage }],
   i18n: { de, en, fr, ru },
 };

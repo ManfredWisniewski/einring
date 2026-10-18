@@ -1,15 +1,22 @@
 import type { Config } from "../config.js";
 import { audiobookshelfModule } from "./audiobookshelf.js";
+import { authentikModule } from "./authentik.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
 import { einhubModule } from "./einhub.js";
+import { einmusicModule } from "./einmusic.js";
 import { emailModule } from "./email.js";
 import { githubModule } from "./github.js";
 import { gitlabModule } from "./gitlab.js";
 import { gotifyModule } from "./gotify.js";
+import { matrixModule } from "./matrix.js";
 import { monitorModule } from "./monitor.js";
 import { navidromeModule } from "./navidrome.js";
+import { nextcloudModule } from "./nextcloud.js";
+import { passmanModule } from "./passman.js";
+import { settingsModule } from "./settings.js";
 import { tablesModule } from "./tables.js";
+import { talkModule } from "./talk.js";
 import { trekModule } from "./trek.js";
 import type { BffModule } from "./types.js";
 import { wikiModule } from "./wiki.js";
@@ -26,11 +33,18 @@ export const bffModules: BffModule[] = [
   yamtrackModule,
   audiobookshelfModule,
   navidromeModule,
+  einmusicModule,
   trekModule,
   emailModule,
   gotifyModule,
   gitlabModule,
   githubModule,
+  authentikModule,
+  nextcloudModule,
+  settingsModule,
+  passmanModule,
+  talkModule,
+  matrixModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

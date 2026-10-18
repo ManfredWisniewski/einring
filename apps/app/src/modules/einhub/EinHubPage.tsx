@@ -5,6 +5,7 @@ import {
   useEinHubMarkRead,
   useEinHubNotifications,
   useEinHubReadAll,
+  useModulePrefs,
   useModuleRegistry,
 } from "@/api/hooks";
 import type { EinHubNotification } from "@/api/types";
@@ -53,7 +54,11 @@ export function EinHubPage() {
   const readAll = useEinHubReadAll();
   const registry = useModuleRegistry();
   const enabledModules = new Set(registry.data?.modules.map((m) => m.id) ?? []);
-  const unread = feed.data?.unread ?? 0;
+  // User-disabled modules (D47) are filtered out of the displayed feed.
+  const prefs = useModulePrefs();
+  const prefDisabled = new Set(prefs.data?.disabled ?? []);
+  const notifications = (feed.data?.notifications ?? []).filter((n) => !prefDisabled.has(n.module));
+  const unread = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="stack">
@@ -79,12 +84,12 @@ export function EinHubPage() {
           })}
         </div>
       )}
-      {feed.data?.notifications.length === 0 && (
+      {notifications.length === 0 && !feed.isPending && !feed.isError && (
         <p className="muted">
           {t("modules.einhub.empty")} {t("modules.einhub.emptyHint")}
         </p>
       )}
-      {feed.data?.notifications.map((n) => (
+      {notifications.map((n) => (
         <NotificationRow key={n.id} n={n} enabled={enabledModules.has(n.module)} />
       ))}
     </div>

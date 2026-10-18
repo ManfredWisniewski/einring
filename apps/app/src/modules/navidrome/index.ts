@@ -12,7 +12,7 @@ const NavidromePage = lazy(() =>
 export const navidromeModule: AppModule = {
   id: "navidrome",
   hasBackend: true,
-  nav: { i18nKey: "modules.navidrome.nav" },
+  nav: { i18nKey: "modules.navidrome.nav", group: "media" },
   routes: [{ path: "/navidrome", Component: NavidromePage }],
   i18n: { de, en, fr, ru },
 };

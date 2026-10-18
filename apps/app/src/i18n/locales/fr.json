@@ -5,7 +5,17 @@
   },
   "nav": {
     "label": "Modules",
-    "logout": "Se déconnecter"
+    "logout": "Se déconnecter",
+    "search": "Rechercher des modules…",
+    "noMatches": "Aucun module ne correspond.",
+    "group": {
+      "core": "Central",
+      "data": "Données",
+      "media": "Médias",
+      "communication": "Communication",
+      "integrations": "Intégrations",
+      "system": "Système"
+    }
   },
   "auth": {
     "login": "Se connecter avec Authentik",
@@ -50,5 +60,14 @@
     "loading": "Chargement…",
     "yes": "oui",
     "no": "non"
+  },
+  "menu": {
+    "open": "Menu",
+    "modules": "Modules",
+    "info": "Info"
+  },
+  "modulesDialog": {
+    "title": "Modules",
+    "hint": "Choisissez les intégrations actives pour vous."
   }
 }

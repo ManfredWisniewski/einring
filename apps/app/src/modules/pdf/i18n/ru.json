@@ -1,0 +1,10 @@
+{
+  "nav": "PDF",
+  "open": "Открыть PDF",
+  "empty": "Выберите PDF-файл, чтобы показать его здесь.",
+  "error": "Не удалось загрузить PDF.",
+  "pages_one": "{{count}} страница",
+  "pages_few": "{{count}} страницы",
+  "pages_many": "{{count}} страниц",
+  "pages_other": "{{count}} страницы"
+}

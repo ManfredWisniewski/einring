@@ -78,6 +78,22 @@ export interface NotificationRow {
   read: number;
 }
 
+/** An uploaded MP3's metadata — audio bytes live under DATA_DIR/einmusic/<id>.mp3 (D48). */
+export interface MusicTrackRow {
+  id: number;
+  sub: string;
+  title: string;
+  bytes: number;
+  createdAt: string;
+}
+
+export interface MusicPlaylistRow {
+  id: number;
+  sub: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
@@ -150,6 +166,21 @@ export interface Store {
   /** Marks one row read; false when foreign/unknown. */
   markNotificationRead(sub: string, id: number): boolean;
   markAllNotificationsRead(sub: string): void;
+  /** einmusic (D48): track metadata; the audio file lives on disk. */
+  listMusicTracks(sub: string): Omit<MusicTrackRow, "sub">[];
+  createMusicTrack(sub: string, title: string, bytes: number): Omit<MusicTrackRow, "sub">;
+  getMusicTrack(sub: string, id: number): Omit<MusicTrackRow, "sub"> | undefined;
+  /** Deletes the row + playlist references; false when the sub doesn't own `id`. */
+  deleteMusicTrack(sub: string, id: number): boolean;
+  listMusicPlaylists(sub: string): (Omit<MusicPlaylistRow, "sub"> & { trackCount: number })[];
+  createMusicPlaylist(sub: string, name: string): Omit<MusicPlaylistRow, "sub">;
+  getMusicPlaylist(sub: string, id: number): Omit<MusicPlaylistRow, "sub"> | undefined;
+  /** The playlist's tracks in position order, joined to their metadata. */
+  listPlaylistTracks(playlistId: number): Omit<MusicTrackRow, "sub">[];
+  /** Atomic replace of the playlist's track set/order. */
+  setPlaylistTracks(playlistId: number, trackIds: number[]): void;
+  renameMusicPlaylist(sub: string, id: number, name: string): boolean;
+  deleteMusicPlaylist(sub: string, id: number): boolean;
   close(): void;
 }
 
@@ -239,6 +270,28 @@ CREATE TABLE IF NOT EXISTS notifications (
   UNIQUE(sub, module, source_id)
 );
 CREATE INDEX IF NOT EXISTS notifications_sub ON notifications(sub, id);
+CREATE TABLE IF NOT EXISTS music_tracks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub TEXT NOT NULL,
+  title TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS music_tracks_sub ON music_tracks(sub);
+CREATE TABLE IF NOT EXISTS music_playlists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS music_playlists_sub ON music_playlists(sub);
+CREATE TABLE IF NOT EXISTS music_playlist_tracks (
+  playlist_id INTEGER NOT NULL,
+  track_id INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  PRIMARY KEY (playlist_id, track_id)
+);
+CREATE INDEX IF NOT EXISTS music_playlist_tracks_pl ON music_playlist_tracks(playlist_id);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -367,6 +420,35 @@ export function openStore(path: string): Store {
   );
   const markNotif = db.prepare("UPDATE notifications SET read = 1 WHERE id = ? AND sub = ?");
   const markAllNotifs = db.prepare("UPDATE notifications SET read = 1 WHERE sub = ?");
+  const listTracks = db.prepare(
+    "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? ORDER BY title",
+  );
+  const putTrack = db.prepare("INSERT INTO music_tracks (sub, title, bytes) VALUES (?, ?, ?)");
+  const getTrack = db.prepare(
+    "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? AND id = ?",
+  );
+  const delTrack = db.prepare("DELETE FROM music_tracks WHERE sub = ? AND id = ?");
+  const delTrackRefs = db.prepare("DELETE FROM music_playlist_tracks WHERE track_id = ?");
+  const listPlaylists = db.prepare(
+    `SELECT p.id, p.name, p.created_at AS createdAt,
+       (SELECT COUNT(*) FROM music_playlist_tracks t WHERE t.playlist_id = p.id) AS trackCount
+     FROM music_playlists p WHERE p.sub = ? ORDER BY p.name`,
+  );
+  const putPlaylist = db.prepare("INSERT INTO music_playlists (sub, name) VALUES (?, ?)");
+  const getPlaylist = db.prepare(
+    "SELECT id, name, created_at AS createdAt FROM music_playlists WHERE sub = ? AND id = ?",
+  );
+  const renamePlaylist = db.prepare("UPDATE music_playlists SET name = ? WHERE sub = ? AND id = ?");
+  const delPlaylist = db.prepare("DELETE FROM music_playlists WHERE sub = ? AND id = ?");
+  const delPlaylistTracks = db.prepare("DELETE FROM music_playlist_tracks WHERE playlist_id = ?");
+  const listPlTracks = db.prepare(
+    `SELECT t.id, t.title, t.bytes, t.created_at AS createdAt
+     FROM music_playlist_tracks pt JOIN music_tracks t ON t.id = pt.track_id
+     WHERE pt.playlist_id = ? ORDER BY pt.position`,
+  );
+  const putPlTrack = db.prepare(
+    "INSERT INTO music_playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
+  );
 
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -497,6 +579,44 @@ export function openStore(path: string): Store {
     unreadNotificationCount: (sub) => (countUnreadNotifs.get(sub) as { n: number }).n,
     markNotificationRead: (sub, id) => markNotif.run(id, sub).changes > 0,
     markAllNotificationsRead: (sub) => void markAllNotifs.run(sub),
+    listMusicTracks: (sub) => listTracks.all(sub) as Omit<MusicTrackRow, "sub">[],
+    createMusicTrack: (sub, title, bytes) => {
+      const id = Number(putTrack.run(sub, title, bytes).lastInsertRowid);
+      return getTrack.get(sub, id) as Omit<MusicTrackRow, "sub">;
+    },
+    getMusicTrack: (sub, id) => getTrack.get(sub, id) as Omit<MusicTrackRow, "sub"> | undefined,
+    deleteMusicTrack: (sub, id) => {
+      const res = delTrack.run(sub, id);
+      if (res.changes > 0) delTrackRefs.run(id);
+      return res.changes > 0;
+    },
+    listMusicPlaylists: (sub) =>
+      listPlaylists.all(sub) as (Omit<MusicPlaylistRow, "sub"> & { trackCount: number })[],
+    createMusicPlaylist: (sub, name) => {
+      const id = Number(putPlaylist.run(sub, name).lastInsertRowid);
+      return getPlaylist.get(sub, id) as Omit<MusicPlaylistRow, "sub">;
+    },
+    getMusicPlaylist: (sub, id) =>
+      getPlaylist.get(sub, id) as Omit<MusicPlaylistRow, "sub"> | undefined,
+    listPlaylistTracks: (playlistId) =>
+      listPlTracks.all(playlistId) as Omit<MusicTrackRow, "sub">[],
+    setPlaylistTracks: (playlistId, trackIds) => {
+      db.exec("BEGIN");
+      try {
+        delPlaylistTracks.run(playlistId);
+        for (const [i, trackId] of trackIds.entries()) putPlTrack.run(playlistId, trackId, i);
+        db.exec("COMMIT");
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+    renameMusicPlaylist: (sub, id, name) => renamePlaylist.run(name, sub, id).changes > 0,
+    deleteMusicPlaylist: (sub, id) => {
+      const res = delPlaylist.run(sub, id);
+      if (res.changes > 0) delPlaylistTracks.run(id);
+      return res.changes > 0;
+    },
     close: () => db.close(),
   };
 }

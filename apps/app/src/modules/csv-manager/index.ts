@@ -12,7 +12,7 @@ const CsvManagerPage = lazy(() =>
 export const csvManagerModule: AppModule = {
   id: "csv-manager",
   hasBackend: true,
-  nav: { i18nKey: "modules.csv-manager.nav" },
+  nav: { i18nKey: "modules.csv-manager.nav", group: "data" },
   routes: [{ path: "/csv-manager", Component: CsvManagerPage }],
   i18n: { de, en, fr, ru },
 };

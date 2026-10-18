@@ -10,7 +10,7 @@ const WikiPage = lazy(() => import("./WikiPage").then((m) => ({ default: m.WikiP
 export const wikiModule: AppModule = {
   id: "wiki",
   hasBackend: true,
-  nav: { i18nKey: "modules.wiki.nav" },
+  nav: { i18nKey: "modules.wiki.nav", group: "data" },
   routes: [{ path: "/wiki", Component: WikiPage }],
   i18n: { de, en, fr, ru },
 };

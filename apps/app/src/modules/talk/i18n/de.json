@@ -1,0 +1,12 @@
+{
+  "nav": "Talk",
+  "empty": "Keine Unterhaltungen.",
+  "notConnected": "Nextcloud ist nicht verbunden — verbinde dich auf der Nextcloud-Seite.",
+  "error": "Talk konnte nicht geladen werden ({{status}}).",
+  "back": "Zurück",
+  "placeholder": "Nachricht schreiben …",
+  "send": "Senden",
+  "attach": "Bild",
+  "sendImage": "Bild senden",
+  "uploading": "Bild wird gesendet …"
+}

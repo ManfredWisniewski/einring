@@ -10,7 +10,7 @@ const EmailPage = lazy(() => import("./EmailPage").then((m) => ({ default: m.Ema
 export const emailModule: AppModule = {
   id: "email",
   hasBackend: true,
-  nav: { i18nKey: "modules.email.nav" },
+  nav: { i18nKey: "modules.email.nav", group: "communication" },
   routes: [{ path: "/email", Component: EmailPage }],
   i18n: { de, en, fr, ru },
 };

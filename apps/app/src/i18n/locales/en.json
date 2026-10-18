@@ -5,7 +5,17 @@
   },
   "nav": {
     "label": "Modules",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "search": "Search modules…",
+    "noMatches": "No modules match.",
+    "group": {
+      "core": "Core",
+      "data": "Data",
+      "media": "Media",
+      "communication": "Communication",
+      "integrations": "Integrations",
+      "system": "System"
+    }
   },
   "auth": {
     "login": "Sign in with Authentik",
@@ -50,5 +60,14 @@
     "loading": "Loading…",
     "yes": "yes",
     "no": "no"
+  },
+  "menu": {
+    "open": "Menu",
+    "modules": "Modules",
+    "info": "Info"
+  },
+  "modulesDialog": {
+    "title": "Modules",
+    "hint": "Choose which integrations are active for you."
   }
 }

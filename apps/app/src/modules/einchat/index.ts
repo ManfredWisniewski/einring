@@ -10,7 +10,7 @@ const EinChatPage = lazy(() => import("./EinChatPage").then((m) => ({ default: m
 export const einchatModule: AppModule = {
   id: "einchat",
   hasBackend: true,
-  nav: { i18nKey: "modules.einchat.nav" },
+  nav: { i18nKey: "modules.einchat.nav", group: "core" },
   routes: [{ path: "/einchat", Component: EinChatPage }],
   i18n: { de, en, fr, ru },
 };

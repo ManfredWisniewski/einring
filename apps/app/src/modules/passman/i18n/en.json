@@ -1,0 +1,17 @@
+{
+  "nav": "Passman",
+  "empty": "No vaults found.",
+  "notConnected": "Nextcloud is not connected — connect on the Nextcloud page.",
+  "error": "Could not load Passman ({{status}}).",
+  "vaultPassword": "Vault password",
+  "unlock": "Unlock",
+  "badPassword": "Wrong password — this key does not unlock the vault.",
+  "lock": "Lock",
+  "search": "Search …",
+  "noResults": "No entries found.",
+  "untitled": "(untitled)",
+  "copyPassword": "Copy password",
+  "copyUrl": "Copy URL",
+  "copyField": "Copy",
+  "copied": "Copied!"
+}

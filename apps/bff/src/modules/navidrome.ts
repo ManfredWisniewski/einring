@@ -20,12 +20,12 @@ interface SubsonicResponse<T> {
   "subsonic-response": { status: "ok" | "failed"; error?: { code: number; message: string } } & T;
 }
 
-interface NavidromeSecret {
+export interface NavidromeSecret {
   username: string;
   password: string;
 }
 
-function parseSecret(secret: string): NavidromeSecret | null {
+export function parseSecret(secret: string): NavidromeSecret | null {
   try {
     const s: unknown = JSON.parse(secret);
     const r = s as NavidromeSecret;
@@ -36,7 +36,7 @@ function parseSecret(secret: string): NavidromeSecret | null {
 }
 
 /** Subsonic auth query params: t = md5(password + salt), s = salt. */
-function authParams(secret: NavidromeSecret): string {
+export function authParams(secret: NavidromeSecret): string {
   const salt = randomBytes(6).toString("hex");
   const token = createHash("md5")
     .update(secret.password + salt)
@@ -52,7 +52,7 @@ function authParams(secret: NavidromeSecret): string {
   return p.toString();
 }
 
-async function subsonic<T>(
+export async function subsonic<T>(
   fetchImpl: Fetch,
   url: string,
   secret: NavidromeSecret,

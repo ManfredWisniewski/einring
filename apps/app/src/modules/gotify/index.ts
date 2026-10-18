@@ -10,7 +10,7 @@ const GotifyPage = lazy(() => import("./GotifyPage").then((m) => ({ default: m.G
 export const gotifyModule: AppModule = {
   id: "gotify",
   hasBackend: true,
-  nav: { i18nKey: "modules.gotify.nav" },
+  nav: { i18nKey: "modules.gotify.nav", group: "communication" },
   routes: [{ path: "/gotify", Component: GotifyPage }],
   i18n: { de, en, fr, ru },
 };

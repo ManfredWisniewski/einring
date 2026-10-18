@@ -1,9 +1,18 @@
 import { useId, useMemo, useState } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 import { ApiError } from "@/api/client";
-import { useServerHealth, useTalkStatus } from "@/api/hooks";
+import {
+  useConnectorStatus,
+  useModulePrefs,
+  useModuleRegistry,
+  useNextcloudSettings,
+  useServerHealth,
+  useTalkStatus,
+} from "@/api/hooks";
 import type { ServerBasics } from "@/api/types";
+import { AuthentikStatusView } from "@/components/AuthentikStatus";
 import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,26 +27,85 @@ import {
 
 export function MonitorPage() {
   const { t } = useTranslation();
+  const registry = useModuleRegistry();
+  // Per-user feature toggles (D46): which Nextcloud-backed monitor sections show.
+  const ncSettings = useNextcloudSettings();
+  const showTalk = ncSettings.data?.settings.monitorTalk !== false;
+  const showServer = ncSettings.data?.settings.monitorServer !== false;
+  const prefs = useModulePrefs();
+  const hasAuthentik =
+    (registry.data?.modules.some((m) => m.id === "authentik") ?? false) &&
+    !(prefs.data?.disabled ?? []).includes("authentik");
+  const anyTab = showTalk || showServer || hasAuthentik;
   return (
     <NextcloudGate>
-      <Tabs className="tabs">
-        <TabList className="tabs__list" aria-label={t("modules.monitor.nav")}>
-          <Tab id="talk" className="tabs__tab">
-            {t("modules.monitor.tabs.talk")}
-          </Tab>
-          <Tab id="server" className="tabs__tab">
-            {t("modules.monitor.tabs.server")}
-          </Tab>
-        </TabList>
-        <TabPanel id="talk">
-          <TalkPanel />
-        </TabPanel>
-        <TabPanel id="server">
-          <ServerPanel />
-        </TabPanel>
-      </Tabs>
+      {anyTab ? (
+        <Tabs className="tabs">
+          <TabList className="tabs__list" aria-label={t("modules.monitor.nav")}>
+            {showTalk && (
+              <Tab id="talk" className="tabs__tab">
+                {t("modules.monitor.tabs.talk")}
+              </Tab>
+            )}
+            {showServer && (
+              <Tab id="server" className="tabs__tab">
+                {t("modules.monitor.tabs.server")}
+              </Tab>
+            )}
+            {hasAuthentik && (
+              <Tab id="authentik" className="tabs__tab">
+                {t("modules.monitor.tabs.authentik")}
+              </Tab>
+            )}
+          </TabList>
+          {showTalk && (
+            <TabPanel id="talk">
+              <TalkPanel />
+            </TabPanel>
+          )}
+          {showServer && (
+            <TabPanel id="server">
+              <ServerPanel />
+            </TabPanel>
+          )}
+          {hasAuthentik && (
+            <TabPanel id="authentik">
+              <AuthentikPanel />
+            </TabPanel>
+          )}
+        </Tabs>
+      ) : (
+        <div className="stack">
+          <p className="muted">{t("modules.nextcloud.emptyHint")}</p>
+          <div>
+            <Button variant="outline" asChild>
+              <Link to="/nextcloud">{t("modules.nextcloud.configure")}</Link>
+            </Button>
+          </div>
+        </div>
+      )}
     </NextcloudGate>
   );
+}
+
+/** Authentik instance health (D45) — or a link to the connector page when unconnected. */
+function AuthentikPanel() {
+  const { t } = useTranslation();
+  const status = useConnectorStatus("authentik");
+  if (status.isPending) return <p className="muted">{t("common.loading")}</p>;
+  if (status.data?.connected !== true) {
+    return (
+      <div className="stack">
+        <p className="muted">{t("modules.authentik.monitorNotConnected")}</p>
+        <div>
+          <Button variant="outline" asChild>
+            <Link to="/authentik">{t("modules.authentik.monitorConfigure")}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return <AuthentikStatusView />;
 }
 
 function formatBytes(n: number | null | undefined): string {

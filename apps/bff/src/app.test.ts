@@ -1,8 +1,10 @@
+import { existsSync, mkdtempSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
+import type { AppDeps } from "./app.js";
 import { createCompositeVerifier, createSessionVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import type { SecretBox } from "./crypto.js";
@@ -1527,6 +1529,7 @@ describe("einchat", () => {
         "audiobookshelf_in_progress",
         "navidrome_search",
         "navidrome_albums",
+        "einmusic_library",
         "trek_list_trips",
         "trek_trip_details",
         "trek_bucket_list",
@@ -1536,6 +1539,8 @@ describe("einchat", () => {
         "gotify_applications",
         "gitlab_todos",
         "github_notifications",
+        "authentik_status",
+        "matrix_rooms",
       ],
     });
   });
@@ -1653,7 +1658,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(17);
+    expect(all.json().tools.length).toBe(20);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -2766,6 +2771,892 @@ describe("github", () => {
   });
 });
 
+describe("authentik", () => {
+  const URL_ = "https://auth.example.com";
+  const API = `${URL_}/api/v3`;
+
+  function fakeAuthentik(over: Record<string, Response> = {}) {
+    const calls: { url: string; auth?: string }[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      calls.push({ url, auth });
+      if (over[url]) return over[url];
+      if (auth !== "Bearer good-key") return json({ detail: "denied" }, 403);
+      if (url === `${API}/core/users/me/`) return json({ username: "frodo", name: "Frodo B." });
+      if (url === `${API}/admin/version/`)
+        return json({ version_current: "2025.8.1", version_latest: "2025.8.3", outdated: true });
+      if (url === `${API}/core/users/?page_size=1`) return json({ pagination: { count: 42 } });
+      if (url === `${API}/core/groups/?page_size=1`) return json({ pagination: { count: 7 } });
+      if (url === `${API}/core/applications/?page_size=1`)
+        return json({ pagination: { count: 12 } });
+      if (url === `${API}/outposts/instances/?page_size=1`)
+        return json({ pagination: { count: 2 } });
+      if (url === `${API}/admin/system_tasks/?page_size=200`)
+        return json([
+          { full_name: "clean_expired_models", status: "successful" },
+          { full_name: "blueprints_discovery", status: "error" },
+        ]);
+      if (url === `${API}/admin/workers/`) return json([{ worker_id: "w1" }]);
+      if (url === `${API}/events/events/?action=login_failed&page_size=1`)
+        return json({ pagination: { count: 5 } });
+      if (url === `${API}/events/events/?ordering=-created&page_size=10`)
+        return json({
+          results: [
+            {
+              action: "login_failed",
+              created: "2026-10-18T10:00:00Z",
+              app: "authentik.events",
+              user: { username: "mallory" },
+            },
+          ],
+        });
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    return { fetchImpl, calls };
+  }
+
+  const connect = (app: FastifyInstance, auth: Record<string, string>, apiKey = "good-key") =>
+    app.inject({
+      method: "POST",
+      url: "/api/authentik/credentials",
+      headers: auth,
+      payload: { apiKey, url: URL_ },
+    });
+
+  it("verifies the token via /core/users/me/ and stores it sealed", async () => {
+    const { fetchImpl, calls } = fakeAuthentik();
+    const { app, auth, store } = await testApp({ fetchImpl });
+    expect((await connect(app, auth)).statusCode).toBe(200);
+    expect(calls.find((c) => c.url.endsWith("/core/users/me/"))?.auth).toBe("Bearer good-key");
+    const stored = store.getServiceCredential(TEST_USER.sub, "authentik");
+    expect(stored?.secretSealed).not.toContain("good-key");
+  });
+
+  it("rejects a bad token with 401 and stores nothing", async () => {
+    const { app, auth, store } = await testApp({ fetchImpl: fakeAuthentik().fetchImpl });
+    expect((await connect(app, auth, "bad")).statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "authentik")).toBeUndefined();
+  });
+
+  it("aggregates the health snapshot; 424 when unconnected", async () => {
+    const { app, auth } = await testApp({ fetchImpl: fakeAuthentik().fetchImpl });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/authentik/health", headers: auth })).statusCode,
+    ).toBe(424);
+    await connect(app, auth);
+    const res = await app.inject({ method: "GET", url: "/api/authentik/health", headers: auth });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.account).toEqual({ username: "frodo", name: "Frodo B." });
+    expect(body.version).toEqual({ current: "2025.8.1", latest: "2025.8.3", outdated: true });
+    expect(body.counts).toEqual({ users: 42, groups: 7, applications: 12, outposts: 2 });
+    expect(body.workers).toBe(1);
+    expect(body.tasks).toEqual({
+      total: 2,
+      failed: 1,
+      failedNames: ["blueprints_discovery"],
+    });
+    expect(body.events.loginFailedTotal).toBe(5);
+    expect(body.events.recent[0]).toMatchObject({
+      action: "login_failed",
+      user: "mallory",
+    });
+  });
+
+  it("degrades per-field when the token lacks admin rights", async () => {
+    const { app, auth } = await testApp({
+      fetchImpl: fakeFetch(async (url, init) => {
+        const authz = (init?.headers as Record<string, string> | undefined)?.Authorization;
+        if (authz !== "Bearer user-token") return json({}, 403);
+        if (url.endsWith("/core/users/me/")) return json({ username: "sam" });
+        if (url.includes("/admin/")) return json({ detail: "denied" }, 403);
+        if (url.endsWith("/core/users/?page_size=1")) return json({ pagination: { count: 3 } });
+        return json({ detail: "denied" }, 403);
+      }),
+    });
+    await connect(app, auth, "user-token");
+    const res = await app.inject({ method: "GET", url: "/api/authentik/health", headers: auth });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.account.username).toBe("sam");
+    expect(body.version).toBeNull();
+    expect(body.counts.users).toBe(3);
+    expect(body.counts.groups).toBeNull();
+    expect(body.workers).toBeNull();
+    expect(body.tasks).toBeNull();
+    expect(body.events).toBeNull();
+  });
+});
+
+describe("nextcloud settings", () => {
+  const get = (app: FastifyInstance, auth: Record<string, string>) =>
+    app.inject({ method: "GET", url: "/api/nextcloud/settings", headers: auth });
+  const put = (app: FastifyInstance, auth: Record<string, string>, body: unknown) =>
+    app.inject({
+      method: "PUT",
+      url: "/api/nextcloud/settings",
+      headers: auth,
+      payload: body as Record<string, unknown>,
+    });
+
+  it("returns all-true defaults before any write", async () => {
+    const { app, auth } = await testApp();
+    const res = await get(app, auth);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().settings).toEqual({
+      monitorTalk: true,
+      monitorServer: true,
+      tables: true,
+      wiki: true,
+    });
+  });
+
+  it("merges partial writes and keeps them per user", async () => {
+    const { app, auth } = await testApp({
+      verifyToken: async (token) => (token === "other-token" ? { sub: "other-user" } : TEST_USER),
+    });
+    const res = await put(app, auth, { tables: false });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().settings).toMatchObject({ tables: false, wiki: true });
+    expect((await get(app, auth)).json().settings.tables).toBe(false);
+
+    const other = await app.inject({
+      method: "GET",
+      url: "/api/nextcloud/settings",
+      headers: { authorization: "Bearer other-token" },
+    });
+    expect(other.json().settings.tables).toBe(true);
+  });
+
+  it("rejects unknown keys and non-boolean values", async () => {
+    const { app, auth } = await testApp();
+    expect((await put(app, auth, { monitorTalk: "yes" })).statusCode).toBe(400);
+    expect((await put(app, auth, { files: true })).statusCode).toBe(400);
+  });
+});
+
+describe("settings (module activation)", () => {
+  const get = (app: FastifyInstance, auth: Record<string, string>) =>
+    app.inject({ method: "GET", url: "/api/settings/modules", headers: auth });
+  const put = (app: FastifyInstance, auth: Record<string, string>, body: unknown) =>
+    app.inject({
+      method: "PUT",
+      url: "/api/settings/modules",
+      headers: auth,
+      payload: body as Record<string, unknown>,
+    });
+
+  it("starts empty, persists a disabled set, and replaces it on PUT", async () => {
+    const { app, auth } = await testApp();
+    expect((await get(app, auth)).json().disabled).toEqual([]);
+    const res = await put(app, auth, { disabled: ["wiki", "tables"] });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().disabled).toEqual(["wiki", "tables"]);
+    expect((await get(app, auth)).json().disabled).toEqual(["wiki", "tables"]);
+    await put(app, auth, { disabled: [] });
+    expect((await get(app, auth)).json().disabled).toEqual([]);
+  });
+
+  it("rejects unknown ids, einhub, and non-string entries", async () => {
+    const { app, auth } = await testApp();
+    expect((await put(app, auth, { disabled: ["nope"] })).statusCode).toBe(400);
+    expect((await put(app, auth, { disabled: ["einhub"] })).statusCode).toBe(400);
+    expect((await put(app, auth, { disabled: [42] })).statusCode).toBe(400);
+    expect((await get(app, auth)).json().disabled).toEqual([]);
+  });
+});
+
+describe("einmusic", () => {
+  const MP3 = Buffer.from("FAKEMP3DATA!!");
+  const mkDir = () => mkdtempSync(join(tmpdir(), "einmusic-"));
+  const musicApp = (overrides: Partial<AppDeps> = {}) =>
+    testApp({ config: loadConfig({ ...testEnv(), DATA_DIR: mkDir() }), ...overrides });
+
+  const upload = (app: FastifyInstance, auth: Record<string, string>, name = "Song One.mp3") =>
+    app.inject({
+      method: "POST",
+      url: `/api/einmusic/tracks?name=${encodeURIComponent(name)}`,
+      headers: { ...auth, "content-type": "audio/mpeg" },
+      payload: MP3,
+    });
+
+  it("uploads, lists, streams (full + range), and deletes a track", async () => {
+    const dir = mkDir();
+    const { app, auth } = await testApp({ config: loadConfig({ ...testEnv(), DATA_DIR: dir }) });
+    const up = await upload(app, auth, "Frodo - Ring Theme.mp3");
+    expect(up.statusCode).toBe(201);
+    const track = up.json().track;
+    expect(track.title).toBe("Ring Theme");
+    expect(track.bytes).toBe(MP3.length);
+    expect(existsSync(join(dir, "einmusic", `${track.id}.mp3`))).toBe(true);
+
+    const list = await app.inject({ method: "GET", url: "/api/einmusic/tracks", headers: auth });
+    expect(list.json().tracks).toHaveLength(1);
+
+    const full = await app.inject({
+      method: "GET",
+      url: `/api/einmusic/tracks/${track.id}/stream`,
+      headers: auth,
+    });
+    expect(full.statusCode).toBe(200);
+    expect(full.headers["content-type"]).toBe("audio/mpeg");
+    expect(full.body).toBe(MP3.toString());
+
+    const part = await app.inject({
+      method: "GET",
+      url: `/api/einmusic/tracks/${track.id}/stream`,
+      headers: { ...auth, range: "bytes=0-3" },
+    });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers["content-range"]).toBe(`bytes 0-3/${MP3.length}`);
+    expect(part.body).toBe("FAKE");
+
+    const bad = await app.inject({
+      method: "GET",
+      url: `/api/einmusic/tracks/${track.id}/stream`,
+      headers: { ...auth, range: "bytes=99-100" },
+    });
+    expect(bad.statusCode).toBe(416);
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/einmusic/tracks/${track.id}`,
+      headers: auth,
+    });
+    expect(del.statusCode).toBe(200);
+    expect(existsSync(join(dir, "einmusic", `${track.id}.mp3`))).toBe(false);
+    const rel = await app.inject({ method: "GET", url: "/api/einmusic/tracks", headers: auth });
+    expect(rel.json().tracks).toHaveLength(0);
+  });
+
+  it("scopes tracks and playlists per user; 404s foreign ids", async () => {
+    const { app, auth } = await musicApp({
+      verifyToken: async (token) => (token === "other" ? { sub: "other" } : TEST_USER),
+    });
+    await upload(app, auth);
+    const foreign = await app.inject({
+      method: "GET",
+      url: "/api/einmusic/tracks/1/stream",
+      headers: { authorization: "Bearer other" },
+    });
+    expect(foreign.statusCode).toBe(404);
+  });
+
+  it("creates playlists, replaces tracks atomically, rejects foreign track ids", async () => {
+    const { app, auth } = await musicApp();
+    const t1 = (await upload(app, auth, "a.mp3")).json().track.id;
+    const t2 = (await upload(app, auth, "b.mp3")).json().track.id;
+    const pl = (
+      await app.inject({
+        method: "POST",
+        url: "/api/einmusic/playlists",
+        headers: auth,
+        payload: { name: "Road" },
+      })
+    ).json().playlist;
+    expect(pl.name).toBe("Road");
+
+    const put = await app.inject({
+      method: "PUT",
+      url: `/api/einmusic/playlists/${pl.id}`,
+      headers: auth,
+      payload: { trackIds: [t2, t1] },
+    });
+    expect(put.statusCode).toBe(200);
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/einmusic/playlists/${pl.id}`,
+      headers: auth,
+    });
+    expect(detail.json().tracks.map((t: { id: number }) => t.id)).toEqual([t2, t1]);
+
+    expect(
+      (
+        await app.inject({
+          method: "PUT",
+          url: `/api/einmusic/playlists/${pl.id}`,
+          headers: auth,
+          payload: { trackIds: [999] },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: `/api/einmusic/playlists/${pl.id}`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: `/api/einmusic/playlists/${pl.id}`,
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it("bridges navidrome playlists + streams via the sealed credential; 424 without it", async () => {
+    const { app, auth, store, secrets } = await musicApp({
+      fetchImpl: fakeFetch(async (url) => {
+        if (url.includes("/rest/getPlaylists.view")) {
+          return json({
+            "subsonic-response": {
+              status: "ok",
+              playlists: { playlist: [{ id: "p1", name: "Mix", songCount: 2 }] },
+            },
+          });
+        }
+        if (url.includes("/rest/getPlaylist.view")) {
+          return json({
+            "subsonic-response": {
+              status: "ok",
+              playlist: {
+                id: "p1",
+                name: "Mix",
+                entry: [{ id: "s1", title: "One", artist: "A", album: "B", duration: 61 }],
+              },
+            },
+          });
+        }
+        if (url.includes("/rest/stream.view")) {
+          return new Response(MP3, {
+            status: 200,
+            headers: { "content-type": "audio/mpeg" },
+          });
+        }
+        return json({ error: `unexpected ${url}` }, 404);
+      }),
+    });
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/einmusic/navidrome/playlists",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(424);
+
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "navidrome",
+      url: "https://music.test",
+      secretSealed: secrets.seal(JSON.stringify({ username: "frodo", password: "ring" })),
+    });
+
+    const pls = await app.inject({
+      method: "GET",
+      url: "/api/einmusic/navidrome/playlists",
+      headers: auth,
+    });
+    expect(pls.json().playlists).toEqual([{ id: "p1", name: "Mix", songCount: 2 }]);
+    const detail = await app.inject({
+      method: "GET",
+      url: "/api/einmusic/navidrome/playlists/p1",
+      headers: auth,
+    });
+    expect(detail.json().tracks[0]).toMatchObject({ id: "s1", title: "One", artist: "A" });
+    const stream = await app.inject({
+      method: "GET",
+      url: "/api/einmusic/navidrome/stream?songId=s1",
+      headers: auth,
+    });
+    expect(stream.statusCode).toBe(200);
+    expect(stream.body).toBe(MP3.toString());
+  });
+});
+
+describe("passman", () => {
+  it("answers 424 when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    expect(
+      (await app.inject({ method: "GET", url: "/api/passman/vaults", headers: auth })).statusCode,
+    ).toBe(424);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/passman/vaults/GUID-1",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(424);
+  });
+
+  it("proxies vaults and vault credentials verbatim", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url === "https://cloud.test/index.php/apps/passman/api/v2/vaults") {
+        return json([
+          {
+            vault_id: 3,
+            guid: "AAAA-BBBB",
+            name: "Work",
+            challenge_password: "enc==",
+          },
+        ]);
+      }
+      if (url === "https://cloud.test/index.php/apps/passman/api/v2/vaults/AAAA-BBBB") {
+        return json({
+          guid: "AAAA-BBBB",
+          name: "Work",
+          credentials: [{ credential_id: 9, label: "mail", username: "frodo", password: "enc-pw" }],
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+
+    const vaults = await app.inject({
+      method: "GET",
+      url: "/api/passman/vaults",
+      headers: auth,
+    });
+    expect(vaults.statusCode).toBe(200);
+    expect(vaults.json().vaults[0]).toMatchObject({ guid: "AAAA-BBBB", name: "Work" });
+
+    const vault = await app.inject({
+      method: "GET",
+      url: "/api/passman/vaults/AAAA-BBBB",
+      headers: auth,
+    });
+    expect(vault.statusCode).toBe(200);
+    expect(vault.json().vault.credentials[0].label).toBe("mail");
+    // Encrypted fields pass through untouched — decryption is app-side only (D50).
+    expect(vault.json().vault.credentials[0].password).toBe("enc-pw");
+  });
+
+  it("maps upstream failures through the global NextcloudError handler", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/apps/passman/")) return json({ error: "nope" }, 401);
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/passman/vaults", headers: auth });
+    expect(res.statusCode).toBe(424);
+    expect(res.json().error).toBe("nextcloud");
+  });
+});
+
+describe("talk", () => {
+  const PNG = Buffer.from("89504e470d0a1a0a", "hex"); // PNG magic
+
+  it("answers 424 when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    for (const url of [
+      "/api/talk/rooms",
+      "/api/talk/rooms/t1/messages",
+      "/api/talk/file?path=Talk/a.png",
+    ]) {
+      expect((await app.inject({ method: "GET", url, headers: auth })).statusCode).toBe(424);
+    }
+  });
+
+  it("lists rooms trimmed", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url === "https://cloud.test/ocs/v2.php/apps/spreed/api/v4/room") {
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: [
+              {
+                token: "t1",
+                type: 1,
+                name: "sam",
+                displayName: "Sam",
+                unreadMessages: 3,
+                lastActivity: 1700000000,
+                lastMessage: { message: "hi" },
+              },
+            ],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/talk/rooms", headers: auth });
+    expect(res.json().rooms).toEqual([
+      {
+        token: "t1",
+        name: "sam",
+        displayName: "Sam",
+        type: 1,
+        unread: 3,
+        lastActivity: 1700000000,
+        lastMessage: "hi",
+      },
+    ]);
+  });
+
+  it("fetches history without moving the read marker", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.startsWith("https://cloud.test/ocs/v2.php/apps/spreed/api/v1/chat/t1")) {
+        expect(url).toContain("lookIntoFuture=0");
+        expect(url).toContain("setReadMarker=0");
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: [
+              { id: 5, actorId: "sam", actorDisplayName: "Sam", timestamp: 100, message: "hi" },
+            ],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/talk/rooms/t1/messages?lastKnown=4",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().messages[0].message).toBe("hi");
+  });
+
+  it("sends a text message with a generated referenceId", async () => {
+    const posted: { url: string; body: string }[] = [];
+    const fetchImpl = fakeFetch((url, init) => {
+      if (
+        url === "https://cloud.test/ocs/v2.php/apps/spreed/api/v1/chat/t1" &&
+        init?.method === "POST"
+      ) {
+        posted.push({ url, body: String(init.body) });
+        return json({ ocs: { meta: { status: "ok", statuscode: 201 }, data: { id: 9 } } }, 201);
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/talk/rooms/t1/messages",
+      headers: auth,
+      payload: { text: "hello" },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(posted[0]?.body ?? "{}") as { message: string; referenceId: string };
+    expect(body.message).toBe("hello");
+    expect(body.referenceId).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("uploads an image to Talk/ then shares it into the room", async () => {
+    const seen: { method?: string; url: string }[] = [];
+    const fetchImpl = fakeFetch((url, init) => {
+      seen.push({ method: init?.method, url });
+      if (init?.method === "MKCOL") return new Response(null, { status: 405 });
+      if (init?.method === "PUT" && url.includes("/Talk/")) {
+        return new Response(null, { status: 201 });
+      }
+      if (url === "https://cloud.test/ocs/v2.php/apps/files_sharing/api/v1/shares") {
+        const b = JSON.parse(String(init?.body)) as {
+          shareType: number;
+          shareWith: string;
+          path: string;
+        };
+        expect(b.shareType).toBe(10);
+        expect(b.shareWith).toBe("t1");
+        expect(b.path).toMatch(/^\/Talk\/\d+-pic\.png$/);
+        return json({ ocs: { meta: { status: "ok", statuscode: 200 }, data: { id: 77 } } });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/talk/rooms/t1/image?name=pic.png",
+      headers: { ...auth, "content-type": "application/octet-stream" },
+      payload: PNG,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().path).toMatch(/^Talk\/\d+-pic\.png$/);
+    const order = seen.map(
+      (s) => `${s.method}:${new URL(s.url).pathname.split("/dav/")[1] ?? s.url}`,
+    );
+    expect(order[0]).toContain("MKCOL");
+    expect(order[1]).toContain("PUT");
+    expect(order[2]).toContain("shares");
+  });
+
+  it("proxies shared files and rejects path traversal", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/dav/files/frodo/Talk/pic.png")) {
+        return new Response(PNG, { status: 200 });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    connect(store, secrets);
+    const ok = await app.inject({
+      method: "GET",
+      url: "/api/talk/file?path=Talk/pic.png",
+      headers: auth,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers["content-type"]).toContain("image/png");
+    expect(ok.body).toBe(PNG.toString());
+    const bad = await app.inject({
+      method: "GET",
+      url: "/api/talk/file?path=../etc/passwd",
+      headers: auth,
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it("feeds unread rooms to einhub", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url === "https://cloud.test/ocs/v2.php/apps/spreed/api/v4/room") {
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: [
+              { token: "t1", displayName: "Sam", unreadMessages: 2, lastActivity: 1700000000 },
+              { token: "t2", displayName: "Quiet", unreadMessages: 0 },
+            ],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl,
+      config: loadConfig({ ...testEnv(), MODULE_EINHUB_REFRESH_SECONDS: "0" }),
+    });
+    connect(store, secrets);
+    const first = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    expect(first.json().unread).toBe(0); // seed pass marks existing as read
+    const second = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().notifications.every((n: { module: string }) => n.module === "talk")).toBe(
+      true,
+    );
+  });
+});
+
+describe("matrix", () => {
+  const HS = "https://matrix.test";
+  const TOK_SECRET = JSON.stringify({ accessToken: "tok-abc", userId: "@frodo:matrix.test" });
+
+  /** Seed a sealed matrix credential (post-login shape, D52). */
+  const seedMatrix = (store: Store, secrets: SecretBox) =>
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "matrix",
+      url: HS,
+      secretSealed: secrets.seal(TOK_SECRET),
+    });
+
+  it("exchanges username+password for an access token on connect", async () => {
+    const fetchImpl = fakeFetch((url, init) => {
+      if (url === `${HS}/_matrix/client/v3/login` && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as {
+          type: string;
+          user: string;
+          password: string;
+        };
+        expect(body.type).toBe("m.login.password");
+        expect(body.user).toBe("frodo");
+        return json({ access_token: "tok-abc", user_id: "@frodo:matrix.test", device_id: "DEV" });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/matrix/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: HS },
+    });
+    expect(res.statusCode).toBe(200);
+    // The sealed secret is the token — the password is never stored (D52).
+    const stored = store.getServiceCredential(TEST_USER.sub, "matrix");
+    const opened = secrets.open(stored?.secretSealed ?? "");
+    expect(JSON.parse(opened).accessToken).toBe("tok-abc");
+    expect(opened).not.toContain("ring");
+  });
+
+  it("rejects a bad login without storing anything", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.includes("/_matrix/client/v3/login")) return json({ error: "forbidden" }, 403);
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store } = await testApp({ fetchImpl });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/matrix/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "wrong", url: HS },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "matrix")).toBeUndefined();
+  });
+
+  it("424s on all routes when not connected", async () => {
+    const { app, auth } = await testApp();
+    for (const url of [
+      "/api/matrix/me",
+      "/api/matrix/rooms",
+      "/api/matrix/rooms/!r1:hs/messages",
+      "/api/matrix/media?mxc=mxc://s/id",
+    ]) {
+      expect((await app.inject({ method: "GET", url, headers: auth })).statusCode).toBe(424);
+    }
+  });
+
+  it("lists joined rooms with resolved names", async () => {
+    const fetchImpl = fakeFetch((url, init) => {
+      const authz = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      expect(authz).toBe("Bearer tok-abc");
+      if (url === `${HS}/_matrix/client/v3/joined_rooms`) {
+        return json({ joined_rooms: ["!r1:hs", "!r2:hs"] });
+      }
+      if (url === `${HS}/_matrix/client/v3/rooms/!r1%3Ahs/state/m.room.name`) {
+        return json({ name: "Shire" });
+      }
+      if (url === `${HS}/_matrix/client/v3/rooms/!r2%3Ahs/state/m.room.name`) {
+        return json({ error: "no name" }, 404);
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    seedMatrix(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/matrix/rooms", headers: auth });
+    expect(res.json().rooms).toEqual([
+      { id: "!r1:hs", name: "Shire" },
+      { id: "!r2:hs", name: null },
+    ]);
+    const me = await app.inject({ method: "GET", url: "/api/matrix/me", headers: auth });
+    expect(me.json()).toEqual({ userId: "@frodo:matrix.test" });
+  });
+
+  it("fetches backwards history and sends text with a txn id", async () => {
+    const seen: { method?: string; url: string; body: unknown }[] = [];
+    const fetchImpl = fakeFetch((url, init) => {
+      seen.push({ method: init?.method, url, body: init?.body });
+      if (url.includes("/rooms/!r1%3Ahs/messages?")) {
+        return json({
+          chunk: [
+            {
+              event_id: "$e2",
+              sender: "@sam:hs",
+              origin_server_ts: 200,
+              type: "m.room.message",
+              content: { msgtype: "m.text", body: "newest" },
+            },
+          ],
+          end: "tok-end",
+        });
+      }
+      if (url.includes("/send/m.room.message/")) {
+        return json({ event_id: "$e3" });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    seedMatrix(store, secrets);
+
+    const msgs = await app.inject({
+      method: "GET",
+      url: "/api/matrix/rooms/!r1:hs/messages",
+      headers: auth,
+    });
+    expect(msgs.statusCode).toBe(200);
+    expect(msgs.json().messages[0]).toMatchObject({
+      sender: "@sam:hs",
+      senderName: "sam",
+      msgtype: "m.text",
+      body: "newest",
+    });
+    expect(msgs.json().end).toBe("tok-end");
+
+    const send = await app.inject({
+      method: "POST",
+      url: "/api/matrix/rooms/!r1:hs/messages",
+      headers: auth,
+      payload: { text: "hello" },
+    });
+    expect(send.statusCode).toBe(201);
+    const putCall = seen.find((s) => s.method === "PUT");
+    const putBody = JSON.parse(String(putCall?.body)) as { msgtype: string; body: string };
+    expect(putBody).toEqual({ msgtype: "m.text", body: "hello" });
+  });
+
+  it("uploads a file to media/v3 then posts an m.image message", async () => {
+    const seen: { method?: string; url: string; body: unknown }[] = [];
+    const fetchImpl = fakeFetch((url, init) => {
+      seen.push({ method: init?.method, url, body: init?.body });
+      if (url.includes("/_matrix/media/v3/upload")) {
+        return json({ content_uri: "mxc://hs/media123" });
+      }
+      if (url.includes("/send/m.room.message/")) {
+        return json({ event_id: "$e4" });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    seedMatrix(store, secrets);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/matrix/rooms/!r1:hs/file?name=pic.png",
+      headers: { ...auth, "content-type": "application/octet-stream" },
+      payload: Buffer.from("pngdata"),
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().mxc).toBe("mxc://hs/media123");
+    const sendBody = JSON.parse(String(seen.find((s) => s.url.includes("/send/"))?.body)) as {
+      msgtype: string;
+      url: string;
+      info: { size: number };
+    };
+    expect(sendBody.msgtype).toBe("m.image");
+    expect(sendBody.url).toBe("mxc://hs/media123");
+    expect(sendBody.info.size).toBe(7);
+  });
+
+  it("proxies mxc media bytes and rejects non-mxc URIs", async () => {
+    const PIX = Buffer.from("89504e47", "hex");
+    const fetchImpl = fakeFetch((url) => {
+      if (url === `${HS}/_matrix/media/v3/download/hs/media123`) {
+        return new Response(PIX, { status: 200, headers: { "content-type": "image/png" } });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({ fetchImpl });
+    seedMatrix(store, secrets);
+    const ok = await app.inject({
+      method: "GET",
+      url: "/api/matrix/media?mxc=mxc://hs/media123",
+      headers: auth,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers["content-type"]).toContain("image/png");
+    const bad = await app.inject({
+      method: "GET",
+      url: "/api/matrix/media?mxc=https://evil.test/x",
+      headers: auth,
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -2782,11 +3673,18 @@ describe("module framework", () => {
         { id: "yamtrack", requires: [] },
         { id: "audiobookshelf", requires: [] },
         { id: "navidrome", requires: [] },
+        { id: "einmusic", requires: [] },
         { id: "trek", requires: [] },
         { id: "email", requires: [] },
         { id: "gotify", requires: [] },
         { id: "gitlab", requires: [] },
         { id: "github", requires: [] },
+        { id: "authentik", requires: [] },
+        { id: "nextcloud", requires: ["nextcloud"] },
+        { id: "settings", requires: [] },
+        { id: "passman", requires: ["nextcloud"] },
+        { id: "talk", requires: ["nextcloud"] },
+        { id: "matrix", requires: [] },
       ],
     });
   });

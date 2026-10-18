@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { config } from "@/config";
 import { createApi } from "./client";
 import type {
+  AuthentikStatus,
   ConnectionStatus,
   ConnectorStatus,
   CsvFile,
@@ -14,6 +15,10 @@ import type {
   EinChatStatus,
   EinChatTools,
   EinHubFeed,
+  EinMusicPlaylistDetail,
+  EinMusicPlaylists,
+  EinMusicTrack,
+  EinMusicTracks,
   EmailList,
   EmailMessage,
   GitHubNotifications,
@@ -23,14 +28,26 @@ import type {
   GotifyMessages,
   GotifyUser,
   LoginFlowStart,
+  MatrixMessages,
+  MatrixRooms,
+  MatrixSelf,
   Me,
+  ModulePrefs,
   ModuleRegistry,
+  NavidromePlaylistDetail,
+  NavidromePlaylists,
+  NextcloudFeatures,
+  NextcloudSettingsResponse,
+  PassmanVaultDetail,
+  PassmanVaults,
   ServerHealthResponse,
   TableNode,
   TableNodeType,
   TableRow,
   TablesApplication,
   TableView,
+  TalkMessages,
+  TalkRooms,
   TalkStatus,
   WikiAskResult,
   WikiIndexResult,
@@ -69,6 +86,14 @@ export const keys = {
   einhub: ["einhub", "notifications"] as const,
   gitlabTodos: ["gitlab", "todos"] as const,
   githubNotifications: ["github", "notifications"] as const,
+  authentikHealth: ["authentik", "health"] as const,
+  nextcloudSettings: ["nextcloud", "settings"] as const,
+  modulePrefs: ["settings", "modules"] as const,
+  einmusicTracks: ["einmusic", "tracks"] as const,
+  einmusicPlaylists: ["einmusic", "playlists"] as const,
+  einmusicPlaylist: (id: number) => ["einmusic", "playlist", id] as const,
+  navidromePlaylists: ["einmusic", "navidrome", "playlists"] as const,
+  navidromePlaylist: (id: string) => ["einmusic", "navidrome", "playlist", id] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -582,6 +607,58 @@ export function useGitHubNotifications(enabled = true) {
   });
 }
 
+/** The Authentik instance health snapshot (D45) — shown on /authentik and in Monitor. */
+export function useAuthentikHealth(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.authentikHealth,
+    queryFn: () => api.get<AuthentikStatus>("/authentik/health"),
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Per-user Nextcloud feature toggles (D46) — monitor tabs, nav visibility. */
+export function useNextcloudSettings(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.nextcloudSettings,
+    queryFn: () => api.get<NextcloudSettingsResponse>("/nextcloud/settings"),
+    enabled,
+  });
+}
+
+/** Merge a partial feature map into the caller's Nextcloud settings. */
+export function useSaveNextcloudSettings() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<NextcloudFeatures>) =>
+      api.put<NextcloudSettingsResponse>("/nextcloud/settings", patch),
+    onSuccess: (res) => qc.setQueryData(keys.nextcloudSettings, res),
+  });
+}
+
+/** The caller's disabled-module set (D47) — header "Modules" dialog + nav filter. */
+export function useModulePrefs(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.modulePrefs,
+    queryFn: () => api.get<ModulePrefs>("/settings/modules"),
+    enabled,
+  });
+}
+
+/** Replace the caller's disabled-module set (D47). */
+export function useSaveModulePrefs() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (disabled: string[]) => api.put<ModulePrefs>("/settings/modules", { disabled }),
+    onSuccess: (res) => qc.setQueryData(keys.modulePrefs, res),
+  });
+}
+
 /**
  * Live message updates: the BFF proxies Gotify's WS stream as SSE (the client
  * token never leaves the BFF). Fetch-based because EventSource can't send
@@ -629,4 +706,242 @@ export function useGotifyStream(enabled: boolean) {
       if (reconnect !== undefined) clearTimeout(reconnect);
     };
   }, [enabled, getAccessToken, qc]);
+}
+
+// --- EinMusic (D48) -------------------------------------------------------
+
+export function useEinMusicTracks(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einmusicTracks,
+    queryFn: () => api.get<EinMusicTracks>("/einmusic/tracks"),
+    enabled,
+  });
+}
+
+/** Upload one MP3; the file bytes are the request body (`?name=` carries the filename). */
+export function useUploadTrack() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) =>
+      api.upload<{ track: EinMusicTrack }>(
+        `/einmusic/tracks?name=${encodeURIComponent(file.name)}`,
+        file,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.einmusicTracks }),
+  });
+}
+
+export function useDeleteTrack() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/einmusic/tracks/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.einmusicTracks });
+      void qc.invalidateQueries({ queryKey: keys.einmusicPlaylists });
+    },
+  });
+}
+
+export function useEinMusicPlaylists(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einmusicPlaylists,
+    queryFn: () => api.get<EinMusicPlaylists>("/einmusic/playlists"),
+    enabled,
+  });
+}
+
+export function useEinMusicPlaylist(id: number | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einmusicPlaylist(id ?? 0),
+    queryFn: () => api.get<EinMusicPlaylistDetail>(`/einmusic/playlists/${id}`),
+    enabled: id !== null,
+  });
+}
+
+export function useCreatePlaylist() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      api.post<{ playlist: { id: number; name: string } }>("/einmusic/playlists", { name }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.einmusicPlaylists }),
+  });
+}
+
+/** Rename and/or atomically replace a playlist's tracks. */
+export function useSavePlaylist() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: number; name?: string; trackIds?: number[] }) =>
+      api.put(`/einmusic/playlists/${args.id}`, { name: args.name, trackIds: args.trackIds }),
+    onSuccess: (_res, args) => {
+      void qc.invalidateQueries({ queryKey: keys.einmusicPlaylists });
+      void qc.invalidateQueries({ queryKey: keys.einmusicPlaylist(args.id) });
+    },
+  });
+}
+
+export function useDeletePlaylist() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/einmusic/playlists/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.einmusicPlaylists }),
+  });
+}
+
+/** Navidrome playlists on the connected server; 424 → not configured (D48). */
+export function useNavidromePlaylists(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.navidromePlaylists,
+    queryFn: () => api.get<NavidromePlaylists>("/einmusic/navidrome/playlists"),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useNavidromePlaylist(id: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.navidromePlaylist(id ?? ""),
+    queryFn: () =>
+      api.get<NavidromePlaylistDetail>(
+        `/einmusic/navidrome/playlists/${encodeURIComponent(id ?? "")}`,
+      ),
+    enabled: id !== null,
+  });
+}
+
+// --- Passman (D50) --------------------------------------------------------
+
+export function usePassmanVaults(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["passman", "vaults"],
+    queryFn: () => api.get<PassmanVaults>("/passman/vaults"),
+    enabled,
+    retry: false,
+  });
+}
+
+/** Vault detail — credentials arrive still SJCL-encrypted; the page decrypts. */
+export function usePassmanVault(guid: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["passman", "vault", guid],
+    queryFn: () => api.get<PassmanVaultDetail>(`/passman/vaults/${encodeURIComponent(guid ?? "")}`),
+    enabled: guid !== null,
+  });
+}
+
+// --- Talk (D51) -----------------------------------------------------------
+
+export function useTalkRooms(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["talk", "rooms"],
+    queryFn: () => api.get<TalkRooms>("/talk/rooms"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+/** Message history; polls every 4 s while a room is open. Read marker untouched. */
+export function useTalkMessages(token: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["talk", "messages", token],
+    queryFn: () => api.get<TalkMessages>(`/talk/rooms/${encodeURIComponent(token ?? "")}/messages`),
+    enabled: token !== null,
+    refetchInterval: 4_000,
+  });
+}
+
+export function useSendTalkMessage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { token: string; text: string }) =>
+      api.post(`/talk/rooms/${encodeURIComponent(args.token)}/messages`, { text: args.text }),
+    onSuccess: (_res, args) => qc.invalidateQueries({ queryKey: ["talk", "messages", args.token] }),
+  });
+}
+
+/** Upload one image into the Talk folder and share it into the room (D51). */
+export function useSendTalkImage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { token: string; file: File }) =>
+      api.upload(
+        `/talk/rooms/${encodeURIComponent(args.token)}/image?name=${encodeURIComponent(args.file.name)}`,
+        args.file,
+      ),
+    onSuccess: (_res, args) => qc.invalidateQueries({ queryKey: ["talk", "messages", args.token] }),
+  });
+}
+
+// --- Matrix (D52) ----------------------------------------------------------
+
+export function useMatrixSelf(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["matrix", "me"],
+    queryFn: () => api.get<MatrixSelf>("/matrix/me"),
+    enabled,
+  });
+}
+
+export function useMatrixRooms(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["matrix", "rooms"],
+    queryFn: () => api.get<MatrixRooms>("/matrix/rooms"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useMatrixMessages(roomId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["matrix", "messages", roomId],
+    queryFn: () =>
+      api.get<MatrixMessages>(`/matrix/rooms/${encodeURIComponent(roomId ?? "")}/messages`),
+    enabled: roomId !== null,
+    refetchInterval: 4_000,
+  });
+}
+
+export function useSendMatrixMessage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { roomId: string; text: string }) =>
+      api.post(`/matrix/rooms/${encodeURIComponent(args.roomId)}/messages`, { text: args.text }),
+    onSuccess: (_res, args) =>
+      qc.invalidateQueries({ queryKey: ["matrix", "messages", args.roomId] }),
+  });
+}
+
+/** Upload a file to the media repo then post the m.image/m.file message (D52). */
+export function useSendMatrixFile() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { roomId: string; file: File }) =>
+      api.upload(
+        `/matrix/rooms/${encodeURIComponent(args.roomId)}/file?name=${encodeURIComponent(args.file.name)}`,
+        args.file,
+      ),
+    onSuccess: (_res, args) =>
+      qc.invalidateQueries({ queryKey: ["matrix", "messages", args.roomId] }),
+  });
 }

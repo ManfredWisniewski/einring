@@ -5,7 +5,17 @@
   },
   "nav": {
     "label": "Module",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "search": "Module suchen…",
+    "noMatches": "Keine passenden Module.",
+    "group": {
+      "core": "Zentrale",
+      "data": "Daten",
+      "media": "Medien",
+      "communication": "Kommunikation",
+      "integrations": "Integrationen",
+      "system": "System"
+    }
   },
   "auth": {
     "login": "Mit Authentik anmelden",
@@ -50,5 +60,14 @@
     "loading": "Wird geladen…",
     "yes": "ja",
     "no": "nein"
+  },
+  "menu": {
+    "open": "Menü",
+    "modules": "Module",
+    "info": "Info"
+  },
+  "modulesDialog": {
+    "title": "Module",
+    "hint": "Wähle, welche Integrationen für dich aktiv sind."
   }
 }

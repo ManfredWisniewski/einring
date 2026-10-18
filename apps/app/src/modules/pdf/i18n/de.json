@@ -1,0 +1,8 @@
+{
+  "nav": "PDF",
+  "open": "PDF öffnen",
+  "empty": "Wähle eine PDF-Datei, um sie hier anzuzeigen.",
+  "error": "Das PDF konnte nicht geladen werden.",
+  "pages_one": "{{count}} Seite",
+  "pages_other": "{{count}} Seiten"
+}

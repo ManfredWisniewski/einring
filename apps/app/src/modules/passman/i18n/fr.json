@@ -1,0 +1,17 @@
+{
+  "nav": "Passman",
+  "empty": "Aucun coffre trouvé.",
+  "notConnected": "Nextcloud n'est pas connecté — connectez-vous sur la page Nextcloud.",
+  "error": "Impossible de charger Passman ({{status}}).",
+  "vaultPassword": "Mot de passe du coffre",
+  "unlock": "Déverrouiller",
+  "badPassword": "Mauvais mot de passe — cette clé n'ouvre pas le coffre.",
+  "lock": "Verrouiller",
+  "search": "Rechercher …",
+  "noResults": "Aucune entrée trouvée.",
+  "untitled": "(sans titre)",
+  "copyPassword": "Copier le mot de passe",
+  "copyUrl": "Copier l'URL",
+  "copyField": "Copier",
+  "copied": "Copié !"
+}

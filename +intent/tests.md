@@ -163,3 +163,70 @@
 - `github` exposes a `notifications` source (D42): notification threads become einhub items (`sourceId` = thread id, title = `<reason>: <subject title>`, body = `repo · type`), so mentions/review requests/CI results surface in EinHub and the nav badge.
 - The `/github` page shows the shared connect form until linked, then the unread-thread list (reason, title, repo, time) linking to the upstream subject; DE + EN + RU + FR.
 - EinChat gets a `github_notifications` tool; without a credential it answers `not_connected`.
+
+### A21 Authentik module (connector + monitoring surface)
+
+- `authentik` uses the shared connector routes with an API token: `POST /api/authentik/credentials {apiKey, url}`; `url` is the instance web URL (`MODULE_AUTHENTIK_URL` may preset it). Verify via `GET /api/v3/core/users/me/` (Bearer) before sealing per `sub`; auth failure → 401, unreachable → 502.
+- `GET /api/authentik/status` returns an aggregate health snapshot `{account, version, counts, workers, tasks, events, fetchedAt}` assembled from best-effort `/api/v3` probes: `/admin/version`, `pagination.count` of users/groups/applications/outposts, `/admin/system_tasks`, `/admin/workers`, and the latest `/events/events`. Each probe degrades to `null` on 401/403/404 or failure — a non-admin token yields a partial status, never a wholesale 5xx; 424 unconnected, 502 when every probe fails.
+- The Monitor page gains an **Authentik tab** (only while the `authentik` module is enabled) that renders the status — version/outdated, counts, workers, failed system tasks, recent events; when the module is enabled but not connected it links to `/authentik` instead.
+- The `/authentik` page is primarily the connect/config surface (shared form until linked, then connected state + disconnect + the same status view); DE + EN + RU + FR.
+- EinChat gets an `authentik_status` tool returning the same aggregate; without a credential it answers `not_connected`.
+
+### A22 Nextcloud module (feature configuration)
+
+- `nextcloud` (BFF, `requires: ["nextcloud"]`) stores per-user Nextcloud feature preferences in `module_settings` under `{"monitorTalk","monitorServer","tables","wiki"}` — all default `true` when unset.
+- `GET /api/nextcloud/settings` returns `{settings}` merged with defaults; `PUT /api/nextcloud/settings` accepts a partial boolean map, merges it, persists, and returns the merged settings. Unknown keys rejected with 400; settings are scoped per `sub`.
+- The `/nextcloud` page (inside the Nextcloud gate) shows the connection state and a checkbox per feature: Monitor Talk tab, Monitor server statistics, Tables, Wiki. Toggling saves immediately; DE + EN + RU + FR.
+- The Monitor page honours `monitorTalk`/`monitorServer`: a disabled tab is not rendered; when both are off and no Authentik module is enabled the page shows a hint linking to `/nextcloud`.
+- Disabling `tables` or `wiki` hides that module's nav entry for the user (a personal-preference filter — the routes stay reachable, the BFF endpoints keep working; EinChat tool control stays with the einchat data-connections UI).
+
+### A23 Module activation menu (per-user integration selection)
+
+- `settings` (BFF) stores the caller's disabled-module set in `module_settings` as `{disabled: string[]}`. `GET /api/settings/modules` returns `{disabled}`; `PUT /api/settings/modules` replaces it — 400 on non-string entries, unknown module ids, or `einhub` (index route, must stay enabled).
+- The app header gains a hamburger menu where the info button was, with items **Modules** and **Info**; Info opens the existing popover content, Modules opens a dialog listing every BFF-enabled module (except einhub) with a checkbox — unchecking adds the id to the caller's disabled set; DE + EN + RU + FR.
+- A disabled module disappears from the nav for that user (merged with the D46 nextcloud feature toggles), its EinHub notifications are filtered out of the displayed feed, and the Monitor Authentik tab hides when `authentik` is disabled. Routes and BFF endpoints keep working — preference-level filtering, not authorization (same as D46); server-side enablement stays `MODULES`.
+- Re-enabling restores the module's nav entry and its previously collected EinHub items (the feed keeps collecting server-side).
+
+### A24 EinMusic module (upload + playback + playlists + Navidrome)
+
+- `einmusic` (BFF) stores MP3s as files under `DATA_DIR/einmusic/<trackId>.mp3` with metadata in `music_tracks` (sub, title, bytes, created_at) — files, not SQLite blobs, keeps the DB small and allows streamed reads. Playlists in `music_playlists` + `music_playlist_tracks` (ordered by `position`), all scoped per `sub`.
+- `POST /api/einmusic/tracks?name=<file.mp3>` accepts the raw body as the track (`audio/mpeg`/`application/octet-stream`, ≤ 50 MB), derives the title from the filename; `GET /tracks` lists, `GET /tracks/:id/stream` serves the file with `Range` support (206 + `Content-Range`/`Accept-Ranges`, 416 on bad ranges), `DELETE /tracks/:id` removes file + row + playlist references; foreign ids → 404.
+- Playlists: `GET/POST /playlists`, `GET /playlists/:id` (ordered tracks), `PUT /playlists/:id {name?, trackIds?}` (atomic replace), `DELETE /playlists/:id`; trackIds must belong to the caller (400 otherwise).
+- Navidrome bridging reuses the sealed navidrome connector credential (D41): `GET /api/einmusic/navidrome/playlists` + `GET /navidrome/playlists/:id` map `getPlaylists`/`getPlaylist` results, `GET /navidrome/stream?songId=` proxies `stream.view` bytes with auth server-side; 424 when no navidrome credential exists.
+- The `/einmusic` page: upload button + track list (play / add-to-playlist / delete), playlists section (create, expand, play in order, remove tracks, delete), and a Navidrome section showing its playlists when a credential exists (hint + link to `/navidrome` otherwise — shown only while the navidrome module is enabled). Playback fetches the stream through the BFF and plays it via an object URL — the bearer token can ride the fetch, an `<audio src>` could not (D48). DE + EN + RU + FR.
+
+### A25 PDF module (in-app PDF display)
+
+- `pdf` is a **frontend-only** module (no BFF counterpart): the `/pdf` page accepts a PDF via file picker (`application/pdf`) or via `?src=` carrying an `/api`-relative path fetched through the authenticated API client (D48 pattern).
+- The document renders in-app with pdf.js (`pdfjs-dist`) — pages drawn to canvases fit to the container width, sequential render, cancellable on unmount/source change; works in browsers and the Android WebView where native PDF embeds do not exist.
+- Filename or `?title=` shows as heading plus the page count; load/parse failures show a translated error; DE + EN + RU + FR.
+
+### A26 Passman module (read-only vault viewer)
+
+- `passman` (BFF, `requires: nextcloud`) proxies `GET /api/passman/vaults` → `/index.php/apps/passman/api/v2/vaults` and `GET /api/passman/vaults/:guid` → the vault with its (still encrypted) credentials; 424 when Nextcloud isn't connected, upstream status preserved through the global `NextcloudError` mapping.
+- The `/passman` page lists vaults (name); selecting one prompts for the vault password, which is verified locally by SJCL-decrypting `challenge_password` — wrong password shows a translated error, never leaves the app.
+- On unlock the credentials decrypt client-side (SJCL `ccm`/iter 1000/ks 256/ts 64, base64-wrapped): `password`, `url`, `description`, `custom_fields`, `files`, `otp`; label/username/email/tags are plaintext per the Passman API.
+- Search filters on label/username/email/description/tags; clicking a tag filters to it; a copy button per password, url and each custom field writes to the clipboard (secret custom fields stay masked); a Lock button drops the key + plaintexts from memory.
+- `credential.tags` is normalized defensively — the API returns `{text}[]`, a lone `{text}` object, an assoc-array object, or a JSON string depending on PHP serialization; any shape flattens to a string list, never throws.
+- Read-only: no mutation endpoints, no EinChat tool (D50). DE + EN + RU + FR.
+
+### A27 Talk module (basic chat + image send)
+
+- `talk` (BFF, `requires: nextcloud`): `GET /api/talk/rooms` lists conversations (token, displayName, type, unread, lastMessage preview); `GET /api/talk/rooms/:token/messages?lastKnown=&limit=` returns history (`lookIntoFuture=0`, `setReadMarker=0` — never moves the read marker); `POST /rooms/:token/messages {text}` sends with a generated `referenceId`.
+- `POST /api/talk/rooms/:token/image?name=<file>` takes raw image bytes (≤ 20 MB): MKCOL `Talk/` (405 ok) → PUT into `Talk/<name>` (sanitized, collision-suffix) → OCS `files_sharing` share `shareType=10` → 201 with the created message; `GET /api/talk/file?path=` proxies file bytes for inline display (path must not escape the files root — `..` rejected 400).
+- The `/talk` page: room list (name + unread badge + last-message preview), message pane (bubbles with actor name + time, image attachments rendered via authenticated blob → objectURL, system messages styled), composer (text input + Enter/send + image attach button), polls messages every ~4 s while a room is open and rooms every ~30 s. Read marker untouched. DE + EN + RU + FR.
+- EinHub shows Talk rooms with `unreadMessages > 0` as notification items (D42); no EinChat tool (D51).
+
+### A28 Matrix module (basic chat + file upload)
+
+- `matrix` is a `userPass` connector (`MODULE_MATRIX_URL` optional default): `POST /api/matrix/credentials` does `m.login.password` and seals the returned `{accessToken, userId, deviceId}` — the raw password is never persisted; `DELETE` logs out upstream (`/_matrix/client/v3/logout`, best-effort) then drops the row.
+- `GET /api/matrix/rooms` → joined rooms with resolved `m.room.name` (id fallback); `GET /api/matrix/rooms/:id/messages?from=&limit=` → `dir=b` event chunk + `end` token; `POST /rooms/:id/messages {text}` → `m.text` with generated txnId; `POST /rooms/:id/file?name=` → `media/v3/upload` then `m.image`/`m.file` message; `GET /api/matrix/media?mxc=` → proxied `download` bytes (mxc:// only, else 400). 424 when not connected.
+- The `/matrix` page: `ConnectorPage` until connected; then room list → drill-in chat pane (sender localpart, timestamp, images inline via authenticated blob, other events collapsed to system lines), composer with text + file attach. Polls rooms 30 s / messages 4 s. DE + EN + RU + FR.
+- EinHub gets a Matrix unread item from `unread_notifications` (D42); `matrix_rooms` lists room names to EinChat (no message content, D52).
+
+### A29 Accordion module navigation with search
+
+- Every `AppModule` with a nav entry declares `nav.group` (a `nav.group.*` i18n key); the Layout groups the nav into collapsible accordion sections in `appModules` order: core (einhub, einchat), data (tables, wiki, csv-manager, pdf, passman), media (audiobookshelf, navidrome, einmusic), communication (email, gotify, talk, matrix), integrations (yamtrack, trek, gitlab, github), system (monitor, authentik, nextcloud).
+- A search input at the top of the nav filters module links by their translated name (case-insensitive substring); while searching, matching groups are expanded and empty groups hidden; a "no matches" hint shows when nothing matches.
+- One section is open at a time; the section containing the current route opens automatically on navigation and stays open while its link is `.active`. The EinHub unread badge keeps rendering on its nav link.
+- All filtering honours the existing visibility rules (MODULES registry, D46 Nextcloud toggles, D47 per-user disablement); labels and hints are translated DE + EN + RU + FR.

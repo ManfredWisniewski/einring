@@ -10,7 +10,7 @@ const MonitorPage = lazy(() => import("./MonitorPage").then((m) => ({ default: m
 export const monitorModule: AppModule = {
   id: "monitor",
   hasBackend: true,
-  nav: { i18nKey: "modules.monitor.nav" },
+  nav: { i18nKey: "modules.monitor.nav", group: "system" },
   routes: [{ path: "/monitor", Component: MonitorPage }],
   i18n: { de, en, fr, ru },
 };

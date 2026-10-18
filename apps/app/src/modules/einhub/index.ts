@@ -10,7 +10,7 @@ const EinHubPage = lazy(() => import("./EinHubPage").then((m) => ({ default: m.E
 export const einhubModule: AppModule = {
   id: "einhub",
   hasBackend: true,
-  nav: { i18nKey: "modules.einhub.nav" },
+  nav: { i18nKey: "modules.einhub.nav", group: "core" },
   routes: [{ path: "/einhub", Component: EinHubPage }],
   i18n: { de, en, fr, ru },
 };

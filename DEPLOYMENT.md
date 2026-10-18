@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github
+# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -89,6 +89,8 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_GOTIFY_URL=          # default Gotify server, e.g. https://push.example.com
 # MODULE_GITLAB_URL=          # default GitLab instance, e.g. https://gitlab.example.com
 # MODULE_GITHUB_URL=          # default GitHub instance, e.g. https://github.com or a GHES host
+# MODULE_AUTHENTIK_URL=       # default Authentik instance, e.g. https://auth.example.com
+# MODULE_MATRIX_URL=          # default Matrix homeserver, e.g. https://matrix.example.com
 # MODULE_EINHUB_REFRESH_SECONDS=60  # min seconds between upstream notification polls per user
 LOG_LEVEL=info
 ```
@@ -108,7 +110,7 @@ docker run -d --name einring \
   ghcr.io/manfredwisniewski/einring:sha-<commit>
 ```
 
-The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials, wiki mirror, csv-manager files) — it is the only state.
+The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials, wiki mirror, csv-manager files) and the `einmusic/` upload directory — it is the only state.
 
 ### docker-compose equivalent
 

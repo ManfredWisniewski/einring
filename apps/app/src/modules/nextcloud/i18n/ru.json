@@ -1,0 +1,19 @@
+{
+  "nav": "Nextcloud",
+  "featuresTitle": "Функции Nextcloud",
+  "intro": "Выберите, какие функции Nextcloud вы используете в EinRing.",
+  "feature": {
+    "monitorTalk": "Монитор: статус Talk",
+    "monitorServer": "Монитор: статистика сервера",
+    "tables": "Таблицы",
+    "wiki": "Wiki (Collectives)"
+  },
+  "featureHint": {
+    "monitorTalk": "Показывает онлайн-статус пользователей Talk в модуле «Монитор».",
+    "monitorServer": "Показывает статистику сервера в модуле «Монитор».",
+    "tables": "Показывает модуль «Таблицы» в навигации.",
+    "wiki": "Показывает модуль «Wiki» в навигации."
+  },
+  "emptyHint": "Все разделы монитора отключены.",
+  "configure": "Включить в модуле Nextcloud"
+}

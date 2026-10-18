@@ -10,7 +10,7 @@ const GitLabPage = lazy(() => import("./GitLabPage").then((m) => ({ default: m.G
 export const gitlabModule: AppModule = {
   id: "gitlab",
   hasBackend: true,
-  nav: { i18nKey: "modules.gitlab.nav" },
+  nav: { i18nKey: "modules.gitlab.nav", group: "integrations" },
   routes: [{ path: "/gitlab", Component: GitLabPage }],
   i18n: { de, en, fr, ru },
 };

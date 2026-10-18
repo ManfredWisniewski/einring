@@ -2,7 +2,8 @@
   "nav": "Монитор",
   "tabs": {
     "server": "Сервер",
-    "talk": "Talk"
+    "talk": "Talk",
+    "authentik": "Authentik"
   },
   "server": {
     "version": "Версия Nextcloud",

@@ -122,6 +122,33 @@ export interface CapabilitiesData {
   };
 }
 
+/** `GET /apps/spreed/api/v4/room` entry — fields vary across Talk releases. */
+export interface TalkRoom {
+  token: string;
+  type?: number;
+  name?: string;
+  displayName?: string;
+  unreadMessages?: number;
+  unreadMention?: boolean;
+  lastActivity?: number;
+  lastMessage?: TalkMessage;
+}
+
+/** A spreed chat message (`/apps/spreed/api/v1/chat/{token}`). */
+export interface TalkMessage {
+  id: number;
+  token?: string;
+  actorType?: string;
+  actorId?: string;
+  actorDisplayName?: string;
+  timestamp?: number;
+  systemMessage?: string;
+  messageType?: string;
+  message?: string;
+  /** Rich-object parameters keyed by placeholder — attachments carry `file` with `path`. */
+  messageParameters?: Record<string, unknown>;
+}
+
 /** `GET /ocs/v2.php/cloud/user` — the connected account's own info incl. storage quota. */
 export interface OwnUser {
   id?: string;
@@ -395,6 +422,95 @@ export class AuthenticatedNextcloud {
     return this.get<OcsResponse<AutocompleteResult[]>>(
       `/ocs/v2.php/apps/spreed/api/v4/core/autocomplete?${q}`,
     );
+  }
+
+  /**
+   * Passman app REST API v2 — raw JSON pass-through; credential fields stay
+   * client-side encrypted (the BFF never sees vault keys, D50).
+   */
+  getPassman<T>(path: string) {
+    return this.get<T>(`/index.php/apps/passman/api/v2${path}`);
+  }
+
+  // -- Talk (spreed) OCS API (D51) -----------------------------------------
+
+  /** `GET /apps/spreed/api/v4/room` — conversations. */
+  getTalkRooms() {
+    return this.get<OcsResponse<TalkRoom[]>>(`/ocs/v2.php/apps/spreed/api/v4/room`);
+  }
+
+  /**
+   * `GET /apps/spreed/api/v1/chat/{token}` — message history.
+   * `setReadMarker=0` so polling never moves the user's read marker.
+   */
+  getTalkMessages(token: string, lastKnown?: number, limit = 50) {
+    const q = new URLSearchParams({
+      lookIntoFuture: "0",
+      limit: String(limit),
+      setReadMarker: "0",
+    });
+    if (lastKnown !== undefined) q.set("lastKnownMessageId", String(lastKnown));
+    return this.get<OcsResponse<TalkMessage[]>>(
+      `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(token)}?${q}`,
+    );
+  }
+
+  /** `POST /apps/spreed/api/v1/chat/{token}` — send a text message. */
+  postTalkMessage(token: string, message: string, referenceId: string) {
+    return this.post<OcsResponse<TalkMessage>>(
+      `/ocs/v2.php/apps/spreed/api/v1/chat/${encodeURIComponent(token)}`,
+      { message, referenceId },
+    );
+  }
+
+  /**
+   * `POST /ocs/v2.php/apps/files_sharing/api/v1/shares` — share an uploaded
+   * file into a conversation (`shareType=10`), producing a `file` rich-object
+   * chat message (the same flow the Android app uses).
+   */
+  shareFileToTalk(token: string, path: string, referenceId: string, caption?: string) {
+    const body: Record<string, unknown> = {
+      shareType: 10,
+      shareWith: token,
+      path,
+      referenceId,
+    };
+    if (caption) body.talkMetaData = JSON.stringify({ messageType: "comment", caption });
+    return this.post<OcsResponse<unknown>>(`/ocs/v2.php/apps/files_sharing/api/v1/shares`, body);
+  }
+
+  /** WebDAV MKCOL — creates a directory under the user's files root. 405 = exists. */
+  async davMkcol(relPath: string): Promise<void> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      method: "MKCOL",
+      headers: { Authorization: this.authHeader, "User-Agent": this.userAgent },
+    });
+    if (!res.ok && res.status !== 405) {
+      throw new NextcloudError(res.status, `MKCOL ${relPath} -> ${res.status}`);
+    }
+  }
+
+  /** WebDAV PUT — upload raw bytes to a file path under the user's files root. */
+  async davPutFile(relPath: string, data: Uint8Array, contentType: string): Promise<void> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      method: "PUT",
+      headers: {
+        Authorization: this.authHeader,
+        "User-Agent": this.userAgent,
+        "Content-Type": contentType,
+      },
+      body: data,
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `PUT ${relPath} -> ${res.status}`);
+  }
+
+  /** WebDAV GET — raw bytes of a file relative to the user's files root. */
+  async davGetBytes(relPath: string): Promise<Buffer> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      headers: { Authorization: this.authHeader, "User-Agent": this.userAgent },
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `GET ${relPath} -> ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
   }
 
   /**

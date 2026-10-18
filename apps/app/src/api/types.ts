@@ -327,3 +327,225 @@ export interface GitHubNotification {
 export interface GitHubNotifications {
   notifications: GitHubNotification[];
 }
+
+/** One Authentik event entry (D45). */
+export interface AuthentikEvent {
+  action: string;
+  created: string;
+  app: string | null;
+  user: string | null;
+}
+
+/**
+ * Aggregated Authentik health snapshot (D45) — every field independently
+ * nullable; the token's permissions decide what the instance reports.
+ */
+export interface AuthentikStatus {
+  account: { username: string; name: string | null } | null;
+  version: { current: string | null; latest: string | null; outdated: boolean | null } | null;
+  counts: {
+    users: number | null;
+    groups: number | null;
+    applications: number | null;
+    outposts: number | null;
+  };
+  workers: number | null;
+  tasks: { total: number; failed: number; failedNames: string[] } | null;
+  events: { loginFailedTotal: number | null; recent: AuthentikEvent[] } | null;
+  fetchedAt: string;
+}
+
+/** Per-user Nextcloud feature toggles (D46) — all default true. */
+export interface NextcloudFeatures {
+  monitorTalk: boolean;
+  monitorServer: boolean;
+  tables: boolean;
+  wiki: boolean;
+}
+
+export interface NextcloudSettingsResponse {
+  settings: NextcloudFeatures;
+}
+
+/** Per-user disabled-module set (D47) — module ids the user has switched off. */
+export interface ModulePrefs {
+  disabled: string[];
+}
+
+/** An uploaded MP3 (D48). */
+export interface EinMusicTrack {
+  id: number;
+  title: string;
+  bytes: number;
+  createdAt: string;
+}
+
+export interface EinMusicTracks {
+  tracks: EinMusicTrack[];
+}
+
+export interface EinMusicPlaylist {
+  id: number;
+  name: string;
+  createdAt: string;
+  trackCount?: number;
+}
+
+export interface EinMusicPlaylists {
+  playlists: EinMusicPlaylist[];
+}
+
+export interface EinMusicPlaylistDetail {
+  playlist: EinMusicPlaylist;
+  tracks: EinMusicTrack[];
+}
+
+/** A playlist on the connected Navidrome server (D48). */
+export interface NavidromePlaylist {
+  id: string;
+  name: string;
+  songCount: number;
+}
+
+export interface NavidromePlaylists {
+  playlists: NavidromePlaylist[];
+}
+
+export interface NavidromeTrack {
+  id: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  duration: number | null;
+}
+
+export interface NavidromePlaylistDetail {
+  playlist: { id: string; name: string };
+  tracks: NavidromeTrack[];
+}
+
+/** Passman vault as returned by `/api/v2/vaults` (D50 — pass-through). */
+export interface PassmanVault {
+  vault_id: number;
+  guid: string;
+  name: string;
+  created?: number;
+  last_access?: number;
+  /** SJCL-encrypted challenge; decrypting it with the vault password verifies the key. */
+  challenge_password?: string;
+}
+
+export interface PassmanVaults {
+  vaults: PassmanVault[];
+}
+
+/**
+ * A Passman credential as returned by `/api/v2/vaults/:guid` — secret fields
+ * (`password`, `url`, `description`, `custom_fields`, `files`, `otp`) are still
+ * SJCL-encrypted base64; only the app decrypts them (D50).
+ */
+export interface PassmanCredential {
+  credential_id: number;
+  label?: string;
+  username?: string;
+  email?: string;
+  description?: string | null;
+  password?: string | null;
+  url?: string | null;
+  custom_fields?: string | null;
+  files?: string | null;
+  otp?: string | null;
+  favicon?: string | null;
+  /**
+   * Shape varies with PHP serialization: `{text}[]`, a single `{text}` object,
+   * an assoc-array object `{"0":{text}}`, or a JSON string — normalize via `passmanTags`.
+   */
+  tags?: unknown;
+  hidden?: boolean;
+  created?: number;
+  changed?: number;
+}
+
+export interface PassmanVaultDetail {
+  vault: {
+    guid?: string;
+    name?: string;
+    credentials?: PassmanCredential[];
+  };
+}
+
+/** A Talk conversation (D51). */
+export interface TalkRoom {
+  token: string;
+  name: string;
+  displayName: string;
+  type: number;
+  unread: number;
+  lastActivity: number;
+  lastMessage: string | null;
+}
+
+export interface TalkRooms {
+  rooms: TalkRoom[];
+}
+
+/** A spreed chat message; `messageParameters` carries rich objects (files). */
+export interface TalkMessage {
+  id: number;
+  token?: string;
+  actorType?: string;
+  actorId?: string;
+  actorDisplayName?: string;
+  timestamp?: number;
+  systemMessage?: string;
+  messageType?: string;
+  message?: string;
+  messageParameters?: Record<string, TalkFileParam | Record<string, unknown>>;
+}
+
+/** A `file` rich-object parameter on a chat message. */
+export interface TalkFileParam {
+  type?: string;
+  id?: string;
+  name?: string;
+  path?: string;
+  mimetype?: string;
+  link?: string;
+  size?: number | string;
+}
+
+export interface TalkMessages {
+  messages: TalkMessage[];
+}
+
+/** A joined Matrix room (D52). */
+export interface MatrixRoom {
+  id: string;
+  name: string | null;
+}
+
+export interface MatrixRooms {
+  rooms: MatrixRoom[];
+}
+
+/** A mapped `/messages` chunk entry — newest first from the BFF (dir=b). */
+export interface MatrixMessage {
+  id?: string;
+  sender: string;
+  senderName: string;
+  ts: number;
+  type: string;
+  msgtype: string | null;
+  body: string;
+  url: string | null;
+  info: { mimetype?: string; size?: number } | null;
+}
+
+export interface MatrixMessages {
+  end: string | null;
+  messages: MatrixMessage[];
+}
+
+export interface MatrixSelf {
+  userId: string | null;
+}

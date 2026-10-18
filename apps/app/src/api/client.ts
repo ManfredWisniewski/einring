@@ -29,6 +29,29 @@ export function createApi(getToken: TokenProvider) {
   }
   return {
     get: <T>(path: string, signal?: AbortSignal) => request<T>(path, {}, signal),
+    /** Binary GET — authenticated blob fetch (einmusic playback, D48). */
+    blob: async (path: string) => {
+      const token = await getToken();
+      const headers = new Headers();
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      const res = await fetch(`${config.apiUrl}/api${path}`, { headers });
+      if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
+      return res.blob();
+    },
+    /** Raw-body upload — the file bytes are the request body (einmusic, D48). */
+    upload: async <T>(path: string, file: Blob) => {
+      const token = await getToken();
+      const headers = new Headers({ "Content-Type": "application/octet-stream" });
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      const res = await fetch(`${config.apiUrl}/api${path}`, {
+        method: "POST",
+        headers,
+        body: file,
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new ApiError(res.status, body);
+      return body as T;
+    },
     post: <T>(path: string, body?: unknown) =>
       request<T>(path, {
         method: "POST",

@@ -12,7 +12,7 @@ const YamtrackPage = lazy(() =>
 export const yamtrackModule: AppModule = {
   id: "yamtrack",
   hasBackend: true,
-  nav: { i18nKey: "modules.yamtrack.nav" },
+  nav: { i18nKey: "modules.yamtrack.nav", group: "integrations" },
   routes: [{ path: "/yamtrack", Component: YamtrackPage }],
   i18n: { de, en, fr, ru },
 };
