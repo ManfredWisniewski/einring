@@ -59,20 +59,22 @@ function ModulesDialog({ close }: { close: () => void }) {
     <div className="stack">
       <DialogHeader title={t("modulesDialog.title")} close={close} />
       <p className="muted">{t("modulesDialog.hint")}</p>
-      {prefs.isPending && <p className="muted">{t("common.loading")}</p>}
-      {modules.map((m) => (
-        <div key={m.id} className="row">
-          <Checkbox
-            id={`app-module-${m.id}`}
-            checked={!disabled.has(m.id)}
-            onCheckedChange={toggle(m.id)}
-            disabled={save.isPending}
-          />
-          <Label htmlFor={`app-module-${m.id}`}>
-            {t(`modules.${m.id}.nav`, { defaultValue: m.id })}
-          </Label>
-        </div>
-      ))}
+      <div className="app-modal__scroll">
+        {prefs.isPending && <p className="muted">{t("common.loading")}</p>}
+        {modules.map((m) => (
+          <div key={m.id} className="row">
+            <Checkbox
+              id={`app-module-${m.id}`}
+              checked={!disabled.has(m.id)}
+              onCheckedChange={toggle(m.id)}
+              disabled={save.isPending}
+            />
+            <Label htmlFor={`app-module-${m.id}`}>
+              {t(`modules.${m.id}.nav`, { defaultValue: m.id })}
+            </Label>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

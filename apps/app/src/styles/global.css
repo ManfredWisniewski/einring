@@ -316,8 +316,12 @@ a {
   border-radius: var(--radius-md);
   box-shadow: var(--box-shadow-md);
   color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
   left: 50%;
+  max-height: calc(80dvh - var(--space-4));
   max-width: 24rem;
+  overflow: hidden;
   padding: var(--space-4);
   position: fixed;
   top: 20%;
@@ -325,7 +329,20 @@ a {
   width: calc(100% - var(--space-8));
 }
 
-.app-modal .react-aria-Dialog {
+/* Scrollable content region inside the modal — header/hint stay pinned. */
+.app-modal__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.app-modal .react-aria-Dialog,
+.app-modal .stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   outline: none;
 }
 
