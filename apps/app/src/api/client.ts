@@ -38,13 +38,13 @@ export function createApi(getToken: TokenProvider) {
       if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
       return res.blob();
     },
-    /** Raw-body upload — the file bytes are the request body (einmusic, D48). */
-    upload: async <T>(path: string, file: Blob) => {
+    /** Raw-body upload — the file bytes are the request body (einmusic D48, eindav D54). */
+    upload: async <T>(path: string, file: Blob, method: "POST" | "PUT" = "POST") => {
       const token = await getToken();
       const headers = new Headers({ "Content-Type": "application/octet-stream" });
       if (token) headers.set("Authorization", `Bearer ${token}`);
       const res = await fetch(`${config.apiUrl}/api${path}`, {
-        method: "POST",
+        method,
         headers,
         body: file,
       });

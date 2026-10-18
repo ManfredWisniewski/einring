@@ -3,6 +3,7 @@ import { audiobookshelfModule } from "./audiobookshelf.js";
 import { authentikModule } from "./authentik.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
+import { eindavModule } from "./eindav.js";
 import { einhubModule } from "./einhub.js";
 import { einmusicModule } from "./einmusic.js";
 import { emailModule } from "./email.js";
@@ -45,6 +46,7 @@ export const bffModules: BffModule[] = [
   passmanModule,
   talkModule,
   matrixModule,
+  eindavModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

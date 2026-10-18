@@ -549,3 +549,69 @@ export interface MatrixMessages {
 export interface MatrixSelf {
   userId: string | null;
 }
+
+// -- EinDAV (D54) -------------------------------------------------------------
+
+export interface EinDavAddressbook {
+  href: string;
+  name: string;
+}
+
+export interface EinDavContact {
+  href: string;
+  etag: string | null;
+  uid: string | null;
+  fn: string;
+  emails: string[];
+  tels: string[];
+  note: string | null;
+  vcard: string;
+}
+
+export interface EinDavContactInput {
+  book: string;
+  href?: string;
+  uid?: string;
+  fn: string;
+  emails: string[];
+  tels: string[];
+  note?: string;
+}
+
+export interface EinDavCalendar {
+  href: string;
+  name: string;
+  color: string | null;
+}
+
+export interface EinDavEvent {
+  href: string;
+  etag: string | null;
+  uid: string | null;
+  summary: string;
+  description: string | null;
+  location: string | null;
+  start: string;
+  end: string;
+  allDay: boolean;
+  ics: string;
+}
+
+export interface EinDavEventInput {
+  cal: string;
+  href?: string;
+  uid?: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  start: string;
+  end?: string;
+}
+
+export interface EinDavFileEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number | null;
+  mtime: string | null;
+}

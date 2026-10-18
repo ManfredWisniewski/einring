@@ -14,6 +14,13 @@ import type {
   EinChatReply,
   EinChatStatus,
   EinChatTools,
+  EinDavAddressbook,
+  EinDavCalendar,
+  EinDavContact,
+  EinDavContactInput,
+  EinDavEvent,
+  EinDavEventInput,
+  EinDavFileEntry,
   EinHubFeed,
   EinMusicPlaylistDetail,
   EinMusicPlaylists,
@@ -945,3 +952,143 @@ export function useSendMatrixFile() {
       qc.invalidateQueries({ queryKey: ["matrix", "messages", args.roomId] }),
   });
 }
+
+// --- EinDAV (D54) -----------------------------------------------------------
+
+const EINDAV = ["eindav"] as const;
+
+export function useEinDavAddressbooks(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...EINDAV, "addressbooks"],
+    queryFn: () => api.get<{ addressbooks: EinDavAddressbook[] }>("/eindav/addressbooks"),
+    enabled,
+  });
+}
+
+export function useEinDavContacts(book: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...EINDAV, "contacts", book],
+    queryFn: () =>
+      api.get<{ contacts: EinDavContact[] }>(
+        `/eindav/contacts?book=${encodeURIComponent(book ?? "")}`,
+      ),
+    enabled: book !== null,
+  });
+}
+
+export function useSaveEinDavContact() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: EinDavContactInput) => api.put<{ href: string }>("/eindav/contact", c),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...EINDAV, "contacts"] }),
+  });
+}
+
+export function useDeleteEinDavContact() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (href: string) => api.delete(`/eindav/contact?href=${encodeURIComponent(href)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...EINDAV, "contacts"] }),
+  });
+}
+
+export function useEinDavCalendars(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...EINDAV, "calendars"],
+    queryFn: () => api.get<{ calendars: EinDavCalendar[] }>("/eindav/calendars"),
+    enabled,
+  });
+}
+
+export function useEinDavEvents(cal: string | null, from: string, to: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...EINDAV, "events", cal, from, to],
+    queryFn: () =>
+      api.get<{ events: EinDavEvent[] }>(
+        `/eindav/events?cal=${encodeURIComponent(cal ?? "")}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      ),
+    enabled: cal !== null,
+  });
+}
+
+export function useSaveEinDavEvent() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (e: EinDavEventInput) => api.put<{ href: string }>("/eindav/event", e),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...EINDAV, "events"] }),
+  });
+}
+
+export function useDeleteEinDavEvent() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (href: string) => api.delete(`/eindav/event?href=${encodeURIComponent(href)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...EINDAV, "events"] }),
+  });
+}
+
+export function useEinDavFiles(path: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...EINDAV, "files", path],
+    queryFn: () =>
+      api.get<{ entries: EinDavFileEntry[] }>(`/eindav/files?path=${encodeURIComponent(path)}`),
+  });
+}
+
+export function useUploadEinDavFile() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { path: string; file: File }) =>
+      api.upload(`/eindav/file?path=${encodeURIComponent(args.path)}`, args.file, "PUT"),
+    onSuccess: (_res, args) =>
+      qc.invalidateQueries({ queryKey: [...EINDAV, "files", dirOf(args.path)] }),
+  });
+}
+
+export function useDeleteEinDavFile() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (path: string) => api.delete(`/eindav/file?path=${encodeURIComponent(path)}`),
+    onSuccess: (_res, path) =>
+      qc.invalidateQueries({ queryKey: [...EINDAV, "files", dirOf(path)] }),
+  });
+}
+
+export function useMkdirEinDav() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (path: string) => api.post(`/eindav/folder?path=${encodeURIComponent(path)}`),
+    onSuccess: (_res, path) =>
+      qc.invalidateQueries({ queryKey: [...EINDAV, "files", dirOf(path)] }),
+  });
+}
+
+/** Download a file through the authenticated BFF proxy and trigger a save. */
+export function useDownloadEinDavFile() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (path: string) => {
+      const blob = await api.blob(`/eindav/file?path=${encodeURIComponent(path)}`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = path.split("/").at(-1) ?? "file";
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
+const dirOf = (path: string) => path.split("/").slice(0, -1).join("/");

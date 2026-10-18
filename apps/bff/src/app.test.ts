@@ -3657,6 +3657,230 @@ describe("matrix", () => {
   });
 });
 
+describe("eindav", () => {
+  const NC = "https://cloud.test";
+  const ABHOME = "/remote.php/dav/addressbooks/users/frodo/";
+  const ABS = `${ABHOME}personal/`;
+  const CAL = "/remote.php/dav/calendars/users/frodo/personal/";
+
+  const MS = (bodies: string) => `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+${bodies}</d:multistatus>`;
+
+  it("424s on all routes when Nextcloud is not connected", async () => {
+    const { app, auth } = await testApp();
+    for (const url of [
+      "/api/eindav/addressbooks",
+      "/api/eindav/contacts?book=/remote.php/dav/x/",
+      "/api/eindav/calendars",
+      "/api/eindav/events?cal=/remote.php/dav/x/",
+      "/api/eindav/files",
+    ]) {
+      expect((await app.inject({ method: "GET", url, headers: auth })).statusCode).toBe(424);
+    }
+  });
+
+  it("lists addressbooks via PROPFIND on the addressbook home", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl: fakeFetch((url, init) => {
+        if (url === `${NC}${ABHOME}` && init?.method === "PROPFIND") {
+          return new Response(
+            MS(
+              `<d:response><d:href>${ABS}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Contacts</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+            ),
+            { status: 207 },
+          );
+        }
+        return new Response("unexpected " + url, { status: 404 });
+      }),
+    });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/eindav/addressbooks", headers: auth });
+    expect(res.json()).toEqual({ addressbooks: [{ href: ABS, name: "Contacts" }] });
+  });
+
+  it("REPORTs contacts, parses vCards, and PUTs a composed vCard", async () => {
+    const VCARD =
+      "BEGIN:VCARD\\r\\nVERSION:3.0\\r\\nFN:Frodo Baggins\\r\\nEMAIL;TYPE=INTERNET:frodo@shire.me\\r\\nTEL;TYPE=CELL:+123\\r\\nEND:VCARD\\r\\n".replaceAll(
+        "\\r\\n",
+        "\r\n",
+      );
+    const seen: { url: string; method?: string; body: unknown }[] = [];
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl: fakeFetch((url, init) => {
+        seen.push({ url, method: init?.method, body: init?.body });
+        if (url === `${NC}${ABS}` && init?.method === "REPORT") {
+          return new Response(
+            MS(
+              `<d:response><d:href>${ABS}f1.vcf</d:href><d:propstat><d:prop><d:getetag>"e1"</d:getetag><card:address-data>${VCARD.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</card:address-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+            ),
+            { status: 207 },
+          );
+        }
+        if (init?.method === "PUT" && url.endsWith(".vcf"))
+          return new Response("", { status: 201 });
+        return new Response("unexpected " + url, { status: 404 });
+      }),
+    });
+    connect(store, secrets);
+    const list = await app.inject({
+      method: "GET",
+      url: `/api/eindav/contacts?book=${encodeURIComponent(ABS)}`,
+      headers: auth,
+    });
+    expect(list.json().contacts[0]).toMatchObject({
+      fn: "Frodo Baggins",
+      emails: ["frodo@shire.me"],
+      tels: ["+123"],
+      etag: "e1",
+    });
+    const put = await app.inject({
+      method: "PUT",
+      url: "/api/eindav/contact",
+      headers: auth,
+      payload: {
+        book: ABS,
+        fn: "Samwise Gamgee",
+        emails: ["sam@shire.me"],
+        tels: [],
+        note: "gardener",
+      },
+    });
+    expect(put.statusCode).toBe(201);
+    const putCall = seen.find((s) => s.method === "PUT");
+    const body = String(putCall?.body);
+    expect(body).toContain("FN:Samwise Gamgee");
+    expect(body).toContain("EMAIL;TYPE=INTERNET:sam@shire.me");
+    expect(body).toContain("NOTE:gardener");
+    expect(putCall?.url).toMatch(/personal\/einring-[0-9a-f]+\.vcf$/);
+  });
+
+  it("REPORTs VEVENTs in a time-range and PUTs a composed iCalendar", async () => {
+    const ICS =
+      "BEGIN:VCALENDAR\\r\\nBEGIN:VEVENT\\r\\nUID:e-1\\r\\nDTSTART:20261020T100000Z\\r\\nDTEND:20261020T110000Z\\r\\nSUMMARY:Elevenses\\r\\nLOCATION:The Green Dragon\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n".replaceAll(
+        "\\r\\n",
+        "\r\n",
+      );
+    const seen: { url: string; method?: string; body: unknown }[] = [];
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl: fakeFetch((url, init) => {
+        seen.push({ url, method: init?.method, body: init?.body });
+        if (url === `${NC}${CAL}` && init?.method === "REPORT") {
+          const body = String(init.body);
+          expect(body).toContain('time-range start="20261001T000000Z" end="20261031T235900Z"');
+          return new Response(
+            MS(
+              `<d:response><d:href>${CAL}e1.ics</d:href><d:propstat><d:prop><d:getetag>"x"</d:getetag><cal:calendar-data>${ICS.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`,
+            ),
+            { status: 207 },
+          );
+        }
+        if (init?.method === "PUT" && url.endsWith(".ics"))
+          return new Response("", { status: 201 });
+        return new Response("unexpected " + url, { status: 404 });
+      }),
+    });
+    connect(store, secrets);
+    const list = await app.inject({
+      method: "GET",
+      url: `/api/eindav/events?cal=${encodeURIComponent(CAL)}&from=2026-10-01&to=2026-10-31`,
+      headers: auth,
+    });
+    expect(list.json().events[0]).toMatchObject({
+      uid: "e-1",
+      summary: "Elevenses",
+      location: "The Green Dragon",
+      start: "2026-10-20T10:00",
+      end: "2026-10-20T11:00",
+    });
+    const put = await app.inject({
+      method: "PUT",
+      url: "/api/eindav/event",
+      headers: auth,
+      payload: {
+        cal: CAL,
+        summary: "Second breakfast",
+        start: "2026-10-21T09:00",
+        end: "2026-10-21T09:30",
+      },
+    });
+    expect(put.statusCode).toBe(201);
+    const body = String(seen.find((s) => s.method === "PUT")?.body);
+    expect(body).toContain("DTSTART:20261021T090000Z");
+    expect(body).toContain("DTEND:20261021T093000Z");
+    expect(body).toContain("SUMMARY:Second breakfast");
+  });
+
+  it("browses, downloads, uploads and deletes WebDAV files", async () => {
+    const FILES = "/remote.php/dav/files/frodo";
+    const seen: { url: string; method?: string }[] = [];
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl: fakeFetch((url, init) => {
+        seen.push({ url, method: init?.method });
+        if (url === `${NC}${FILES}` && init?.method === "PROPFIND") {
+          return new Response(
+            MS(`<d:response><d:href>${FILES}/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+<d:response><d:href>${FILES}/notes.txt</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>5</d:getcontentlength><d:getcontenttype>text/plain</d:getcontenttype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`),
+            { status: 207 },
+          );
+        }
+        if (url === `${NC}${FILES}/notes.txt` && (init?.method ?? "GET") === "GET") {
+          return new Response("hello", { status: 200, headers: { "content-type": "text/plain" } });
+        }
+        if (url === `${NC}${FILES}/up.bin` && init?.method === "PUT") {
+          return new Response("", { status: 201 });
+        }
+        if (url === `${NC}${FILES}/notes.txt` && init?.method === "DELETE") {
+          return new Response("", { status: 200 });
+        }
+        return new Response("unexpected " + url, { status: 404 });
+      }),
+    });
+    connect(store, secrets);
+    const list = await app.inject({ method: "GET", url: "/api/eindav/files?path=", headers: auth });
+    expect(list.json().entries).toEqual([
+      { name: "notes.txt", path: "notes.txt", isDir: false, size: 5, mtime: null },
+    ]);
+    const dl = await app.inject({
+      method: "GET",
+      url: "/api/eindav/file?path=notes.txt",
+      headers: auth,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.headers["content-type"]).toContain("text/plain");
+    const up = await app.inject({
+      method: "PUT",
+      url: "/api/eindav/file?path=up.bin",
+      headers: { ...auth, "content-type": "application/octet-stream" },
+      payload: Buffer.from("bin"),
+    });
+    expect(up.statusCode).toBe(201);
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/eindav/file?path=notes.txt",
+      headers: auth,
+    });
+    expect(del.statusCode, del.body).toBe(204);
+    const trav = await app.inject({
+      method: "GET",
+      url: "/api/eindav/file?path=..%2Fsecret",
+      headers: auth,
+    });
+    expect(trav.statusCode).toBe(400);
+  });
+
+  it("rejects object hrefs outside /remote.php/dav/", async () => {
+    const { app, auth, store, secrets } = await testApp();
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/api/eindav/contact?href=" + encodeURIComponent("https://evil.test/x.vcf"),
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 describe("module framework", () => {
   it("GET /api/modules lists enabled modules and their service deps", async () => {
     const { app, auth } = await testApp();
@@ -3685,6 +3909,7 @@ describe("module framework", () => {
         { id: "passman", requires: ["nextcloud"] },
         { id: "talk", requires: ["nextcloud"] },
         { id: "matrix", requires: [] },
+        { id: "eindav", requires: ["nextcloud"] },
       ],
     });
   });

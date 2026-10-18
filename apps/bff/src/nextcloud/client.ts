@@ -190,6 +190,8 @@ export interface DavEntry {
   isCollection: boolean;
   etag?: string;
   lastModified?: string;
+  size?: number;
+  contentType?: string;
 }
 
 export class NextcloudError extends Error {
@@ -550,7 +552,7 @@ export class AuthenticatedNextcloud {
       },
       body: `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:">
-  <d:prop><d:resourcetype/><d:getetag/><d:getlastmodified/></d:prop>
+  <d:prop><d:resourcetype/><d:getetag/><d:getlastmodified/><d:getcontentlength/><d:getcontenttype/></d:prop>
 </d:propfind>`,
     });
     if (!res.ok) throw new NextcloudError(res.status, `PROPFIND ${relPath} -> ${res.status}`);
@@ -565,6 +567,85 @@ export class AuthenticatedNextcloud {
     });
     if (!res.ok) throw new NextcloudError(res.status, `GET ${relPath} -> ${res.status}`);
     return res.text();
+  }
+
+  /** WebDAV DELETE — removes a file or collection under the user's files root. */
+  async davDelete(relPath: string): Promise<void> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      method: "DELETE",
+      headers: { Authorization: this.authHeader, "User-Agent": this.userAgent },
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `DELETE ${relPath} -> ${res.status}`);
+  }
+
+  /** WebDAV GET returning the raw response — for proxied downloads (content-type passthrough). */
+  async davGetResponse(relPath: string): Promise<Response> {
+    const res = await this.fetchImpl(`${this.davBase}${davPath(relPath)}`, {
+      headers: { Authorization: this.authHeader, "User-Agent": this.userAgent },
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `GET ${relPath} -> ${res.status}`);
+    return res;
+  }
+
+  // -- EinDAV: generic CardDAV/CalDAV plumbing (D54) -------------------------
+
+  /** DAV home roots that are not the files root (`/remote.php/dav/<kind>/users/<login>`). */
+  davHome(kind: "addressbooks" | "calendars"): string {
+    return `/remote.php/dav/${kind}/users/${encodeURIComponent(this.loginName)}`;
+  }
+
+  /** PROPFIND on an absolute DAV path, returning the raw multistatus XML. */
+  async davPropfindAbs(href: string, depth: 0 | 1, propsXml: string): Promise<string> {
+    const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
+      method: "PROPFIND",
+      headers: {
+        Authorization: this.authHeader,
+        "User-Agent": this.userAgent,
+        Depth: String(depth),
+        "Content-Type": "application/xml",
+      },
+      body: `<?xml version="1.0"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>${propsXml}</d:prop>
+</d:propfind>`,
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `PROPFIND ${href} -> ${res.status}`);
+    return res.text();
+  }
+
+  /** REPORT on an absolute DAV path (addressbook-query, calendar-query, multiget). */
+  async davReport(href: string, bodyXml: string): Promise<string> {
+    const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
+      method: "REPORT",
+      headers: {
+        Authorization: this.authHeader,
+        "User-Agent": this.userAgent,
+        Depth: "1",
+        "Content-Type": "application/xml",
+      },
+      body: bodyXml,
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `REPORT ${href} -> ${res.status}`);
+    return res.text();
+  }
+
+  /** PUT/DELETE on an absolute DAV object href (contact `.vcf`, event `.ics`). */
+  async davObjectRequest(
+    method: "PUT" | "DELETE",
+    href: string,
+    body?: string,
+    contentType?: string,
+  ): Promise<void> {
+    const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
+      method,
+      headers: {
+        Authorization: this.authHeader,
+        "User-Agent": this.userAgent,
+        ...(contentType ? { "Content-Type": contentType } : {}),
+      },
+      body,
+    });
+    if (!res.ok) throw new NextcloudError(res.status, `${method} ${href} -> ${res.status}`);
   }
 }
 
@@ -589,7 +670,7 @@ export function parseMultistatus(xml: string, filesPrefix: string): DavEntry[] {
     const relPath = href.startsWith(filesPrefix)
       ? href.slice(filesPrefix.length).replace(/\/$/, "")
       : href;
-    const { resourcetype, getetag, getlastmodified } = ok.prop;
+    const { resourcetype, getetag, getlastmodified, getcontentlength, getcontenttype } = ok.prop;
     entries.push({
       href: r.href,
       relPath,
@@ -597,6 +678,8 @@ export function parseMultistatus(xml: string, filesPrefix: string): DavEntry[] {
         typeof resourcetype === "object" && resourcetype !== null && "collection" in resourcetype,
       etag: getetag != null ? String(getetag).replaceAll('"', "") : undefined,
       lastModified: getlastmodified != null ? String(getlastmodified) : undefined,
+      size: getcontentlength != null ? Number(getcontentlength) || undefined : undefined,
+      contentType: getcontenttype != null ? String(getcontenttype) : undefined,
     });
   }
   return entries;
@@ -612,7 +695,51 @@ interface DavPropstat {
     resourcetype?: unknown;
     getetag?: unknown;
     getlastmodified?: unknown;
+    getcontentlength?: unknown;
+    getcontenttype?: unknown;
   };
+}
+
+// -- EinDAV generic propstat parsing (D54) -----------------------------------
+
+/** One `response` element of a multistatus doc, with its 200-propstat props by local name. */
+export interface DavPropResponse {
+  /** Absolute DAV path as returned by the server (URL-encoded). */
+  href: string;
+  /** Property map by local element name; values are the parser's raw output. */
+  props: Record<string, unknown>;
+}
+
+/**
+ * Parses a multistatus document into href + raw props — used for CardDAV/CalDAV
+ * PROPFIND/REPORT results where the prop set varies per call.
+ */
+export function parsePropResponses(xml: string): DavPropResponse[] {
+  const doc = new XMLParser({ removeNSPrefix: true }).parse(xml) as {
+    multistatus?: { response?: DavResponse | DavResponse[] };
+  };
+  const raw = doc.multistatus?.response;
+  const responses = raw == null ? [] : Array.isArray(raw) ? raw : [raw];
+  const out: DavPropResponse[] = [];
+  for (const r of responses) {
+    if (typeof r.href !== "string") continue;
+    const stats: (DavPropstat | undefined)[] = Array.isArray(r.propstat)
+      ? r.propstat
+      : [r.propstat];
+    const ok = stats.find((s) => s && String(s.status).includes(" 200"));
+    out.push({ href: r.href, props: (ok?.prop ?? {}) as Record<string, unknown> });
+  }
+  return out;
+}
+
+/** Text content of a parsed XML prop (`{ "#text": v }` when attrs exist, else scalar). */
+export function propText(v: unknown): string | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "object") {
+    const t = (v as Record<string, unknown>)["#text"];
+    return t == null ? undefined : String(t);
+  }
+  return String(v);
 }
 interface PrincipalResponse {
   href?: unknown;

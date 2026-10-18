@@ -3,6 +3,7 @@ import { audiobookshelfModule } from "./audiobookshelf";
 import { authentikModule } from "./authentik";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
+import { eindavModule } from "./eindav";
 import { einhubModule } from "./einhub";
 import { einmusicModule } from "./einmusic";
 import { emailModule } from "./email";
@@ -47,6 +48,7 @@ export const appModules: AppModule[] = [
   passmanModule,
   talkModule,
   matrixModule,
+  eindavModule,
 ];
 
 /**
