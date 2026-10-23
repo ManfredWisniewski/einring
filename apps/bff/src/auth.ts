@@ -7,6 +7,8 @@ export interface AuthUser {
   name?: string;
   email?: string;
   preferredUsername?: string;
+  /** Authentik group memberships (D56) — only present on JWTs, never on embedded sessions. */
+  groups?: string[];
 }
 
 export type TokenVerifier = (token: string) => Promise<AuthUser>;
@@ -39,6 +41,9 @@ export async function createAuthentikVerifier(
       name: str(payload.name),
       email: str(payload.email),
       preferredUsername: str(payload.preferred_username),
+      groups: Array.isArray(payload.groups)
+        ? payload.groups.filter((g): g is string => typeof g === "string")
+        : undefined,
     };
   };
 }

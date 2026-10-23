@@ -636,3 +636,254 @@ export interface Recipe extends RecipeListItem {
   cookTime: string | null;
   instructions: string[];
 }
+
+// -- School (D56) -------------------------------------------------------------
+
+export type SchoolRole = "admin" | "teacher" | "parent" | "student";
+export type SchoolPersonKind = "student" | "guardian" | "teacher" | "staff";
+
+export interface SchoolPerson {
+  id: string;
+  sub: string | null;
+  kind: SchoolPersonKind;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  birthdate: string | null;
+  matrixId: string | null;
+  active: number;
+  notes: string | null;
+  billingMode: "flat" | "per_lesson" | "per_scheduled" | "none";
+  flatCents: number | null;
+  lessonCents: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchoolMe {
+  roles: SchoolRole[];
+  person: SchoolPerson | null;
+  peers: string[];
+}
+
+export interface SchoolUser {
+  sub: string;
+  name: string | null;
+  email: string | null;
+  lastSeen: string;
+  personId: string | null;
+}
+
+export interface SchoolHousehold {
+  id: string;
+  name: string;
+  address: string | null;
+  iban: string | null;
+  discount_pct: number;
+  discountPct?: number;
+  notes: string | null;
+  members?: { personId: string; relation: "guardian" | "student"; name?: string }[];
+}
+
+export interface SchoolLessonType {
+  id: string;
+  name: string;
+  durationMin: number;
+  defaultRateCents: number;
+  active: number;
+}
+
+export interface SchoolSeries {
+  id: string;
+  teacherId: string;
+  teacherName?: string;
+  lessonTypeId: string | null;
+  typeName?: string | null;
+  weekday: number;
+  startTime: string;
+  durationMin: number;
+  validFrom: string;
+  validUntil: string | null;
+  location: string | null;
+  title: string | null;
+  notes: string | null;
+  students?: { id: string; name: string }[];
+}
+
+export type SchoolAttendance = "attended" | "absent_excused" | "absent_unexcused" | "cancelled";
+
+export interface SchoolLessonStudent {
+  studentId: string;
+  studentName?: string;
+  attendance: SchoolAttendance | null;
+  privateNote?: string | null;
+  publicNote?: string | null;
+  practice?: string | null;
+}
+
+export interface SchoolLesson {
+  id: string;
+  seriesId: string | null;
+  teacherId: string;
+  teacherName?: string;
+  substituteTeacherId: string | null;
+  substituteName?: string | null;
+  lessonTypeId: string | null;
+  typeName?: string | null;
+  date: string;
+  startTime: string;
+  durationMin: number;
+  location: string | null;
+  status: "scheduled" | "cancelled_school" | "cancelled_teacher" | "cancelled_parent" | "done";
+  cancelReason: string | null;
+  isMakeup: number;
+  notes: string | null;
+  students: SchoolLessonStudent[];
+}
+
+export interface SchoolConflict {
+  kind:
+    | "teacher_double_booking"
+    | "student_double_booking"
+    | "teacher_absent"
+    | "holiday"
+    | "outside_availability";
+  detail: string;
+}
+
+export interface SchoolHoliday {
+  id: string;
+  name: string;
+  startDate?: string;
+  endDate?: string;
+  start_date?: string;
+  end_date?: string;
+  kind: "holiday" | "closure";
+}
+
+export interface SchoolInstrument {
+  id: string;
+  name: string;
+  category: string | null;
+  serialNo?: string | null;
+  serial_no?: string | null;
+  monthlyRateCents?: number;
+  monthly_rate_cents?: number;
+  status: string;
+  condition?: string | null;
+  notes: string | null;
+}
+
+export interface SchoolRental {
+  id: string;
+  instrumentId?: string;
+  instrument_id?: string;
+  studentId?: string;
+  student_id?: string;
+  instrumentName?: string;
+  studentName?: string;
+  startDate?: string;
+  start_date?: string;
+  endDate?: string | null;
+  end_date?: string | null;
+  monthlyRateCents?: number;
+  monthly_rate_cents?: number;
+  status: string;
+}
+
+export interface SchoolInvoice {
+  id: string;
+  householdId: string;
+  householdName?: string;
+  period: string;
+  number: string;
+  status: "draft" | "issued" | "paid" | "cancelled";
+  totalCents: number;
+  issuedAt: string | null;
+  dueDate: string | null;
+}
+
+export interface SchoolInvoiceLine {
+  id: string;
+  kind: string;
+  description: string;
+  amountCents: number;
+}
+
+export interface SchoolPayment {
+  id: string;
+  paidAt: string;
+  amountCents: number;
+  method: string | null;
+  note: string | null;
+}
+
+export interface SchoolInvoiceDetail extends SchoolInvoice {
+  lines: SchoolInvoiceLine[];
+  payments: SchoolPayment[];
+  paidCents?: number;
+  notes?: string | null;
+}
+
+export interface SchoolThread {
+  id: string;
+  kind: "direct" | "announcement";
+  title: string | null;
+  audience: string | null;
+  createdAt: string;
+  lastBody: string | null;
+  lastAt: string | null;
+  memberCount: number;
+  unread: boolean;
+}
+
+export interface SchoolMessage {
+  id: string;
+  senderSub: string;
+  senderName?: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface SchoolContact {
+  sub: string;
+  name: string | null;
+}
+
+export interface SchoolEvent {
+  id: string;
+  kind: "concert" | "recital" | "exam" | "other";
+  title: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  location: string | null;
+  description: string | null;
+  teacherId: string | null;
+  teacherName: string | null;
+  participants: {
+    studentId: string;
+    studentName: string;
+    piece: string | null;
+    status: "invited" | "confirmed" | "declined";
+    note: string | null;
+  }[];
+  rehearsals: {
+    id: string;
+    date: string;
+    startTime: string;
+    durationMin: number;
+    location: string | null;
+    note: string | null;
+  }[];
+}
+
+export interface SchoolMakeupRequest {
+  id: string;
+  lessonId: string;
+  studentId: string;
+  studentName?: string;
+  reason: string | null;
+  status: "open" | "scheduled" | "declined";
+  createdAt?: string;
+}

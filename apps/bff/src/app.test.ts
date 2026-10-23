@@ -1543,6 +1543,7 @@ describe("einchat", () => {
         "matrix_rooms",
         "eindav_contacts",
         "recipes_search",
+        "school_today",
       ],
     });
   });
@@ -1660,7 +1661,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(22);
+    expect(all.json().tools.length).toBe(23);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -4103,6 +4104,7 @@ describe("module framework", () => {
         { id: "matrix", requires: [] },
         { id: "eindav", requires: ["nextcloud"] },
         { id: "recipes", requires: ["nextcloud"] },
+        { id: "school", requires: [] },
       ],
     });
   });

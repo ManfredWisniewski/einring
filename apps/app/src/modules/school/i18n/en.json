@@ -1,0 +1,155 @@
+{
+  "nav": "School",
+  "noAccess": "No school access — your account has no school role.",
+  "lesson": "Lesson",
+  "makeup": "make-up lesson",
+  "tabs": {
+    "today": "Today",
+    "calendar": "Calendar",
+    "billing": "Billing",
+    "messages": "Messages",
+    "events": "Events",
+    "people": "People"
+  },
+  "today": {
+    "title": "Today's lessons",
+    "empty": "No lessons today.",
+    "reportAbsence": "Report {{name}} absent",
+    "practice": "Practice"
+  },
+  "status": {
+    "scheduled": "scheduled",
+    "cancelled_school": "cancelled (school)",
+    "cancelled_teacher": "cancelled (teacher)",
+    "cancelled_parent": "cancelled (parents)",
+    "done": "done"
+  },
+  "attendance": {
+    "attended": "attended",
+    "absent_excused": "excused",
+    "absent_unexcused": "unexcused",
+    "cancelled": "cancelled"
+  },
+  "weekday": {
+    "0": "Sunday",
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday"
+  },
+  "calendar": {
+    "thisWeek": "This week",
+    "newLesson": "Single lesson",
+    "newSeries": "New series",
+    "newHoliday": "Holiday/closure",
+    "holidays": "Holidays & closures",
+    "series": "Weekly series",
+    "noSeries": "No series.",
+    "endSeries": "end",
+    "openEnded": "open-ended"
+  },
+  "form": {
+    "date": "Date",
+    "time": "Time",
+    "duration": "Minutes",
+    "type": "Lesson type",
+    "students": "Students",
+    "pickStudents": "Pick student…",
+    "teacher": "Teacher",
+    "weekday": "Weekday",
+    "validFrom": "Valid from",
+    "validUntil": "Valid until",
+    "name": "Name",
+    "email": "Email",
+    "location": "Location",
+    "save": "Save",
+    "saveForced": "Save despite conflict"
+  },
+  "kind": {
+    "student": "Student",
+    "guardian": "Guardian",
+    "teacher": "Teacher",
+    "staff": "Staff"
+  },
+  "relation": {
+    "guardian": "Guardian",
+    "student": "Student"
+  },
+  "people": {
+    "filterKind": "Kind",
+    "all": "All",
+    "newPerson": "New person",
+    "newHousehold": "New household",
+    "households": "Households",
+    "householdName": "Household name",
+    "discount": "{{pct}} % discount",
+    "discountPct": "Discount %",
+    "editMembers": "Members",
+    "linked": "linked",
+    "link": "Link login…"
+  },
+  "billing": {
+    "period": "Period",
+    "generate": "Generate invoices",
+    "generated": "{{created}} created, {{skipped}} skipped",
+    "empty": "No invoices in this period.",
+    "due": "Due",
+    "payment": "Payment",
+    "pdf": "PDF",
+    "issue": "Issue",
+    "recordPayment": "Record payment",
+    "mode": "Billing",
+    "cents": "Amount (cents)",
+    "none": "none",
+    "flat": "flat fee",
+    "per_lesson": "per lesson",
+    "per_scheduled": "per scheduled"
+  },
+  "invoiceStatus": {
+    "draft": "draft",
+    "issued": "issued",
+    "paid": "paid",
+    "cancelled": "cancelled"
+  },
+  "instruments": {
+    "title": "Rental instruments",
+    "status": {
+      "available": "available",
+      "rented": "rented",
+      "repair": "in repair",
+      "retired": "retired"
+    }
+  },
+  "rentals": {
+    "title": "Rentals"
+  },
+  "messages": {
+    "title": "Messages",
+    "direct": "Direct message",
+    "empty": "No conversations.",
+    "back": "← Back",
+    "placeholder": "Write a message…",
+    "send": "Send"
+  },
+  "events": {
+    "title": "Events",
+    "new": "New event",
+    "empty": "No events.",
+    "confirm": "Confirm",
+    "decline": "Decline",
+    "rehearsals": "Rehearsals",
+    "kind": {
+      "concert": "Concert",
+      "recital": "Recital",
+      "exam": "Exam",
+      "other": "Other"
+    },
+    "status": {
+      "invited": "invited",
+      "confirmed": "confirmed",
+      "declined": "declined"
+    }
+  }
+}

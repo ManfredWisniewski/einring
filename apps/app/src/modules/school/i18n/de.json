@@ -1,0 +1,155 @@
+{
+  "nav": "Schule",
+  "noAccess": "Kein Schulzugang — dein Konto hat keine Schulrolle.",
+  "lesson": "Unterricht",
+  "makeup": "Nachholstunde",
+  "tabs": {
+    "today": "Heute",
+    "calendar": "Kalender",
+    "billing": "Abrechnung",
+    "messages": "Nachrichten",
+    "events": "Termine",
+    "people": "Personen"
+  },
+  "today": {
+    "title": "Heutige Stunden",
+    "empty": "Heute kein Unterricht.",
+    "reportAbsence": "{{name}} abmelden",
+    "practice": "Übung"
+  },
+  "status": {
+    "scheduled": "geplant",
+    "cancelled_school": "abgesagt (Schule)",
+    "cancelled_teacher": "abgesagt (Lehrkraft)",
+    "cancelled_parent": "abgesagt (Eltern)",
+    "done": "durchgeführt"
+  },
+  "attendance": {
+    "attended": "anwesend",
+    "absent_excused": "entschuldigt",
+    "absent_unexcused": "unentschuldigt",
+    "cancelled": "abgesagt"
+  },
+  "weekday": {
+    "0": "Sonntag",
+    "1": "Montag",
+    "2": "Dienstag",
+    "3": "Mittwoch",
+    "4": "Donnerstag",
+    "5": "Freitag",
+    "6": "Samstag"
+  },
+  "calendar": {
+    "thisWeek": "Diese Woche",
+    "newLesson": "Einzelstunde",
+    "newSeries": "Serie anlegen",
+    "newHoliday": "Ferien/Schließtag",
+    "holidays": "Ferien & Schließtage",
+    "series": "Wochenserien",
+    "noSeries": "Keine Serien.",
+    "endSeries": "beenden",
+    "openEnded": "offen"
+  },
+  "form": {
+    "date": "Datum",
+    "time": "Uhrzeit",
+    "duration": "Minuten",
+    "type": "Unterrichtsart",
+    "students": "Schüler:innen",
+    "pickStudents": "Schüler:in wählen…",
+    "teacher": "Lehrkraft",
+    "weekday": "Wochentag",
+    "validFrom": "Gültig ab",
+    "validUntil": "Gültig bis",
+    "name": "Name",
+    "email": "E-Mail",
+    "location": "Ort",
+    "save": "Speichern",
+    "saveForced": "Trotz Konflikt speichern"
+  },
+  "kind": {
+    "student": "Schüler:in",
+    "guardian": "Elternteil",
+    "teacher": "Lehrkraft",
+    "staff": "Team"
+  },
+  "relation": {
+    "guardian": "Elternteil",
+    "student": "Schüler:in"
+  },
+  "people": {
+    "filterKind": "Art",
+    "all": "Alle",
+    "newPerson": "Person anlegen",
+    "newHousehold": "Haushalt anlegen",
+    "households": "Haushalte",
+    "householdName": "Haushaltsname",
+    "discount": "{{pct}} % Rabatt",
+    "discountPct": "Rabatt %",
+    "editMembers": "Mitglieder",
+    "linked": "verknüpft",
+    "link": "Login verknüpfen…"
+  },
+  "billing": {
+    "period": "Zeitraum",
+    "generate": "Rechnungen erzeugen",
+    "generated": "{{created}} erstellt, {{skipped}} übersprungen",
+    "empty": "Keine Rechnungen im Zeitraum.",
+    "due": "Fällig",
+    "payment": "Zahlung",
+    "pdf": "PDF",
+    "issue": "Ausstellen",
+    "recordPayment": "Zahlung buchen",
+    "mode": "Abrechnung",
+    "cents": "Betrag (Cent)",
+    "none": "keine",
+    "flat": "Pauschale",
+    "per_lesson": "pro Stunde",
+    "per_scheduled": "pro Termin"
+  },
+  "invoiceStatus": {
+    "draft": "Entwurf",
+    "issued": "ausgestellt",
+    "paid": "bezahlt",
+    "cancelled": "storniert"
+  },
+  "instruments": {
+    "title": "Leihinstrumente",
+    "status": {
+      "available": "verfügbar",
+      "rented": "verliehen",
+      "repair": "in Reparatur",
+      "retired": "ausgemustert"
+    }
+  },
+  "rentals": {
+    "title": "Verleihungen"
+  },
+  "messages": {
+    "title": "Nachrichten",
+    "direct": "Direktnachricht",
+    "empty": "Keine Unterhaltungen.",
+    "back": "← Zurück",
+    "placeholder": "Nachricht schreiben…",
+    "send": "Senden"
+  },
+  "events": {
+    "title": "Veranstaltungen",
+    "new": "Veranstaltung anlegen",
+    "empty": "Keine Veranstaltungen.",
+    "confirm": "Zusagen",
+    "decline": "Absagen",
+    "rehearsals": "Proben",
+    "kind": {
+      "concert": "Konzert",
+      "recital": "Vorspiel",
+      "exam": "Prüfung",
+      "other": "Sonstiges"
+    },
+    "status": {
+      "invited": "eingeladen",
+      "confirmed": "zugesagt",
+      "declined": "abgesagt"
+    }
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "nav": "Школа",
+  "noAccess": "Нет доступа к школе — у вашей учётной записи нет школьной роли.",
+  "lesson": "Урок",
+  "makeup": "отработка",
+  "tabs": {
+    "today": "Сегодня",
+    "calendar": "Календарь",
+    "billing": "Оплата",
+    "messages": "Сообщения",
+    "events": "События",
+    "people": "Люди"
+  },
+  "today": {
+    "title": "Уроки сегодня",
+    "empty": "Сегодня уроков нет.",
+    "reportAbsence": "Сообщить об отсутствии: {{name}}",
+    "practice": "Задание"
+  },
+  "status": {
+    "scheduled": "запланирован",
+    "cancelled_school": "отменён (школа)",
+    "cancelled_teacher": "отменён (учитель)",
+    "cancelled_parent": "отменён (родители)",
+    "done": "проведён"
+  },
+  "attendance": {
+    "attended": "присутствовал",
+    "absent_excused": "уважительная",
+    "absent_unexcused": "неуважительная",
+    "cancelled": "отменён"
+  },
+  "weekday": {
+    "0": "Воскресенье",
+    "1": "Понедельник",
+    "2": "Вторник",
+    "3": "Среда",
+    "4": "Четверг",
+    "5": "Пятница",
+    "6": "Суббота"
+  },
+  "calendar": {
+    "thisWeek": "Эта неделя",
+    "newLesson": "Разовый урок",
+    "newSeries": "Новая серия",
+    "newHoliday": "Каникулы/закрытие",
+    "holidays": "Каникулы и закрытия",
+    "series": "Еженедельные серии",
+    "noSeries": "Серий нет.",
+    "endSeries": "завершить",
+    "openEnded": "бессрочно"
+  },
+  "form": {
+    "date": "Дата",
+    "time": "Время",
+    "duration": "Минут",
+    "type": "Тип урока",
+    "students": "Ученики",
+    "pickStudents": "Выбрать ученика…",
+    "teacher": "Учитель",
+    "weekday": "День недели",
+    "validFrom": "Действует с",
+    "validUntil": "Действует до",
+    "name": "Имя",
+    "email": "E-mail",
+    "location": "Место",
+    "save": "Сохранить",
+    "saveForced": "Сохранить несмотря на конфликт"
+  },
+  "kind": {
+    "student": "Ученик",
+    "guardian": "Родитель",
+    "teacher": "Учитель",
+    "staff": "Персонал"
+  },
+  "relation": {
+    "guardian": "Родитель",
+    "student": "Ученик"
+  },
+  "people": {
+    "filterKind": "Тип",
+    "all": "Все",
+    "newPerson": "Новая персона",
+    "newHousehold": "Новая семья",
+    "households": "Семьи",
+    "householdName": "Название семьи",
+    "discount": "скидка {{pct}} %",
+    "discountPct": "Скидка %",
+    "editMembers": "Участники",
+    "linked": "связан",
+    "link": "Связать аккаунт…"
+  },
+  "billing": {
+    "period": "Период",
+    "generate": "Сформировать счета",
+    "generated": "создано: {{created}}, пропущено: {{skipped}}",
+    "empty": "Нет счетов за этот период.",
+    "due": "Срок оплаты",
+    "payment": "Платёж",
+    "pdf": "PDF",
+    "issue": "Выставить",
+    "recordPayment": "Записать платёж",
+    "mode": "Тарификация",
+    "cents": "Сумма (центы)",
+    "none": "нет",
+    "flat": "фиксированная",
+    "per_lesson": "за урок",
+    "per_scheduled": "за занятие"
+  },
+  "invoiceStatus": {
+    "draft": "черновик",
+    "issued": "выставлен",
+    "paid": "оплачен",
+    "cancelled": "аннулирован"
+  },
+  "instruments": {
+    "title": "Инструменты в аренду",
+    "status": {
+      "available": "доступен",
+      "rented": "арендован",
+      "repair": "в ремонте",
+      "retired": "списан"
+    }
+  },
+  "rentals": {
+    "title": "Аренда"
+  },
+  "messages": {
+    "title": "Сообщения",
+    "direct": "Личное сообщение",
+    "empty": "Нет переписок.",
+    "back": "← Назад",
+    "placeholder": "Написать сообщение…",
+    "send": "Отправить"
+  },
+  "events": {
+    "title": "События",
+    "new": "Новое событие",
+    "empty": "Нет событий.",
+    "confirm": "Подтвердить",
+    "decline": "Отклонить",
+    "rehearsals": "Репетиции",
+    "kind": {
+      "concert": "Концерт",
+      "recital": "Отчётный концерт",
+      "exam": "Экзамен",
+      "other": "Другое"
+    },
+    "status": {
+      "invited": "приглашён",
+      "confirmed": "подтверждено",
+      "declined": "отклонено"
+    }
+  }
+}

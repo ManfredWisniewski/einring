@@ -49,6 +49,24 @@ import type {
   PassmanVaults,
   Recipe,
   RecipeListItem,
+  SchoolAttendance,
+  SchoolConflict,
+  SchoolEvent,
+  SchoolHoliday,
+  SchoolHousehold,
+  SchoolInstrument,
+  SchoolInvoice,
+  SchoolInvoiceDetail,
+  SchoolLesson,
+  SchoolLessonType,
+  SchoolMakeupRequest,
+  SchoolMe,
+  SchoolMessage,
+  SchoolPerson,
+  SchoolRental,
+  SchoolSeries,
+  SchoolThread,
+  SchoolUser,
   ServerHealthResponse,
   TableNode,
   TableNodeType,
@@ -1123,5 +1141,491 @@ export function useRecipeImage(id: string | null, hasImage: boolean) {
     queryFn: () => api.blob(`/recipes/${encodeURIComponent(id ?? "")}/image`),
     enabled: id !== null && hasImage,
     staleTime: 5 * 60_000,
+  });
+}
+
+// --- School (D56) -----------------------------------------------------------
+
+const SCHOOL = ["school"] as const;
+
+/** Roles + linked profile — gates every school view. */
+export function useSchoolMe(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "me"],
+    queryFn: () => api.get<SchoolMe>("/school/me"),
+    enabled,
+  });
+}
+
+export function useSchoolUsers(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "users"],
+    queryFn: () => api.get<{ users: SchoolUser[] }>("/school/users"),
+    enabled,
+  });
+}
+
+export function useSchoolPersons(kind: SchoolPerson["kind"] | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "persons", kind],
+    queryFn: () =>
+      api.get<{ persons: SchoolPerson[] }>(`/school/persons${kind ? `?kind=${kind}` : ""}`),
+    enabled,
+  });
+}
+
+export function useSchoolSavePerson() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/persons/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/persons", input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "persons"] }),
+  });
+}
+
+export function useSchoolDeletePerson() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/school/persons/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "persons"] }),
+  });
+}
+
+export function useSchoolLinkPerson() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; sub: string }) =>
+      api.post(`/school/persons/${input.id}/link`, { sub: input.sub }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL] }),
+  });
+}
+
+export function useSchoolHouseholds(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "households"],
+    queryFn: () => api.get<{ households: SchoolHousehold[] }>("/school/households"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveHousehold() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/households/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/households", input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "households"] }),
+  });
+}
+
+export function useSchoolSetMembers() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      members: { personId: string; relation: "guardian" | "student" }[];
+    }) => api.put(`/school/households/${input.id}/members`, { members: input.members }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "households"] }),
+  });
+}
+
+export function useSchoolLessonTypes(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "lesson-types"],
+    queryFn: () => api.get<{ lessonTypes: SchoolLessonType[] }>("/school/lesson-types"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveLessonType() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<{ id: string }>("/school/lesson-types", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "lesson-types"] }),
+  });
+}
+
+export function useSchoolSeries(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "series"],
+    queryFn: () => api.get<{ series: SchoolSeries[] }>("/school/series"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveSeries() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/series/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/series", input.body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "series"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] });
+    },
+  });
+}
+
+export function useSchoolDeleteSeries() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/school/series/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "series"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] });
+    },
+  });
+}
+
+/** Lessons in a date range — the BFF materializes the range lazily. */
+export function useSchoolLessons(from: string, to: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "lessons", from, to],
+    queryFn: () => api.get<{ lessons: SchoolLesson[] }>(`/school/lessons?from=${from}&to=${to}`),
+    enabled,
+  });
+}
+
+export function useSchoolCreateLesson() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<{ id: string }>("/school/lessons", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] }),
+  });
+}
+
+export function useSchoolPatchLesson() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: Record<string, unknown> }) =>
+      api.patch(`/school/lessons/${input.id}`, input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] }),
+  });
+}
+
+export function useSchoolCheckConflicts() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<{ conflicts: SchoolConflict[] }>("/school/lessons/check", body),
+  });
+}
+
+export function useSchoolMarkAttendance() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      lessonId: string;
+      studentId: string;
+      attendance: SchoolAttendance;
+      practice?: string;
+      publicNote?: string;
+      privateNote?: string;
+    }) =>
+      api.put(`/school/lessons/${input.lessonId}/attendance`, {
+        studentId: input.studentId,
+        attendance: input.attendance,
+        practice: input.practice,
+        publicNote: input.publicNote,
+        privateNote: input.privateNote,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] }),
+  });
+}
+
+export function useSchoolReportAbsence() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      lessonId: string;
+      studentId: string;
+      reason?: string;
+      wantMakeup?: boolean;
+    }) =>
+      api.post(`/school/lessons/${input.lessonId}/report-absence`, {
+        studentId: input.studentId,
+        reason: input.reason,
+        wantMakeup: input.wantMakeup,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "lessons"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "makeup-requests"] });
+    },
+  });
+}
+
+export function useSchoolMakeupRequests(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "makeup-requests"],
+    queryFn: () => api.get<{ requests: SchoolMakeupRequest[] }>("/school/makeup-requests"),
+    enabled,
+  });
+}
+
+export function useSchoolHolidays(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "holidays"],
+    queryFn: () => api.get<{ holidays: SchoolHoliday[] }>("/school/holidays"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveHoliday() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; startDate: string; endDate: string; kind?: string }) =>
+      api.post<{ id: string }>("/school/holidays", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "holidays"] }),
+  });
+}
+
+export function useSchoolDeleteHoliday() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/school/holidays/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "holidays"] }),
+  });
+}
+
+export function useSchoolInstruments(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "instruments"],
+    queryFn: () => api.get<{ instruments: SchoolInstrument[] }>("/school/instruments"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveInstrument() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<{ id: string }>("/school/instruments", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "instruments"] }),
+  });
+}
+
+export function useSchoolRentals(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "rentals"],
+    queryFn: () => api.get<{ rentals: SchoolRental[] }>("/school/rentals"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveRental() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/rentals/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/rentals", input.body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "rentals"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "instruments"] });
+    },
+  });
+}
+
+export function useSchoolInvoices(period: string | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "invoices", period],
+    queryFn: () =>
+      api.get<{ invoices: SchoolInvoice[] }>(
+        `/school/invoices${period ? `?period=${period}` : ""}`,
+      ),
+    enabled,
+  });
+}
+
+export function useSchoolInvoice(id: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "invoice", id],
+    queryFn: () => api.get<{ invoice: SchoolInvoiceDetail }>(`/school/invoices/${id ?? ""}`),
+    enabled: id !== null,
+  });
+}
+
+export function useSchoolGenerateInvoices() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (period: string) =>
+      api.post<{ created: number; skipped: number }>("/school/invoices/generate", { period }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "invoices"] }),
+  });
+}
+
+export function useSchoolPatchInvoice() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: Record<string, unknown> }) =>
+      api.patch(`/school/invoices/${input.id}`, input.body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "invoices"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "invoice"] });
+    },
+  });
+}
+
+export function useSchoolAddPayment() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; amountCents: number; method?: string }) =>
+      api.post(`/school/invoices/${input.id}/payments`, {
+        amountCents: input.amountCents,
+        method: input.method,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "invoices"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "invoice"] });
+    },
+  });
+}
+
+/** Authenticated invoice-PDF download (D56). */
+export function useSchoolInvoicePdf() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async (input: { id: string; number: string }) => {
+      const blob = await api.blob(`/school/invoices/${input.id}/pdf`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${input.number}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
+export function useSchoolThreads(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "threads"],
+    queryFn: () => api.get<{ threads: SchoolThread[] }>("/school/threads"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSchoolThreadMessages(threadId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "thread", threadId],
+    queryFn: () =>
+      api.get<{ messages: SchoolMessage[] }>(`/school/threads/${threadId ?? ""}/messages`),
+    enabled: threadId !== null,
+    refetchInterval: 5_000,
+  });
+}
+
+export function useSchoolSendMessage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      threadId?: string;
+      body: string;
+      title?: string;
+      memberSubs?: string[];
+      audience?: string;
+    }) =>
+      input.threadId
+        ? api.post(`/school/threads/${input.threadId}/messages`, { body: input.body })
+        : api.post<{ id: string }>("/school/threads", {
+            title: input.title,
+            memberSubs: input.memberSubs,
+            audience: input.audience,
+            body: input.body,
+          }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "threads"] });
+      void qc.invalidateQueries({ queryKey: [...SCHOOL, "thread"] });
+    },
+  });
+}
+
+export function useSchoolEvents(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "events"],
+    queryFn: () => api.get<{ events: SchoolEvent[] }>("/school/events"),
+    enabled,
+  });
+}
+
+export function useSchoolSaveEvent() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/events/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/events", input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "events"] }),
+  });
+}
+
+export function useSchoolEventParticipants() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      eventId: string;
+      participants: { studentId: string; piece?: string }[];
+    }) =>
+      api.put(`/school/events/${input.eventId}/participants`, {
+        participants: input.participants,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "events"] }),
+  });
+}
+
+export function useSchoolConfirmParticipation() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { eventId: string; studentId: string; status: string }) =>
+      api.patch(`/school/events/${input.eventId}/participants/${input.studentId}`, {
+        status: input.status,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "events"] }),
   });
 }

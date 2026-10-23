@@ -17,6 +17,7 @@ import { nextcloudModule } from "./nextcloud";
 import { passmanModule } from "./passman";
 import { pdfModule } from "./pdf";
 import { recipesModule } from "./recipes";
+import { schoolModule } from "./school";
 import { tablesModule } from "./tables";
 import { talkModule } from "./talk";
 import { trekModule } from "./trek";
@@ -51,6 +52,7 @@ export const appModules: AppModule[] = [
   matrixModule,
   eindavModule,
   recipesModule,
+  schoolModule,
 ];
 
 /**

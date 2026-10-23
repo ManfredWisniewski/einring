@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes
+# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -93,6 +93,16 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_MATRIX_URL=          # default Matrix homeserver, e.g. https://matrix.example.com
 # MODULE_RECIPES_FOLDER=      # WebDAV folder of Cookbook recipe dirs (default Recipes)
 # MODULE_EINHUB_REFRESH_SECONDS=60  # min seconds between upstream notification polls per user
+# --- school module (D56) ----------------------------------------------------
+# Authentik group names that map to school roles (see "School module" below):
+# MODULE_SCHOOL_GROUP_ADMIN=einring-school-admin
+# MODULE_SCHOOL_GROUP_TEACHER=einring-school-teacher
+# MODULE_SCHOOL_GROUP_PARENT=einring-school-parent
+# MODULE_SCHOOL_GROUP_STUDENT=einring-school-student
+# MODULE_SCHOOL_DB=           # school SQLite path (default /data/school.sqlite)
+# MODULE_SCHOOL_MATRIX_URL=   # optional Matrix homeserver for message delivery
+# MODULE_SCHOOL_MATRIX_TOKEN= # bot/appservice access token for that homeserver
+# MODULE_SCHOOL_SEED=1        # enables POST /api/school/seed (demo data, empty DB only)
 LOG_LEVEL=info
 ```
 
@@ -111,7 +121,7 @@ docker run -d --name einring \
   ghcr.io/manfredwisniewski/einring:sha-<commit>
 ```
 
-The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite database (Nextcloud credentials, wiki mirror, csv-manager files) and the `einmusic/` upload directory — it is the only state.
+The container runs as the `node` user and exposes a health check on `/healthz`. `/data` holds the SQLite databases (`einring.sqlite` for Nextcloud credentials/wiki mirror/csv-manager, `school.sqlite` for the school module when enabled) and the `einmusic/` upload directory — it is the only state.
 
 ### docker-compose equivalent
 
@@ -228,6 +238,16 @@ Connectors share one pattern (D41): each user links their own account in the app
 | `trek` | API key `trek_…` (Settings → Integrations → API Keys) | `trek_list_trips`, `trek_trip_details`, `trek_bucket_list` |
 | `email` | IMAP username + password + server (`imaps://host:993` or bare host; the `url` field accepts non-HTTP addresses via the connector's `parseUrl` override) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
 | `gotify` | username + password — a client token is minted upstream (`POST /client`) and stored instead of the password; disconnect deletes the client | `gotify_recent_messages`, `gotify_applications` — plus `/gotify`: live message stream (WS→SSE proxy), priority/app view, delete one/all, application management |
+
+## School module (music-school management)
+
+The `school` module (D56) manages a small music school: people/households, recurring lessons with holiday handling, attendance, monthly invoicing with PDF export, instrument rentals, in-app messaging, and events. It stores everything in a **separate** SQLite file (`/data/school.sqlite` by default — inside the same backup volume; override with `MODULE_SCHOOL_DB`).
+
+**Roles come from Authentik groups**, not from an internal user table. Create four groups in Authentik (names configurable via `MODULE_SCHOOL_GROUP_*`, defaults `einring-school-admin/-teacher/-parent/-student`) and add users to them. The OIDC provider must emit the `groups` claim (Authentik includes it by default via the profile scope). Users without any school group see no school data; every route enforces scope server-side.
+
+Persons (students, guardians, teachers) are **profiles**, not logins: an admin creates them under `/school` → People and links a profile to a login with "Link login…" (pickable from `school_users`, which records every authenticated caller). Until linked, a parent/student login has a role but sees no students.
+
+**Messaging delivery:** in-app threads are the source of truth. Setting `MODULE_SCHOOL_MATRIX_URL` + `MODULE_SCHOOL_MATRIX_TOKEN` additionally fans messages out to linked persons' Matrix IDs (`matrixId` on the person profile); without them, deliveries are in-app only and WhatsApp stays a manual action. `MODULE_SCHOOL_SEED=1` enables `POST /api/school/seed` (admin-only, refuses a non-empty DB) to populate demo data; `POST /api/school/import/csv` imports `persons`/`instruments` CSVs.
 
 ## Embedded in Nextcloud (External sites)
 
