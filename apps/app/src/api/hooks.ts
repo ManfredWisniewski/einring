@@ -53,6 +53,8 @@ import type {
   SchoolConflict,
   SchoolEvent,
   SchoolHoliday,
+  SchoolHomework,
+  SchoolHomeworkAssignment,
   SchoolHousehold,
   SchoolInstrument,
   SchoolInvoice,
@@ -1627,5 +1629,100 @@ export function useSchoolConfirmParticipation() {
         status: input.status,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "events"] }),
+  });
+}
+
+/* ------------------------------------------------------- school homework */
+
+export function useSchoolHomework(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "homework"],
+    queryFn: () => api.get<{ homework: SchoolHomework[] }>("/school/homework"),
+    enabled,
+  });
+}
+
+export function useSchoolHomeworkDetail(id: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "homework", id],
+    queryFn: () => api.get<{ homework: SchoolHomework }>(`/school/homework/${id ?? ""}`),
+    enabled: id !== null,
+  });
+}
+
+export function useSchoolSaveHomework() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; body: Record<string, unknown> }) =>
+      input.id
+        ? api.patch(`/school/homework/${input.id}`, input.body)
+        : api.post<{ id: string }>("/school/homework", input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "homework"] }),
+  });
+}
+
+export function useSchoolDeleteHomework() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/school/homework/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "homework"] }),
+  });
+}
+
+export function useSchoolAssignments(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...SCHOOL, "assignments"],
+    queryFn: () =>
+      api.get<{ assignments: SchoolHomeworkAssignment[] }>("/school/homework/assignments"),
+    enabled,
+  });
+}
+
+export function useSchoolAssignHomework() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      homeworkId: string;
+      studentIds: string[];
+      note?: string;
+      dueDate?: string;
+    }) => api.post("/school/homework/assign", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "assignments"] }),
+  });
+}
+
+export function useSchoolPatchAssignment() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; body: Record<string, unknown> }) =>
+      api.patch(`/school/homework/assignments/${input.id}`, input.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "assignments"] }),
+  });
+}
+
+/** Submit = POST the message, then PUT the media file (raw bytes, D57). */
+export function useSchoolSubmitHomework() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { assignmentId: string; message: string; file: File }) => {
+      const { id } = await api.post<{ id: string }>(
+        `/school/homework/assignments/${input.assignmentId}/submissions`,
+        { message: input.message },
+      );
+      await api.upload(
+        `/school/homework/submissions/${id}/media?name=${encodeURIComponent(input.file.name)}`,
+        input.file,
+        "PUT",
+      );
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "assignments"] }),
   });
 }

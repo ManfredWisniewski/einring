@@ -100,6 +100,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_SCHOOL_GROUP_PARENT=einring-school-parent
 # MODULE_SCHOOL_GROUP_STUDENT=einring-school-student
 # MODULE_SCHOOL_DB=           # school SQLite path (default /data/school.sqlite)
+# MODULE_SCHOOL_MEDIA_DIR=    # homework submission audio/video (default /data/school-media)
 # MODULE_SCHOOL_MATRIX_URL=   # optional Matrix homeserver for message delivery
 # MODULE_SCHOOL_MATRIX_TOKEN= # bot/appservice access token for that homeserver
 # MODULE_SCHOOL_SEED=1        # enables POST /api/school/seed (demo data, empty DB only)
@@ -246,6 +247,8 @@ The `school` module (D56) manages a small music school: people/households, recur
 **Roles come from Authentik groups**, not from an internal user table. Create four groups in Authentik (names configurable via `MODULE_SCHOOL_GROUP_*`, defaults `einring-school-admin/-teacher/-parent/-student`) and add users to them. The OIDC provider must emit the `groups` claim (Authentik includes it by default via the profile scope). Users without any school group see no school data; every route enforces scope server-side.
 
 Persons (students, guardians, teachers) are **profiles**, not logins: an admin creates them under `/school` → People and links a profile to a login with "Link login…" (pickable from `school_users`, which records every authenticated caller). Until linked, a parent/student login has a role but sees no students.
+
+**Homework:** teachers keep a homework library (markup text + optional MusicXML sheet) and assign it to their students; students reply with a message plus an audio/video recording stored under `MODULE_SCHOOL_MEDIA_DIR` (default `/data/school-media`, same backup volume, 50 MB cap). Assignment and submission events post a notification into the in-app thread, which fans out via Matrix when configured.
 
 **Messaging delivery:** in-app threads are the source of truth. Setting `MODULE_SCHOOL_MATRIX_URL` + `MODULE_SCHOOL_MATRIX_TOKEN` additionally fans messages out to linked persons' Matrix IDs (`matrixId` on the person profile); without them, deliveries are in-app only and WhatsApp stays a manual action. `MODULE_SCHOOL_SEED=1` enables `POST /api/school/seed` (admin-only, refuses a non-empty DB) to populate demo data; `POST /api/school/import/csv` imports `persons`/`instruments` CSVs.
 

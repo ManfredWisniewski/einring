@@ -261,3 +261,12 @@
 - Audit: every sensitive write (persons, series, lessons, invoices, instruments, events, overrides, linking, anonymization) appends `school_audit` with actor `sub`; `GET /audit` is admin-only.
 - Import/seed: `POST /import/csv {kind, csv}` imports persons/instruments (header-mapped columns); `POST /seed` inserts demo data only when the store is empty and `MODULE_SCHOOL_SEED` is set.
 - App: `/school` module page with role-aware sub-navigation (Today, Calendar, Series, People, Availability, Holidays, Instruments, Invoices, Messages, Events, Settings) — each surface renders only what the caller's roles allow; DE + EN + RU + FR, token variables only.
+
+### A33 School homework (assignments with media submissions)
+
+- Homework library: staff CRUD on `school_homework` (title, markup `body`, optional inline `musicxml` text + `musicxml_name`); a teacher sees/edits only own items, admin sees all.
+- `POST /homework/assign {homeworkId, studentIds[], note?, dueDate?}` upserts `school_homework_assignments` (status `assigned`); teachers may only assign own homework to their own students (`teacherStudentIds`), admin unrestricted. Assigning posts a notification into a direct thread with the student's (and guardians') subs, fanned out through the D56 delivery layer.
+- Submission: `POST /homework/assignments/:id/submissions {message}` (the linked student or a guardian of that student) then `PUT /homework/submissions/:id/media?name=` with raw audio/video bytes (50 MB cap, `application/octet-stream` parser). Assignment status becomes `submitted` when media is attached; staff set `reviewed` + `feedback` via `PATCH /homework/assignments/:id`. A submission notifies the owning teacher the same way.
+- `GET /homework/assignments` is scoped: admin all, teacher = assignments on own homework, student = own, guardian = household children's; each row carries homework title, student name, note/due/status/feedback and its submissions (message + media metadata).
+- `GET /homework/submissions/:id/media` streams the stored file (`DATA_DIR/school-media/<id>`, `MODULE_SCHOOL_MEDIA_DIR` override) only to admin, the homework's teacher, the assigned student or their guardians.
+- App: `/school` gains a Homework tab — teachers manage library + assign + review submissions (inline audio/video player); students/guardians see assignments, download the MusicXML sheet and submit message + file. DE + EN + RU + FR, token variables only.

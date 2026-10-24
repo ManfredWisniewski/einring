@@ -9,6 +9,7 @@
     "billing": "Оплата",
     "messages": "Сообщения",
     "events": "События",
+    "homework": "Задания",
     "people": "Люди"
   },
   "today": {
@@ -150,6 +151,30 @@
       "invited": "приглашён",
       "confirmed": "подтверждено",
       "declined": "отклонено"
+    }
+  },
+  "homework": {
+    "assignments": "Домашние задания",
+    "library": "Библиотека заданий",
+    "new": "Новое задание",
+    "empty": "Нет заданий.",
+    "assign": "Назначить",
+    "delete": "Удалить",
+    "due": "до",
+    "sheet": "Скачать ноты (MusicXML)",
+    "message": "Короткое сообщение…",
+    "submit": "Отправить",
+    "mediaError": "Не удалось загрузить запись.",
+    "feedback": "Отзыв",
+    "feedbackPlaceholder": "Отзыв для ученика…",
+    "markReviewed": "Отметить проверенным",
+    "titlePlaceholder": "Название",
+    "bodyPlaceholder": "Описание задания (Markdown)…",
+    "notePlaceholder": "Заметка для ученика…",
+    "status": {
+      "assigned": "назначено",
+      "submitted": "сдано",
+      "reviewed": "проверено"
     }
   }
 }

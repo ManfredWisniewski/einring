@@ -1,4 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type AppDeps, buildApp } from "./app.js";
 import type { AuthUser } from "./auth.js";
 import { loadConfig } from "./config.js";
@@ -16,6 +19,7 @@ export function testEnv(): Record<string, string> {
     NEXTCLOUD_URL: "https://cloud.test/",
     MODULE_TABLES_APPLICATION_ID: "3",
     MODULE_SCHOOL_DB: ":memory:",
+    MODULE_SCHOOL_MEDIA_DIR: mkdtempSync(join(tmpdir(), "school-media-")),
     ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     STATIC_DIR: "./does-not-exist",
   };

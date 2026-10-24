@@ -9,6 +9,7 @@
     "billing": "Billing",
     "messages": "Messages",
     "events": "Events",
+    "homework": "Homework",
     "people": "People"
   },
   "today": {
@@ -150,6 +151,30 @@
       "invited": "invited",
       "confirmed": "confirmed",
       "declined": "declined"
+    }
+  },
+  "homework": {
+    "assignments": "Homework",
+    "library": "Assignment library",
+    "new": "New assignment",
+    "empty": "No homework.",
+    "assign": "Assign",
+    "delete": "Delete",
+    "due": "due",
+    "sheet": "Download sheet music (MusicXML)",
+    "message": "Short message…",
+    "submit": "Submit",
+    "mediaError": "Could not load the recording.",
+    "feedback": "Feedback",
+    "feedbackPlaceholder": "Feedback for the student…",
+    "markReviewed": "Mark as reviewed",
+    "titlePlaceholder": "Title",
+    "bodyPlaceholder": "Assignment description (Markdown)…",
+    "notePlaceholder": "Note for the student…",
+    "status": {
+      "assigned": "assigned",
+      "submitted": "submitted",
+      "reviewed": "reviewed"
     }
   }
 }

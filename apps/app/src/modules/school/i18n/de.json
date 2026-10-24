@@ -9,6 +9,7 @@
     "billing": "Abrechnung",
     "messages": "Nachrichten",
     "events": "Termine",
+    "homework": "Hausaufgaben",
     "people": "Personen"
   },
   "today": {
@@ -150,6 +151,30 @@
       "invited": "eingeladen",
       "confirmed": "zugesagt",
       "declined": "abgesagt"
+    }
+  },
+  "homework": {
+    "assignments": "Hausaufgaben",
+    "library": "Aufgaben-Bibliothek",
+    "new": "Neue Aufgabe",
+    "empty": "Keine Hausaufgaben.",
+    "assign": "Zuweisen",
+    "delete": "Löschen",
+    "due": "bis",
+    "sheet": "Noten herunterladen (MusicXML)",
+    "message": "Kurze Nachricht…",
+    "submit": "Abgeben",
+    "mediaError": "Aufnahme konnte nicht geladen werden.",
+    "feedback": "Rückmeldung",
+    "feedbackPlaceholder": "Feedback für die Schülerin / den Schüler…",
+    "markReviewed": "Als geprüft markieren",
+    "titlePlaceholder": "Titel",
+    "bodyPlaceholder": "Aufgabenbeschreibung (Markdown)…",
+    "notePlaceholder": "Notiz für die Schülerin / den Schüler…",
+    "status": {
+      "assigned": "zugewiesen",
+      "submitted": "abgegeben",
+      "reviewed": "geprüft"
     }
   }
 }

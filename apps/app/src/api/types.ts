@@ -887,3 +887,41 @@ export interface SchoolMakeupRequest {
   status: "open" | "scheduled" | "declined";
   createdAt?: string;
 }
+
+export interface SchoolHomework {
+  id: string;
+  teacherId: string;
+  teacherName: string | null;
+  title: string;
+  body: string;
+  musicxml?: string | null;
+  musicxmlName: string | null;
+  hasMusicxml?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchoolHomeworkSubmission {
+  id: string;
+  message: string;
+  mediaName: string | null;
+  mediaMime: string | null;
+  mediaBytes: number | null;
+  createdAt: string;
+}
+
+export interface SchoolHomeworkAssignment {
+  id: string;
+  homeworkId: string;
+  homeworkTitle: string;
+  teacherId: string;
+  teacherName: string | null;
+  studentId: string;
+  studentName: string;
+  note: string | null;
+  dueDate: string | null;
+  status: "assigned" | "submitted" | "reviewed";
+  feedback: string | null;
+  createdAt: string;
+  submissions: SchoolHomeworkSubmission[];
+}

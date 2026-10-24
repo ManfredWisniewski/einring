@@ -249,6 +249,39 @@ export interface SchoolEvent {
   createdAt: string;
 }
 
+export interface Homework {
+  id: string;
+  teacherId: string;
+  title: string;
+  body: string;
+  musicxml: string | null;
+  musicxmlName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HomeworkAssignment {
+  id: string;
+  homeworkId: string;
+  studentId: string;
+  note: string | null;
+  dueDate: string | null;
+  status: "assigned" | "submitted" | "reviewed";
+  feedback: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HomeworkSubmission {
+  id: string;
+  assignmentId: string;
+  message: string;
+  mediaName: string | null;
+  mediaMime: string | null;
+  mediaBytes: number | null;
+  createdAt: string;
+}
+
 export interface AuditRow {
   id: number;
   sub: string;
@@ -523,6 +556,40 @@ CREATE TABLE IF NOT EXISTS school_event_rehearsals (
   location TEXT,
   note TEXT
 );
+CREATE TABLE IF NOT EXISTS school_homework (
+  id TEXT PRIMARY KEY,
+  teacher_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  musicxml TEXT,
+  musicxml_name TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+CREATE TABLE IF NOT EXISTS school_homework_assignments (
+  id TEXT PRIMARY KEY,
+  homework_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  note TEXT,
+  due_date TEXT,
+  status TEXT NOT NULL DEFAULT 'assigned',
+  feedback TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (homework_id, student_id)
+);
+CREATE INDEX IF NOT EXISTS school_hwa_student ON school_homework_assignments(student_id);
+CREATE TABLE IF NOT EXISTS school_homework_submissions (
+  id TEXT PRIMARY KEY,
+  assignment_id TEXT NOT NULL,
+  message TEXT NOT NULL,
+  media_name TEXT,
+  media_mime TEXT,
+  media_bytes INTEGER,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS school_hws_assignment ON school_homework_submissions(assignment_id);
 CREATE TABLE IF NOT EXISTS school_consents (
   id TEXT PRIMARY KEY,
   person_id TEXT NOT NULL,

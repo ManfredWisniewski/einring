@@ -5,6 +5,7 @@ import { openSchoolDb } from "./school/db.js";
 import { materializeLessons, todayBerlin } from "./school/domain.js";
 import { registerBillingRoutes } from "./school/routes-billing.js";
 import { registerCoreRoutes } from "./school/routes-core.js";
+import { registerHomeworkRoutes } from "./school/routes-homework.js";
 import { registerScheduleRoutes } from "./school/routes-schedule.js";
 import { registerSocialRoutes } from "./school/routes-social.js";
 import { touchUser } from "./school/scope.js";
@@ -23,6 +24,8 @@ const configSchema = z.object({
   MATRIX_TOKEN: z.string().optional(),
   /** Enables POST /api/school/seed (demo data, empty DB only). */
   SEED: z.string().optional(),
+  /** Homework submission media directory; default <DATA_DIR>/school-media. */
+  MEDIA_DIR: z.string().optional(),
 });
 
 /**
@@ -83,10 +86,15 @@ export const schoolModule: BffModule<z.infer<typeof configSchema>> = {
     timer.unref();
     api.addHook("onClose", async () => clearInterval(timer));
 
+    const mediaDir =
+      config.MEDIA_DIR ??
+      join((ctx as { config: { DATA_DIR: string } }).config.DATA_DIR, "school-media");
+
     registerCoreRoutes(api, db, config);
     registerScheduleRoutes(api, db, config);
     registerBillingRoutes(api, db, config);
     registerSocialRoutes(api, db, config, ctx);
+    registerHomeworkRoutes(api, db, config, ctx, mediaDir);
   },
 };
 

@@ -9,6 +9,7 @@
     "billing": "Facturation",
     "messages": "Messages",
     "events": "Événements",
+    "homework": "Devoirs",
     "people": "Personnes"
   },
   "today": {
@@ -150,6 +151,30 @@
       "invited": "invité",
       "confirmed": "confirmé",
       "declined": "décliné"
+    }
+  },
+  "homework": {
+    "assignments": "Devoirs",
+    "library": "Bibliothèque d'exercices",
+    "new": "Nouvel exercice",
+    "empty": "Aucun devoir.",
+    "assign": "Assigner",
+    "delete": "Supprimer",
+    "due": "pour le",
+    "sheet": "Télécharger la partition (MusicXML)",
+    "message": "Petit message…",
+    "submit": "Envoyer",
+    "mediaError": "Impossible de charger l'enregistrement.",
+    "feedback": "Retour",
+    "feedbackPlaceholder": "Retour pour l'élève…",
+    "markReviewed": "Marquer comme corrigé",
+    "titlePlaceholder": "Titre",
+    "bodyPlaceholder": "Description de l'exercice (Markdown)…",
+    "notePlaceholder": "Note pour l'élève…",
+    "status": {
+      "assigned": "assigné",
+      "submitted": "rendu",
+      "reviewed": "corrigé"
     }
   }
 }

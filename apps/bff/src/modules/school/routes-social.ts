@@ -3,13 +3,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../app.js";
 import { audit, now } from "./db.js";
-import {
-  allowedPeerSubs,
-  audienceSubs,
-  deliverMatrix,
-  guardianStudentIds,
-  uuid,
-} from "./domain.js";
+import { deliver } from "./delivery.js";
+import { allowedPeerSubs, audienceSubs, guardianStudentIds, uuid } from "./domain.js";
 import { callerOf, forbidden, isAdmin, isStaff, ownStudentId, type SchoolConfig } from "./scope.js";
 
 const threadIn = z.object({
@@ -75,38 +70,8 @@ export function registerSocialRoutes(
   ctx: AppContext,
 ): void {
   const caller = (req: FastifyRequest) => callerOf(db, req, cfg);
-
-  /** Writes delivery rows for a new message; attempts Matrix fan-out when configured. */
-  async function deliver(messageId: string, body: string, senderSub: string, memberSubs: string[]) {
-    const ins = db.prepare(
-      `INSERT INTO school_deliveries (id, message_id, channel, target_sub, status, detail, at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const matrixOf = db.prepare(
-      "SELECT matrix_id AS m FROM school_persons WHERE sub = ? AND matrix_id IS NOT NULL",
-    );
-    for (const sub of memberSubs) {
-      if (sub === senderSub) continue;
-      ins.run(uuid(), messageId, "inapp", sub, "sent", null, now());
-      const matrixId = (matrixOf.get(sub) as { m: string } | undefined)?.m;
-      if (cfg.MATRIX_URL && cfg.MATRIX_TOKEN && matrixId) {
-        try {
-          const room = await deliverMatrix(
-            ctx.fetchImpl ?? fetch,
-            cfg.MATRIX_URL,
-            cfg.MATRIX_TOKEN,
-            matrixId,
-            body,
-          );
-          ins.run(uuid(), messageId, "matrix", sub, "sent", room, now());
-        } catch (e) {
-          ins.run(uuid(), messageId, "matrix", sub, "failed", String(e), now());
-        }
-      } else if (matrixId) {
-        ins.run(uuid(), messageId, "whatsapp", sub, "manual", matrixId, now());
-      }
-    }
-  }
+  const fanOut = (mid: string, body: string, from: string, subs: string[]) =>
+    deliver(db, cfg, ctx.fetchImpl ?? fetch, mid, body, from, subs);
 
   /* --------------------------------------------------------------- threads */
 
@@ -175,7 +140,7 @@ export function registerSocialRoutes(
     db.prepare(
       "INSERT INTO school_messages (id, thread_id, sender_sub, body, created_at) VALUES (?, ?, ?, ?, ?)",
     ).run(mid, tid, c.sub, b.body, ts);
-    await deliver(mid, b.body, c.sub, [...members]);
+    await fanOut(mid, b.body, c.sub, [...members]);
     audit(db, c.sub, "create", "thread", tid, {
       kind: b.kind,
       audience: b.audience,
@@ -227,7 +192,7 @@ export function registerSocialRoutes(
         sub: string;
       }[]
     ).map((r) => r.sub);
-    await deliver(mid, parsed.data.body, c.sub, members);
+    await fanOut(mid, parsed.data.body, c.sub, members);
     return reply.code(201).send({ id: mid });
   });
 

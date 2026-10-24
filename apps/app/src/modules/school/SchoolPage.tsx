@@ -4,6 +4,7 @@ import { useSchoolMe } from "@/api/hooks";
 import BillingView from "./views/BillingView";
 import CalendarView from "./views/CalendarView";
 import EventsView from "./views/EventsView";
+import HomeworkView from "./views/HomeworkView";
 import MessagesView from "./views/MessagesView";
 import PeopleView from "./views/PeopleView";
 import TodayView from "./views/TodayView";
@@ -39,6 +40,9 @@ export default function SchoolPage() {
         <Tab id="messages" className="tabs__tab">
           {t("modules.school.tabs.messages")}
         </Tab>
+        <Tab id="homework" className="tabs__tab">
+          {t("modules.school.tabs.homework")}
+        </Tab>
         <Tab id="events" className="tabs__tab">
           {t("modules.school.tabs.events")}
         </Tab>
@@ -59,6 +63,9 @@ export default function SchoolPage() {
       </TabPanel>
       <TabPanel id="messages">
         <MessagesView />
+      </TabPanel>
+      <TabPanel id="homework">
+        <HomeworkView staff={staff} />
       </TabPanel>
       <TabPanel id="events">
         <EventsView staff={staff} person={me.data.person} />

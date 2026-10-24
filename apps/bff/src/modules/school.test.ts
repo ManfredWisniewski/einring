@@ -542,4 +542,190 @@ describe("school module", () => {
     expect(lessons).toHaveLength(1);
     expect(lessons.at(0)?.students.at(0)?.studentId).toBe(studentId);
   });
+
+  it("runs the homework flow: library, assign, notify, submit, media, review", async () => {
+    const app = await schoolApp();
+    const { teacherId, studentId, guardianId, lessonTypeId } = await fixture(app);
+    await link(app, teacherId, "teach-1");
+    await link(app, studentId, "stu-1");
+    await link(app, guardianId, "par-1");
+    // make student one of the teacher's students
+    await app.inject({
+      method: "POST",
+      url: "/api/school/series",
+      headers: admin,
+      payload: {
+        teacherId,
+        lessonTypeId,
+        weekday: 1,
+        startTime: "15:00",
+        durationMin: 45,
+        validFrom: "2026-01-05",
+        studentIds: [studentId],
+      },
+    });
+
+    // teacher creates a library item
+    const hw = await app.inject({
+      method: "POST",
+      url: "/api/school/homework",
+      headers: teacher,
+      payload: {
+        title: "C-Dur Tonleiter",
+        body: "2 Oktaven, **langsam**",
+        musicxml: "<score-partwise/>",
+        musicxmlName: "scale.musicxml",
+      },
+    });
+    expect(hw.statusCode).toBe(201);
+    const homeworkId = j(hw).id as string;
+
+    // assigning notifies the household via a direct thread
+    const asg = await app.inject({
+      method: "POST",
+      url: "/api/school/homework/assign",
+      headers: teacher,
+      payload: {
+        homeworkId,
+        studentIds: [studentId],
+        note: "bis nächste Woche",
+        dueDate: "2026-01-20",
+      },
+    });
+    expect(asg.statusCode).toBe(201);
+    const stuThreads = await app.inject({
+      method: "GET",
+      url: "/api/school/threads",
+      headers: student,
+    });
+    expect(
+      (j(stuThreads).threads as { lastBody: string }[]).some((t) =>
+        t.lastBody?.includes("C-Dur Tonleiter"),
+      ),
+    ).toBe(true);
+
+    // student sees the assignment incl. MusicXML, submits message + media
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/school/homework/assignments",
+      headers: student,
+    });
+    const assignment = (j(list).assignments as { id: string; status: string }[]).at(0);
+    expect(assignment?.status).toBe("assigned");
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/school/homework/${homeworkId}`,
+      headers: student,
+    });
+    expect(j(detail).homework).toMatchObject({ title: "C-Dur Tonleiter" });
+
+    const sub = await app.inject({
+      method: "POST",
+      url: `/api/school/homework/assignments/${assignment?.id}/submissions`,
+      headers: student,
+      payload: { message: "Hier meine Aufnahme" },
+    });
+    expect(sub.statusCode).toBe(201);
+    const subId = j(sub).id as string;
+    const up = await app.inject({
+      method: "PUT",
+      url: `/api/school/homework/submissions/${subId}/media?name=take.mp3`,
+      headers: { ...student, "content-type": "audio/mpeg" },
+      payload: Buffer.from("fakemp3bytes"),
+    });
+    expect(up.statusCode).toBe(200);
+
+    // teacher sees submission, downloads media, marks reviewed
+    const tList = await app.inject({
+      method: "GET",
+      url: "/api/school/homework/assignments",
+      headers: teacher,
+    });
+    const tAsg = (
+      j(tList).assignments as {
+        id: string;
+        status: string;
+        submissions: { mediaName: string }[];
+      }[]
+    ).at(0);
+    expect(tAsg?.status).toBe("submitted");
+    expect(tAsg?.submissions.at(0)?.mediaName).toBe("take.mp3");
+    const dl = await app.inject({
+      method: "GET",
+      url: `/api/school/homework/submissions/${subId}/media`,
+      headers: teacher,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.body).toBe("fakemp3bytes");
+    const rev = await app.inject({
+      method: "PATCH",
+      url: `/api/school/homework/assignments/${assignment?.id}`,
+      headers: teacher,
+      payload: { status: "reviewed", feedback: "Sauber gespielt" },
+    });
+    expect(rev.statusCode).toBe(200);
+
+    // guardian can read the assignment; an unrelated parent cannot touch the media
+    const pList = await app.inject({
+      method: "GET",
+      url: "/api/school/homework/assignments",
+      headers: parent,
+    });
+    expect((j(pList).assignments as unknown[]).length).toBe(1);
+    const denied = await app.inject({
+      method: "GET",
+      url: `/api/school/homework/submissions/${subId}/media`,
+      headers: H("parent2-tok"),
+    });
+    expect(denied.statusCode).toBe(403);
+  });
+
+  it("keeps homework scoped: other teacher cannot see or assign it", async () => {
+    const app = await schoolApp();
+    const { teacherId, studentId, lessonTypeId } = await fixture(app);
+    const otherTeacher = await mkPerson(app, { kind: "teacher", name: "Tessa Teacher" });
+    await link(app, teacherId, "teach-1");
+    await link(app, otherTeacher, "teach-2");
+    await app.inject({
+      method: "POST",
+      url: "/api/school/series",
+      headers: admin,
+      payload: {
+        teacherId,
+        lessonTypeId,
+        weekday: 1,
+        startTime: "15:00",
+        durationMin: 45,
+        validFrom: "2026-01-05",
+        studentIds: [studentId],
+      },
+    });
+    const hw = await app.inject({
+      method: "POST",
+      url: "/api/school/homework",
+      headers: teacher,
+      payload: { title: "Arpeggios" },
+    });
+    const homeworkId = j(hw).id as string;
+
+    const t2list = await app.inject({
+      method: "GET",
+      url: "/api/school/homework",
+      headers: H("teacher2-tok"),
+    });
+    expect((j(t2list).homework as unknown[]).length).toBe(0);
+    const denied = await app.inject({
+      method: "POST",
+      url: "/api/school/homework/assign",
+      headers: H("teacher2-tok"),
+      payload: { homeworkId, studentIds: [studentId] },
+    });
+    expect(denied.statusCode).toBe(403);
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/api/school/homework/${homeworkId}`,
+      headers: H("teacher2-tok"),
+    });
+    expect(del.statusCode).toBe(403);
+  });
 });
