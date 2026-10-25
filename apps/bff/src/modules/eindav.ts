@@ -35,7 +35,13 @@ const propLine = (line: string) => {
 };
 
 const vcardEscape = (s: string) =>
-  s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  s
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r\n/g, "\\n")
+    .replace(/\r/g, "\\n")
+    .replace(/\n/g, "\\n");
 const vcardUnescape = (s: string) =>
   s.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
 
@@ -182,10 +188,13 @@ export function buildIcs(e: {
 
 // -- Schemas ------------------------------------------------------------------
 
+/** UIDs land in DAV hrefs and vCard/ICS UID lines — restrict to a safe charset. */
+const uidStr = z.string().regex(/^[A-Za-z0-9._-]{1,128}$/);
+
 const contactSchema = z.object({
   book: z.string().min(1),
   href: z.string().optional(),
-  uid: z.string().optional(),
+  uid: uidStr.optional(),
   fn: z.string().min(1).max(500),
   emails: z.array(z.string().max(300)).max(20).default([]),
   tels: z.array(z.string().max(100)).max(20).default([]),
@@ -195,7 +204,7 @@ const contactSchema = z.object({
 const eventSchema = z.object({
   cal: z.string().min(1),
   href: z.string().optional(),
-  uid: z.string().optional(),
+  uid: uidStr.optional(),
   summary: z.string().min(1).max(500),
   description: z.string().max(8000).optional(),
   location: z.string().max(500).optional(),

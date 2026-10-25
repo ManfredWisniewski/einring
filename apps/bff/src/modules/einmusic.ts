@@ -46,8 +46,19 @@ function navidromeCred(ctx: AppContext, sub: string) {
   return c && secret ? { url: c.url, secret } : null;
 }
 
-export const einmusicModule: BffModule = {
+const configSchema = z.object({
+  /** Per-user aggregate upload quota. */
+  MAX_TOTAL_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2 * 1024 * 1024 * 1024),
+  MAX_TRACKS: z.coerce.number().int().positive().default(500),
+});
+
+export const einmusicModule: BffModule<z.infer<typeof configSchema>> = {
   id: "einmusic",
+  configSchema,
 
   chatTools(ctx): ChatTool[] {
     return [
@@ -70,7 +81,7 @@ export const einmusicModule: BffModule = {
     ];
   },
 
-  register(api, ctx) {
+  register(api, ctx, config) {
     // Raw-body upload: the MP3 bytes are the request body (D48).
     api.addContentTypeParser(
       ["audio/mpeg", "application/octet-stream"],
@@ -88,6 +99,13 @@ export const einmusicModule: BffModule = {
       const body = req.body;
       if (!Buffer.isBuffer(body) || body.length === 0) {
         return reply.code(400).send({ error: "expected the mp3 bytes as the request body" });
+      }
+      const usage = ctx.store.musicUsage(req.user.sub);
+      if (
+        usage.bytes + body.length > config.MAX_TOTAL_BYTES ||
+        usage.tracks + 1 > config.MAX_TRACKS
+      ) {
+        return reply.code(413).send({ error: "upload quota exceeded" });
       }
       const { title } = parseTrackName(name);
       const track = ctx.store.createMusicTrack(req.user.sub, title, body.length);

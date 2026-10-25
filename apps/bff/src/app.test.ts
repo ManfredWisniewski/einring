@@ -158,44 +158,74 @@ describe("instance config", () => {
   });
 });
 
+/** Fake that also captures the claim code written into the completer's own files. */
+function nextcloudFlowFake(state: { finished: boolean }, capture: { code?: string }) {
+  const { fakeFetch, json } = helpers;
+  return fakeFetch((url, init) => {
+    if (url === "https://cloud.test/index.php/login/v2" && init?.method === "POST") {
+      return json({ poll: { token: "poll-token", endpoint: POLL_URL }, login: LOGIN_URL });
+    }
+    if (url === POLL_URL) {
+      return state.finished
+        ? json({ server: "https://cloud.test", loginName: "frodo", appPassword: "app-pw-secret" })
+        : new Response("", { status: 404 });
+    }
+    if (url === "https://cloud.test/ocs/v2.php/cloud/user") {
+      return json({
+        ocs: { meta: { status: "ok", statuscode: 200 }, data: { displayname: "Frodo B." } },
+      });
+    }
+    const m = /einring-sign-in-(\d{6})\.txt$/.exec(String(url));
+    if (m && init?.method === "PUT") {
+      capture.code = m[1];
+      return new Response("", { status: 201 });
+    }
+    if (m && init?.method === "DELETE") return new Response("", { status: 204 });
+    if (url === "https://cloud.test/ocs/v2.php/core/apppassword" && init?.method === "DELETE") {
+      return json({ ocs: { meta: { status: "ok", statuscode: 100 }, data: {} } });
+    }
+    return json({ error: `unexpected ${url}` }, 500);
+  });
+}
+
+const LOGIN_URL = "https://cloud.test/login/v2/flow/abc";
+const POLL_URL = "https://cloud.test/login/v2/poll";
+const helpers = { fakeFetch, json };
+
+async function claimFlow(
+  app: FastifyInstance,
+  flow: string,
+  capture: { code?: string },
+  headers?: Record<string, string>,
+) {
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/nextcloud/login-flow/claim",
+    headers,
+    payload: { flow, code: capture.code },
+  });
+  return res;
+}
+
 describe("nextcloud login flow", () => {
-  const LOGIN_URL = "https://cloud.test/login/v2/flow/abc";
-  const POLL_URL = "https://cloud.test/login/v2/poll";
-
-  function nextcloudFake(state: { finished: boolean }) {
-    return fakeFetch((url, init) => {
-      if (url === "https://cloud.test/index.php/login/v2" && init?.method === "POST") {
-        return json({ poll: { token: "poll-token", endpoint: POLL_URL }, login: LOGIN_URL });
-      }
-      if (url === POLL_URL) {
-        expect(String(init?.body)).toBe("token=poll-token");
-        return state.finished
-          ? json({ server: "https://cloud.test", loginName: "frodo", appPassword: "app-pw-secret" })
-          : new Response("", { status: 404 });
-      }
-      if (url === "https://cloud.test/ocs/v2.php/cloud/user") {
-        return json({
-          ocs: { meta: { status: "ok", statuscode: 200 }, data: { displayname: "Frodo B." } },
-        });
-      }
-      return json({ error: `unexpected ${url}` }, 500);
-    });
-  }
-
-  it("starts disconnected, stays pending until Nextcloud completes, then is connected", async () => {
+  it("starts disconnected, stays pending until Nextcloud completes, then is claimed", async () => {
     const state = { finished: false };
-    const { app, auth, store } = await testApp({ fetchImpl: nextcloudFake(state) });
+    const capture: { code?: string } = {};
+    const { app, auth, store } = await testApp({ fetchImpl: nextcloudFlowFake(state, capture) });
 
     let res = await app.inject({ method: "GET", url: "/api/nextcloud/connection", headers: auth });
     expect(res.json()).toEqual({ status: "disconnected" });
 
     res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow", headers: auth });
-    expect(res.json()).toEqual({ login: LOGIN_URL });
+    const { login, flow } = res.json() as { login: string; flow: string };
+    expect(login).toBe(LOGIN_URL);
+    expect(flow).toBeTruthy();
 
     res = await app.inject({
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       headers: auth,
+      payload: { flow },
     });
     expect(res.json().status).toBe("pending");
 
@@ -204,14 +234,28 @@ describe("nextcloud login flow", () => {
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       headers: auth,
+      payload: { flow },
     });
+    expect(res.json()).toEqual({ status: "awaiting_claim" });
+    // Poll NEVER hands out the credential — only the completer's code does.
+    expect(store.getCredential(TEST_USER.sub)).toBeUndefined();
+    expect(capture.code).toMatch(/^\d{6}$/);
+
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/claim",
+      headers: auth,
+      payload: { flow, code: "000000" },
+    });
+    expect(res.statusCode).toBe(401);
+
+    res = await claimFlow(app, flow, capture, auth);
     expect(res.json()).toEqual({
       status: "connected",
       loginName: "frodo",
       displayName: "Frodo B.",
       server: "https://cloud.test",
     });
-
     const stored = store.getCredential(TEST_USER.sub);
     expect(stored?.appPasswordSealed).toBeDefined();
     expect(stored?.appPasswordSealed).not.toContain("app-pw-secret");
@@ -228,40 +272,19 @@ describe("nextcloud login flow", () => {
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       headers: auth,
+      payload: { flow: "bogus" },
     });
     expect(res.statusCode).toBe(409);
   });
 });
 
 describe("embedded login flow (anonymous)", () => {
-  const LOGIN_URL = "https://cloud.test/login/v2/flow/abc";
-  const POLL_URL = "https://cloud.test/login/v2/poll";
-
-  function nextcloudFake(state: { finished: boolean }) {
-    return fakeFetch((url, init) => {
-      if (url === "https://cloud.test/index.php/login/v2" && init?.method === "POST") {
-        return json({ poll: { token: "poll-token", endpoint: POLL_URL }, login: LOGIN_URL });
-      }
-      if (url === POLL_URL) {
-        return state.finished
-          ? json({ server: "https://cloud.test", loginName: "frodo", appPassword: "app-pw-secret" })
-          : new Response("", { status: 404 });
-      }
-      if (url === "https://cloud.test/ocs/v2.php/cloud/user") {
-        return json({
-          ocs: { meta: { status: "ok", statuscode: 200 }, data: { displayname: "Frodo B." } },
-        });
-      }
-      return json({ error: `unexpected ${url}` }, 500);
-    });
-  }
-
   /** App whose verifier accepts the test JWT and real session tokens. */
-  async function embeddedApp(state: { finished: boolean }) {
+  async function embeddedApp(state: { finished: boolean }, capture: { code?: string } = {}) {
     const store = openStore(":memory:");
     const { app, auth } = await testApp({
       store,
-      fetchImpl: nextcloudFake(state),
+      fetchImpl: nextcloudFlowFake(state, capture),
       verifyToken: createCompositeVerifier(async (token) => {
         if (token !== "valid-token") throw new Error("bad token");
         return TEST_USER;
@@ -270,11 +293,11 @@ describe("embedded login flow (anonymous)", () => {
     return { app, store, auth };
   }
 
-  it("mints a session on flow completion and accepts it on all routes", async () => {
+  it("mints a session only on claim — a flow-id holder gains nothing", async () => {
     const state = { finished: false };
-    const { app, store } = await embeddedApp(state);
+    const capture: { code?: string } = {};
+    const { app, store } = await embeddedApp(state, capture);
 
-    // No bearer: start returns a flow id instead of binding to a user sub.
     let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" });
     expect(res.statusCode).toBe(200);
     const { login, flow } = res.json() as { login: string; flow?: string };
@@ -287,7 +310,7 @@ describe("embedded login flow (anonymous)", () => {
       url: "/api/nextcloud/login-flow/poll",
       payload: { flow },
     });
-    expect(res.json()).toEqual({ status: "pending", login: "" });
+    expect(res.json()).toEqual({ status: "pending", login: LOGIN_URL });
 
     state.finished = true;
     res = await app.inject({
@@ -295,6 +318,12 @@ describe("embedded login flow (anonymous)", () => {
       url: "/api/nextcloud/login-flow/poll",
       payload: { flow },
     });
+    // HIGH fix: knowing the flow id yields awaiting_claim, never a session.
+    expect(res.json()).toEqual({ status: "awaiting_claim" });
+    expect(store.getCredential("nc:frodo")).toBeUndefined();
+    expect(capture.code).toMatch(/^\d{6}$/);
+
+    res = await claimFlow(app, flow as string, capture);
     const body = res.json() as { status: string; sessionToken?: string };
     expect(body.status).toBe("connected");
     expect(body.sessionToken).toBeTruthy();
@@ -330,16 +359,20 @@ describe("embedded login flow (anonymous)", () => {
     expect(res.statusCode).toBe(409);
   });
 
-  it("an authed caller's flow still binds to their own sub (no session minted)", async () => {
+  it("an authed caller's claim binds to their own sub (no session minted)", async () => {
     const state = { finished: true };
-    const { app, auth, store } = await embeddedApp(state);
+    const capture: { code?: string } = {};
+    const { app, auth, store } = await embeddedApp(state, capture);
     let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow", headers: auth });
-    expect(res.json()).toEqual({ login: LOGIN_URL }); // no flow id for authed starts
+    const { flow } = res.json() as { flow: string };
     res = await app.inject({
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       headers: auth,
+      payload: { flow },
     });
+    expect(res.json()).toEqual({ status: "awaiting_claim" });
+    res = await claimFlow(app, flow, capture, auth);
     const body = res.json() as { status: string; sessionToken?: string };
     expect(body.status).toBe("connected");
     expect(body.sessionToken).toBeUndefined();
@@ -349,15 +382,17 @@ describe("embedded login flow (anonymous)", () => {
 
   it("disconnecting deletes the session — a dead token gets 401", async () => {
     const state = { finished: true };
-    const { app } = await embeddedApp(state);
+    const capture: { code?: string } = {};
+    const { app } = await embeddedApp(state, capture);
     const { flow } = (
       await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" })
     ).json() as { flow: string };
-    const res = await app.inject({
+    await app.inject({
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       payload: { flow },
     });
+    const res = await claimFlow(app, flow, capture);
     const sessionAuth = { authorization: `Bearer ${res.json().sessionToken}` };
     expect(
       (await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth })).statusCode,
@@ -383,7 +418,7 @@ describe("embedded login flow (anonymous)", () => {
     });
     const res = await app.inject({ method: "GET", url: "/" });
     expect(res.headers["content-security-policy"]).toBe(
-      "frame-ancestors 'self' https://cloud.test",
+      "frame-ancestors 'self' https://cloud.test; img-src 'self' data: blob:",
     );
     await rm(dir, { recursive: true });
   });

@@ -707,7 +707,7 @@ export function person(db: DatabaseSync, id: string): Person | undefined {
 
 export function personBySub(db: DatabaseSync, sub: string): Person | undefined {
   const row = db
-    .prepare(`SELECT * FROM school_persons WHERE sub = ? AND deleted_at IS NULL`)
+    .prepare(`SELECT * FROM school_persons WHERE sub = ? AND deleted_at IS NULL AND active = 1`)
     .get(sub) as Record<string, unknown> | undefined;
   return row ? mapRow<Person>(row, PERSON_MAP) : undefined;
 }

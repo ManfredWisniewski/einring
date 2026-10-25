@@ -207,6 +207,19 @@ export class NextcloudError extends Error {
  * Minimal Nextcloud client: Login Flow v2 and the Tables app REST API v1.
  * https://docs.nextcloud.com/server/stable/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2
  */
+/** Fails when `url` is not on the configured upstream origin. */
+function assertSameOrigin(url: string, baseUrl: string, what: string): void {
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    throw new NextcloudError(502, `login flow ${what} is not a URL`);
+  }
+  if (origin !== new URL(baseUrl).origin) {
+    throw new NextcloudError(502, `login flow ${what} is off-origin`);
+  }
+}
+
 export class NextcloudClient {
   constructor(
     private readonly baseUrl: string,
@@ -218,13 +231,19 @@ export class NextcloudClient {
     const res = await this.fetchImpl(`${this.baseUrl}/index.php/login/v2`, {
       method: "POST",
       headers: { "User-Agent": this.userAgent, Accept: "application/json" },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new NextcloudError(res.status, "login flow could not be started");
-    return (await res.json()) as LoginFlowStart;
+    const flow = (await res.json()) as LoginFlowStart;
+    // Upstream-supplied URLs must stay on the configured origin (SSRF/phishing guard).
+    assertSameOrigin(flow.login, this.baseUrl, "login URL");
+    assertSameOrigin(flow.poll?.endpoint ?? "", this.baseUrl, "poll endpoint");
+    return flow;
   }
 
   /** Returns `undefined` while the user has not finished logging in (Nextcloud answers 404). */
   async pollLoginFlow(endpoint: string, token: string): Promise<LoginFlowResult | undefined> {
+    assertSameOrigin(endpoint, this.baseUrl, "poll endpoint");
     const res = await this.fetchImpl(endpoint, {
       method: "POST",
       headers: {
@@ -233,6 +252,9 @@ export class NextcloudClient {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ token }),
+      // The flow token must never be forwarded to another origin by a redirect.
+      redirect: "error",
+      signal: AbortSignal.timeout(30_000),
     });
     if (res.status === 404) return undefined;
     if (!res.ok) throw new NextcloudError(res.status, "login flow poll failed");
@@ -253,16 +275,32 @@ export class NextcloudClient {
 export class AuthenticatedNextcloud {
   private readonly authHeader: string;
   private readonly davBase: string;
+  private readonly fetchImpl: Fetch;
+  private readonly baseOrigin: string;
 
   constructor(
     private readonly baseUrl: string,
-    private readonly fetchImpl: Fetch,
+    fetchImpl: Fetch,
     private readonly userAgent: string,
     private readonly loginName: string,
     appPassword: string,
   ) {
     this.authHeader = `Basic ${Buffer.from(`${loginName}:${appPassword}`).toString("base64")}`;
     this.davBase = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(loginName)}`;
+    this.baseOrigin = new URL(baseUrl).origin;
+    // Every upstream call gets a default timeout; callers may pass their own signal.
+    this.fetchImpl = (input, init) =>
+      fetchImpl(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(30_000) });
+  }
+
+  /** Rejects hrefs that would resolve outside `/remote.php/dav/` (or off-origin). */
+  private assertDavHref(href: string): void {
+    const u = new URL(href, this.baseUrl);
+    if (u.origin !== this.baseOrigin || !u.pathname.startsWith("/remote.php/dav/")) {
+      const err = new Error(`href escapes DAV root`) as Error & { statusCode?: number };
+      err.statusCode = 400;
+      throw err;
+    }
   }
 
   private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -374,6 +412,11 @@ export class AuthenticatedNextcloud {
   /** Own account info incl. storage quota — any authenticated user. */
   getOwnUser() {
     return this.get<OcsResponse<OwnUser>>("/ocs/v2.php/cloud/user");
+  }
+
+  /** Revokes this app password upstream (`DELETE /ocs/v2.php/core/apppassword`). */
+  deleteAppPassword() {
+    return this.del<void>("/ocs/v2.php/core/apppassword");
   }
 
   /** Provisioning API: users incl. display names and groups. Requires admin — throws NextcloudError(401/403). */
@@ -596,6 +639,7 @@ export class AuthenticatedNextcloud {
 
   /** PROPFIND on an absolute DAV path, returning the raw multistatus XML. */
   async davPropfindAbs(href: string, depth: 0 | 1, propsXml: string): Promise<string> {
+    this.assertDavHref(href);
     const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
       method: "PROPFIND",
       headers: {
@@ -615,6 +659,7 @@ export class AuthenticatedNextcloud {
 
   /** REPORT on an absolute DAV path (addressbook-query, calendar-query, multiget). */
   async davReport(href: string, bodyXml: string): Promise<string> {
+    this.assertDavHref(href);
     const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
       method: "REPORT",
       headers: {
@@ -636,6 +681,7 @@ export class AuthenticatedNextcloud {
     body?: string,
     contentType?: string,
   ): Promise<void> {
+    this.assertDavHref(href);
     const res = await this.fetchImpl(`${this.baseUrl}${href}`, {
       method,
       headers: {

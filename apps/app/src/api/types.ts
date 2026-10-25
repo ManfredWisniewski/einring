@@ -10,6 +10,7 @@ export interface Me {
 export type ConnectionStatus =
   | { status: "disconnected" }
   | { status: "pending"; login: string }
+  | { status: "awaiting_claim" }
   | {
       status: "connected";
       loginName: string;
@@ -19,10 +20,10 @@ export type ConnectionStatus =
       sessionToken?: string;
     };
 
-/** `flow` is set only for anonymous (embedded) starts; echo it back on poll. */
+/** `flow` identifies the pending login flow; echo it back on poll and claim. */
 export interface LoginFlowStart {
   login: string;
-  flow?: string;
+  flow: string;
 }
 
 export interface TableColumn {

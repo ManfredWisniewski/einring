@@ -1,4 +1,8 @@
 import DOMPurify from "dompurify";
+
+/** External-content markup: strip images — remote <img> would beacon the viewer IP out. */
+const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
+
 import { marked } from "marked";
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,7 +20,7 @@ import { Label } from "@/components/ui/label";
 
 function Bubble({ msg }: { msg: EinChatMessage }) {
   if (msg.role === "assistant") {
-    const html = DOMPurify.sanitize(marked.parse(msg.content) as string);
+    const html = DOMPurify.sanitize(marked.parse(msg.content) as string, SANITIZE_OPTS);
     return (
       <article className="chat-msg chat-msg--assistant">
         {/* Sanitized by DOMPurify; source is the configured LLM provider's reply. */}

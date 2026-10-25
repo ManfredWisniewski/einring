@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppContext } from "../app.js";
 import type { LlmClient } from "../llm/client.js";
 import { type AuthenticatedNextcloud, NextcloudError } from "../nextcloud/client.js";
+import { makeRateLimiter } from "../rate-limit.js";
 import type { BffModule, ChatTool } from "./types.js";
 
 export interface WikiPageMeta {
@@ -428,9 +429,16 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
       } satisfies WikiTree;
     });
 
+    const syncLimit = makeRateLimiter(10, 60_000);
+    const indexLimit = makeRateLimiter(10, 60_000);
+    const askLimit = makeRateLimiter(30, 60_000);
+
     api.post("/sync", async (request, reply) => {
       if (!credFor(request.user.sub)) {
         return reply.code(424).send({ error: "nextcloud not connected" });
+      }
+      if (!syncLimit.allow(request.user.sub)) {
+        return reply.code(429).send({ error: "too many requests" });
       }
       return sync(request.user.sub);
     });
@@ -473,11 +481,17 @@ export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
 
     api.post("/llm/index", async (request, reply) => {
       if (!llm) return reply.code(424).send({ error: "llm not configured" });
+      if (!indexLimit.allow(request.user.sub)) {
+        return reply.code(429).send({ error: "too many requests" });
+      }
       return runIndex(request.user.sub);
     });
 
     api.post("/ask", async (request, reply) => {
       if (!llm) return reply.code(424).send({ error: "llm not configured" });
+      if (!askLimit.allow(request.user.sub)) {
+        return reply.code(429).send({ error: "too many requests" });
+      }
       const { question } = (request.body ?? {}) as { question?: unknown };
       const q = typeof question === "string" ? question.trim() : "";
       if (!q || q.length > 2000) {

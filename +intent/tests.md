@@ -270,3 +270,36 @@
 - `GET /homework/assignments` is scoped: admin all, teacher = assignments on own homework, student = own, guardian = household children's; each row carries homework title, student name, note/due/status/feedback and its submissions (message + media metadata).
 - `GET /homework/submissions/:id/media` streams the stored file (`DATA_DIR/school-media/<id>`, `MODULE_SCHOOL_MEDIA_DIR` override) only to admin, the homework's teacher, the assigned student or their guardians.
 - App: `/school` gains a Homework tab — teachers manage library + assign + review submissions (inline audio/video player); students/guardians see assignments, download the MusicXML sheet and submit message + file. DE + EN + RU + FR, token variables only.
+
+### A34 Login-flow claim binding + upstream hardening (security)
+
+- `POST /api/nextcloud/login-flow` returns `{login, flow}` for every caller; upstream `login`/`poll.endpoint` outside the configured `NEXTCLOUD_URL` origin are rejected.
+- `POST /login-flow/poll` requires the flow id and returns `pending` → `awaiting_claim` — never a credential or session. The completed app password stays parked on the flow.
+- On upstream completion the BFF writes `einring-sign-in-<6-digit-code>.txt` into the completer's own Nextcloud files; `POST /login-flow/claim {flow, code}` is the only path that stores the credential (Authentik callers → own `sub`; anonymous → `nc:<login>` + einring session token).
+- Wrong codes → 401 (attempts capped per flow); rate limits bound flow start/poll/claim per IP; abandoned `login_flows` rows are pruned.
+- `DELETE /nextcloud/connection` and credential replacement revoke the superseded app password upstream (`DELETE /ocs/v2.php/core/apppassword`) — failures are logged/surfaced.
+- The app shows a code-entry step between polling and "connected".
+
+### A35 School authorization floor + scoping (security)
+
+- Every `/api/school/*` request from a caller with zero school roles answers 403 — a de-roled user cannot ride a lingering person link.
+- A teacher-role caller without a resolvable teacher person fails closed on `GET /persons`, `GET /persons/:id` and `GET /reports/attendance`.
+- Enrollment writes (`POST/PATCH /series`, `POST /lessons`, `PATCH /lessons/:id` addStudentIds, `PUT /events/:id/participants`) reject non-student or inactive person ids with 422.
+- `PATCH /lessons/:id`: substitutes may only edit `cancelReason`/`notes`; `status=cancelled_school` and teacher reassignment are admin-only; roster edits require owner/admin.
+- Lesson reads: parents/students get only their own students' rows with private fields stripped; a teacher's view of foreign lessons reduces to an opaque busy slot.
+- `POST /lessons/:id/report-absence` rejects non-`scheduled`, past-date and already-marked lessons (409) unless admin; `makeupRequestId` must be an open request of a listed student.
+- `POST /lessons/check` for non-admins only probes own teacher + own students.
+- Rentals/instruments and announcement appends are scoped (teacher-assigned students; announcement append = creator or admin); event mutation is restricted to admin/owning teacher.
+- Reviewed homework submissions and their media are immutable (409); deleting homework cascades to assignments, submissions and media files.
+- `school_today` chat tool applies the same caller scoping as the REST routes; role-less callers get no lessons.
+- Person anonymization scrubs name copies in invoice labels, thread/message/delivery/audit subs, lesson private notes and deletes homework submissions + media; the JSON export covers all of them.
+
+### A36 Resource bounds + serialization (security)
+
+- `parseCsv` rejects header width above `MODULE_CSV_MANAGER_MAX_COLS` (default 500) and a `rows × cols` cell budget before padding — a ~5 MB CSV cannot OOM the BFF.
+- EinDAV uid values match `[A-Za-z0-9._-]{1,128}`; DAV hrefs must resolve inside `/remote.php/dav/` on the configured origin; `vcardEscape` normalizes CR.
+- EinMusic enforces a per-user aggregate quota (`MODULE_EINMUSIC_MAX_TOTAL_BYTES`, `MODULE_EINMUSIC_MAX_TRACKS`) in addition to the per-request body limit.
+- Connector credential overwrite revokes the superseded upstream credential first; `DELETE /credentials` returns 502 when upstream revocation fails.
+- Wiki sync/index/ask and einchat message enforce per-sub request budgets (429).
+- External-sender markdown/HTML (Gotify, Wiki, EinChat, Email) is rendered with `<img>` stripped; the served index CSP includes `img-src 'self' data: blob:`.
+- Upstream HTTP calls carry default timeouts; login-flow poll refuses redirects (`redirect: "error"`).

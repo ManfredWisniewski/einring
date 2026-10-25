@@ -8,6 +8,7 @@ import {
   guardianStudentIds,
   materializeLessons,
   periodRange,
+  teacherStudentIds,
   todayBerlin,
   uuid,
 } from "./domain.js";
@@ -19,6 +20,7 @@ import {
   isAdmin,
   needRole,
   ownStudentId,
+  ownTeacherId,
   type SchoolConfig,
 } from "./scope.js";
 
@@ -161,25 +163,23 @@ export function registerBillingRoutes(
          ORDER BY i.name`,
       )
       .all() as Record<string, unknown>[];
-    const scoped = rows.map((r) => ({ ...r }));
     if (!isAdmin(c)) {
+      const ownT = ownTeacherId(c);
       const mine = new Set<string>([
         ...(ownStudentId(c) ? [ownStudentId(c) as string] : []),
         ...guardianStudentIds(db, c.sub),
+        ...(ownT ? teacherStudentIds(db, ownT) : []),
       ]);
+      // Instrument catalog stays visible; renter identity/details only for own students.
       return {
-        instruments: scoped
-          .filter(
-            (r) => !r.studentId || mine.has(String(r.studentId)) || c.roles.includes("teacher"),
-          )
-          .map((r) =>
-            mine.has(String(r.studentId)) || c.roles.includes("teacher")
-              ? r
-              : { ...r, studentName: undefined, studentId: undefined, rentalId: undefined },
-          ),
+        instruments: rows.map((r) =>
+          !r.studentId || mine.has(String(r.studentId))
+            ? r
+            : { ...r, studentName: undefined, studentId: undefined, rentalId: undefined },
+        ),
       };
     }
-    return { instruments: scoped, today: todayBerlin() };
+    return { instruments: rows, today: todayBerlin() };
   });
 
   api.post("/instruments", async (req, reply) => {
@@ -267,18 +267,14 @@ export function registerBillingRoutes(
       )
       .all() as Record<string, unknown>[];
     if (isAdmin(c)) return { rentals: rows, today: todayBerlin() };
+    const ownT = ownTeacherId(c);
     const mine = new Set<string>([
       ...(ownStudentId(c) ? [ownStudentId(c) as string] : []),
       ...guardianStudentIds(db, c.sub),
+      ...(ownT ? teacherStudentIds(db, ownT) : []),
     ]);
     return {
-      rentals: rows
-        .filter((r) => mine.has(String(r.studentId)) || c.roles.includes("teacher"))
-        .map((r) =>
-          mine.has(String(r.studentId)) || c.roles.includes("teacher")
-            ? r
-            : { ...r, studentName: undefined },
-        ),
+      rentals: rows.filter((r) => mine.has(String(r.studentId))),
       today: todayBerlin(),
     };
   });
@@ -557,7 +553,9 @@ export function registerBillingRoutes(
     const q = req.query as { from?: string; to?: string };
     const { from, to } =
       q.from && q.to ? { from: q.from, to: q.to } : periodRange(todayBerlin().slice(0, 7));
-    const own = c.person?.kind === "teacher" && !isAdmin(c) ? c.person.id : null;
+    const own = isAdmin(c) ? null : ownTeacherId(c);
+    // Teacher-role caller without a resolvable teacher link fails closed.
+    if (!isAdmin(c) && !own) return { from, to, rows: [] };
     const rows = db
       .prepare(
         `SELECT p.name AS student, p.id AS studentId, ls.attendance AS att, COUNT(*) AS n

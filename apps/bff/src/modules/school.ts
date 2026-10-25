@@ -1,14 +1,14 @@
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import { openSchoolDb } from "./school/db.js";
-import { materializeLessons, todayBerlin } from "./school/domain.js";
+import { openSchoolDb, personBySub } from "./school/db.js";
+import { guardianStudentIds, materializeLessons, todayBerlin } from "./school/domain.js";
 import { registerBillingRoutes } from "./school/routes-billing.js";
 import { registerCoreRoutes } from "./school/routes-core.js";
 import { registerHomeworkRoutes } from "./school/routes-homework.js";
 import { registerScheduleRoutes } from "./school/routes-schedule.js";
 import { registerSocialRoutes } from "./school/routes-social.js";
-import { touchUser } from "./school/scope.js";
+import { rolesOf, touchUser } from "./school/scope.js";
 import type { BffModule, ChatTool } from "./types.js";
 
 const configSchema = z.object({
@@ -45,20 +45,47 @@ export const schoolModule: BffModule<z.infer<typeof configSchema>> = {
         description:
           "List today's music-school lessons visible to the caller (time, teacher, students, status).",
         parameters: { type: "object", properties: {} },
-        async call(_args, _sub) {
+        async call(_args, sub, user) {
           const today = todayBerlin();
           materializeLessons(db, today, today);
+          // Same scoping as the REST routes: admin → all, teacher → own/substitute,
+          // parent/student → linked students, role-less → nothing.
+          const roles = rolesOf(user?.groups, config);
+          const person = personBySub(db, sub) ?? null;
+          const ownTeacher = person?.kind === "teacher" ? person.id : null;
+          const studentIds = new Set<string>();
+          if (!ownTeacher) {
+            for (const id of guardianStudentIds(db, sub)) studentIds.add(id);
+            if (person?.kind === "student") studentIds.add(person.id);
+          }
+          const rows = db
+            .prepare(
+              `SELECT l.id, l.teacher_id AS teacherId, l.substitute_teacher_id AS substituteId,
+                      l.start_time AS startTime, l.duration_min AS durationMin, l.status,
+                      p.name AS teacher, lt.name AS type
+               FROM school_lessons l
+               JOIN school_persons p ON p.id = l.teacher_id
+               LEFT JOIN school_lesson_types lt ON lt.id = l.lesson_type_id
+               WHERE l.date = ? ORDER BY l.start_time`,
+            )
+            .all(today) as Record<string, unknown>[];
+          const isAdmin = roles.includes("admin");
+          const visible = rows.filter((l) => {
+            if (isAdmin) return true;
+            if (ownTeacher) return l.teacherId === ownTeacher || l.substituteId === ownTeacher;
+            if (studentIds.size === 0) return false;
+            return (
+              db
+                .prepare(
+                  "SELECT 1 FROM school_lesson_students WHERE lesson_id = ? AND student_id IN (" +
+                    [...studentIds].map(() => "?").join(",") +
+                    ")",
+                )
+                .get(l.id as string, ...studentIds) !== undefined
+            );
+          });
           return {
-            lessons: db
-              .prepare(
-                `SELECT l.start_time AS startTime, l.duration_min AS durationMin, l.status,
-                        p.name AS teacher, lt.name AS type
-                 FROM school_lessons l
-                 JOIN school_persons p ON p.id = l.teacher_id
-                 LEFT JOIN school_lesson_types lt ON lt.id = l.lesson_type_id
-                 WHERE l.date = ? ORDER BY l.start_time`,
-              )
-              .all(today),
+            lessons: visible.map(({ id: _id, teacherId: _t, substituteId: _s, ...l }) => l),
           };
         },
       },
@@ -67,9 +94,15 @@ export const schoolModule: BffModule<z.infer<typeof configSchema>> = {
 
   register(api, ctx, config) {
     const db = getDb(ctx, config);
-    // Record every caller so admins can link logins to profiles (D56).
-    api.addHook("preHandler", async (req) => {
-      if (req.user) touchUser(db, req.user);
+    // Role floor: school roles come from the Authentik groups claim (D56); a caller
+    // with no school role has no business on any school route — group revocation
+    // takes effect at the next request, regardless of a lingering person link.
+    api.addHook("preHandler", async (req, reply) => {
+      if (!req.user) return;
+      if (rolesOf(req.user.groups, config).length === 0) {
+        return reply.code(403).send({ error: "forbidden" });
+      }
+      touchUser(db, req.user);
     });
     // Lazy materialization: keep at least an 8-week horizon of lessons.
     materializeLessons(db, todayBerlin(), horizon(8));
@@ -90,7 +123,7 @@ export const schoolModule: BffModule<z.infer<typeof configSchema>> = {
       config.MEDIA_DIR ??
       join((ctx as { config: { DATA_DIR: string } }).config.DATA_DIR, "school-media");
 
-    registerCoreRoutes(api, db, config);
+    registerCoreRoutes(api, db, config, mediaDir);
     registerScheduleRoutes(api, db, config);
     registerBillingRoutes(api, db, config);
     registerSocialRoutes(api, db, config, ctx);

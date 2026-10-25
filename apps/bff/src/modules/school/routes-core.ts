@@ -1,3 +1,5 @@
+import { unlinkSync } from "node:fs";
+import { join } from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -21,6 +23,7 @@ import {
   isStaff,
   needRole,
   ownStudentId,
+  ownTeacherId,
   type SchoolConfig,
 } from "./scope.js";
 
@@ -91,6 +94,7 @@ export function registerCoreRoutes(
   api: FastifyInstance,
   db: DatabaseSync,
   cfg: SchoolConfig,
+  mediaDir: string,
 ): void {
   const caller = (req: FastifyRequest) => callerOf(db, req, cfg);
 
@@ -153,13 +157,12 @@ export function registerCoreRoutes(
     let rows = (db.prepare(`${sql} ORDER BY name`).all(...args) as Record<string, unknown>[]).map(
       (r) => mapRow<Person>(r, PERSON_MAP),
     );
-    if (!isAdmin(c) && c.person?.kind === "teacher") {
-      const mine = teacherStudentIds(db, c.person.id);
-      rows = rows.filter((p) =>
-        p.id === c.person?.id || mine.has(p.id) || p.kind !== "student"
-          ? mine.has(p.id) || p.id === c.person?.id
-          : false,
-      );
+    // A teacher-role caller without a resolvable teacher link fails closed.
+    if (!isAdmin(c)) {
+      const ownT = ownTeacherId(c);
+      if (!ownT) return { persons: [] };
+      const mine = teacherStudentIds(db, ownT);
+      rows = rows.filter((p) => mine.has(p.id) || p.id === ownT);
     }
     return { persons: rows };
   });
@@ -207,8 +210,9 @@ export function registerCoreRoutes(
     if (!isStaff(c)) {
       const ids = visibleStudentIds(db, c);
       if (ids !== "all" && p.id !== c.person?.id && !ids.has(p.id)) return forbidden(reply);
-    } else if (!isAdmin(c) && c.person?.kind === "teacher") {
-      if (p.id !== c.person.id && !teacherStudentIds(db, c.person.id).has(p.id)) {
+    } else if (!isAdmin(c)) {
+      const ownT = ownTeacherId(c);
+      if (!ownT || (p.id !== ownT && !teacherStudentIds(db, ownT).has(p.id))) {
         return forbidden(reply);
       }
     }
@@ -265,18 +269,75 @@ export function registerCoreRoutes(
     const c = caller(req);
     if (!needRole(c, reply, "admin")) return;
     const id = (req.params as { id: string }).id;
+    const before = db
+      .prepare("SELECT name, sub FROM school_persons WHERE id = ? AND deleted_at IS NULL")
+      .get(id) as { name: string; sub: string | null } | undefined;
+    if (!before) return reply.code(404).send({ error: "not found" });
     const ts = now();
-    const res = db
-      .prepare(
-        `UPDATE school_persons
-         SET name = 'Person-' || substr(id, 1, 8), sub = NULL, email = NULL, phone = NULL,
-             birthdate = NULL, matrix_id = NULL, notes = NULL, active = 0,
-             deleted_at = ?, updated_at = ?
-         WHERE id = ? AND deleted_at IS NULL`,
-      )
-      .run(ts, ts, id);
-    if (Number(res.changes) === 0) return reply.code(404).send({ error: "not found" });
+    const pseudonym = `Person-${id.slice(0, 8)}`;
+    db.prepare(
+      `UPDATE school_persons
+       SET name = 'Person-' || substr(id, 1, 8), sub = NULL, email = NULL, phone = NULL,
+           birthdate = NULL, matrix_id = NULL, notes = NULL, active = 0,
+           deleted_at = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(ts, ts, id);
     db.prepare("DELETE FROM school_household_members WHERE person_id = ?").run(id);
+    // Derived copies of the name must not outlive the profile.
+    db.prepare("UPDATE school_invoice_lines SET label = REPLACE(label, ?, ?)").run(
+      before.name,
+      pseudonym,
+    );
+    if (before.sub) {
+      const orphan = `deleted-${id.slice(0, 8)}`;
+      db.prepare("UPDATE school_messages SET sender_sub = ? WHERE sender_sub = ?").run(
+        orphan,
+        before.sub,
+      );
+      db.prepare("UPDATE school_threads SET created_by_sub = ? WHERE created_by_sub = ?").run(
+        orphan,
+        before.sub,
+      );
+      db.prepare("DELETE FROM school_thread_members WHERE sub = ?").run(before.sub);
+      db.prepare("UPDATE school_deliveries SET target_sub = ? WHERE target_sub = ?").run(
+        orphan,
+        before.sub,
+      );
+      db.prepare(
+        "UPDATE school_makeup_requests SET requested_by_sub = ? WHERE requested_by_sub = ?",
+      ).run(orphan, before.sub);
+      db.prepare("UPDATE school_audit SET sub = ? WHERE sub = ?").run(orphan, before.sub);
+    }
+    db.prepare("UPDATE school_audit SET detail = REPLACE(detail, ?, ?)").run(
+      before.name,
+      pseudonym,
+    );
+    // Teacher-written notes and attendance markers about the person are personal data.
+    db.prepare(
+      `UPDATE school_lesson_students
+       SET private_note = NULL, public_note = NULL, practice = NULL, marked_by_sub = NULL
+       WHERE student_id = ?`,
+    ).run(id);
+    // Homework assignments + submissions incl. on-disk media are removed outright.
+    const submissions = db
+      .prepare(
+        `SELECT s.id FROM school_homework_submissions s
+         JOIN school_homework_assignments a ON a.id = s.assignment_id
+         WHERE a.student_id = ?`,
+      )
+      .all(id) as { id: string }[];
+    db.prepare(
+      `DELETE FROM school_homework_submissions WHERE assignment_id IN
+       (SELECT id FROM school_homework_assignments WHERE student_id = ?)`,
+    ).run(id);
+    db.prepare("DELETE FROM school_homework_assignments WHERE student_id = ?").run(id);
+    for (const s of submissions) {
+      try {
+        unlinkSync(join(mediaDir, s.id));
+      } catch {
+        /* already gone */
+      }
+    }
     audit(db, c.sub, "anonymize", "person", id);
     return { ok: true };
   });
@@ -320,7 +381,8 @@ export function registerCoreRoutes(
         id,
       ),
       attendance: q(
-        `SELECT l.date, l.start_time, l.duration_min, ls.attendance, ls.public_note, ls.practice
+        `SELECT l.date, l.start_time, l.duration_min, ls.attendance, ls.private_note,
+                ls.public_note, ls.practice
          FROM school_lesson_students ls JOIN school_lessons l ON l.id = ls.lesson_id
          WHERE ls.student_id = ? ORDER BY l.date`,
         id,
@@ -329,6 +391,33 @@ export function registerCoreRoutes(
       events: q("SELECT * FROM school_event_participants WHERE student_id = ?", id),
       consents: q("SELECT * FROM school_consents WHERE person_id = ?", id),
       makeupRequests: q("SELECT * FROM school_makeup_requests WHERE student_id = ?", id),
+      invoices: q(
+        `SELECT i.* FROM school_invoices i
+         WHERE i.household_id IN
+           (SELECT household_id FROM school_household_members WHERE person_id = ?)`,
+        id,
+      ),
+      homework: q(
+        `SELECT a.*, h.title AS homeworkTitle FROM school_homework_assignments a
+         JOIN school_homework h ON h.id = a.homework_id WHERE a.student_id = ?`,
+        id,
+      ),
+      homeworkSubmissions: q(
+        `SELECT s.* FROM school_homework_submissions s
+         JOIN school_homework_assignments a ON a.id = s.assignment_id
+         WHERE a.student_id = ?`,
+        id,
+      ),
+      messages: p.sub
+        ? q(`SELECT m.* FROM school_messages m WHERE m.sender_sub = ?`, String(p.sub))
+        : [],
+      threadMemberships: p.sub
+        ? q("SELECT * FROM school_thread_members WHERE sub = ?", String(p.sub))
+        : [],
+      deliveries: p.sub
+        ? q("SELECT * FROM school_deliveries WHERE target_sub = ?", String(p.sub))
+        : [],
+      audit: p.sub ? q("SELECT * FROM school_audit WHERE sub = ?", String(p.sub)) : [],
       exportedAt: now(),
     };
   });

@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { AppContext } from "../app.js";
 import type { ChatMessage } from "../llm/client.js";
+import { makeRateLimiter } from "../rate-limit.js";
 import type { BffModule, ChatTool } from "./types.js";
 
 /** Safety cap on the tool-call loop — a model that never stops gets cut off. */
 const MAX_TOOL_ITERATIONS = 5;
+const messageLimit = makeRateLimiter(20, 60_000);
 
 const SYSTEM_PROMPT = `You are EinChat, an assistant inside the Einring app (personal data field companion).
 You can call tools exposed by the user's connected modules — use them whenever they
@@ -95,6 +97,9 @@ export const einchatModule: BffModule = {
         return reply.code(400).send({ error: "expected {messages: [{role, content}]}" });
       }
       const sub = req.user.sub;
+      if (!messageLimit.allow(sub)) {
+        return reply.code(429).send({ error: "too many requests" });
+      }
       const off = disabledTools(ctx, sub);
       const active = collected.filter((c) => !off.has(c.tool.name));
       const byName = new Map(active.map((c) => [c.tool.name, c.tool]));
@@ -119,7 +124,7 @@ export const einchatModule: BffModule = {
           const tool = byName.get(tc.name);
           let out: unknown;
           try {
-            out = tool ? await tool.call(tc.arguments, sub) : { error: "unknown_tool" };
+            out = tool ? await tool.call(tc.arguments, sub, req.user) : { error: "unknown_tool" };
           } catch (e) {
             req.log.warn({ err: e, tool: tc.name }, "chat tool call failed");
             out = { error: "tool_failed" };

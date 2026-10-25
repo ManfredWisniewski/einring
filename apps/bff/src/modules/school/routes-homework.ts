@@ -1,4 +1,4 @@
-import { createReadStream, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, mkdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -94,7 +94,7 @@ export function registerHomeworkRoutes(
       .prepare(
         `SELECT a.*, h.teacher_id AS teacherId, h.title AS homeworkTitle
          FROM school_homework_assignments a
-         JOIN school_homework h ON h.id = a.homework_id
+         JOIN school_homework h ON h.id = a.homework_id AND h.deleted_at IS NULL
          WHERE a.id = ?`,
       )
       .get(id) as
@@ -245,7 +245,27 @@ export function registerHomeworkRoutes(
       .get(id) as { teacher_id: string } | undefined;
     if (!h) return reply.code(404).send({ error: "not found" });
     if (!ownsHomework(c, h.teacher_id)) return forbidden(reply);
+    // Cascade: descendant rows and their media files go with the homework.
+    const subs = db
+      .prepare(
+        `SELECT s.id FROM school_homework_submissions s
+         JOIN school_homework_assignments a ON a.id = s.assignment_id
+         WHERE a.homework_id = ?`,
+      )
+      .all(id) as { id: string }[];
+    db.prepare(
+      `DELETE FROM school_homework_submissions WHERE assignment_id IN
+       (SELECT id FROM school_homework_assignments WHERE homework_id = ?)`,
+    ).run(id);
+    db.prepare("DELETE FROM school_homework_assignments WHERE homework_id = ?").run(id);
     db.prepare("UPDATE school_homework SET deleted_at = ? WHERE id = ?").run(now(), id);
+    for (const s of subs) {
+      try {
+        unlinkSync(join(mediaDir, s.id));
+      } catch {
+        /* already gone */
+      }
+    }
     audit(db, c.sub, "delete", "homework", id);
     return { ok: true };
   });
@@ -384,6 +404,7 @@ export function registerHomeworkRoutes(
     const a = getAssignment(id);
     if (!a) return reply.code(404).send({ error: "not found" });
     if (!studentProxy(db, c, a.student_id)) return forbidden(reply);
+    if (a.status === "reviewed") return reply.code(409).send({ error: "already reviewed" });
     const parsed = submissionIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const sid = uuid();
@@ -429,6 +450,9 @@ export function registerHomeworkRoutes(
         .get(id) as { id: string; studentId: string; assignmentId: string } | undefined;
       if (!s) return reply.code(404).send({ error: "not found" });
       if (!studentProxy(db, c, s.studentId)) return forbidden(reply);
+      const asg = getAssignment(s.assignmentId);
+      if (!asg) return reply.code(404).send({ error: "not found" });
+      if (asg.status === "reviewed") return reply.code(409).send({ error: "already reviewed" });
       const body = req.body;
       if (!Buffer.isBuffer(body) || body.length === 0) {
         return reply.code(400).send({ error: "expected media bytes as the request body" });
@@ -457,7 +481,7 @@ export function registerHomeworkRoutes(
                 a.student_id AS studentId, h.teacher_id AS teacherId
          FROM school_homework_submissions s
          JOIN school_homework_assignments a ON a.id = s.assignment_id
-         JOIN school_homework h ON h.id = a.homework_id
+         JOIN school_homework h ON h.id = a.homework_id AND h.deleted_at IS NULL
          WHERE s.id = ?`,
       )
       .get(id) as

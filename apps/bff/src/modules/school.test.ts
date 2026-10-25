@@ -110,7 +110,8 @@ describe("school module", () => {
       url: "/api/school/me",
       headers: H("plain-tok"),
     });
-    expect(j(res2).roles).toEqual([]);
+    // Role floor: a caller with zero school roles gets 403 on every school route.
+    expect(res2.statusCode).toBe(403);
   });
 
   it("admin manages persons; parents cannot", async () => {

@@ -1,4 +1,8 @@
 import DOMPurify from "dompurify";
+
+/** External-content markup: strip images — remote <img> would beacon the viewer IP out. */
+const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
+
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
@@ -47,8 +51,12 @@ function MailRow({ uid, subject, from, date }: EmailSummary) {
               <p className="email-text">{msg.data.text}</p>
             ) : msg.data.html ? (
               // Sanitized by DOMPurify; source is the user's own mailbox.
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: remote mail HTML is sanitized
-              <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.data.html) }} />
+              <div
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: remote mail HTML is sanitized
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(msg.data.html, SANITIZE_OPTS),
+                }}
+              />
             ) : (
               <p className="muted">{t("modules.email.noContent")}</p>
             ))}

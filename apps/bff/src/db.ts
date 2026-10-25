@@ -16,6 +16,18 @@ export interface PendingLoginFlow {
   sub: string;
   pollToken: string;
   pollEndpoint: string;
+  /** Validated upstream login URL the user is sent to. */
+  upstreamLogin?: string | null;
+  /** Sub of the caller that initiated the flow (null for anonymous). */
+  initiatorSub?: string | null;
+  /** sha256 of the claim code — set once the upstream login completed. */
+  claimHash?: string | null;
+  /** Upstream login name after a completed flow. */
+  loginName?: string | null;
+  /** Upstream server base URL after a completed flow. */
+  server?: string | null;
+  /** Sealed app password parked on the flow until claimed. */
+  appPasswordSealed?: string | null;
 }
 
 /** A mirrored Collectives page. `path` is relative to the Collectives root ("Handbook/Intro.md"). */
@@ -105,10 +117,17 @@ export interface Store {
   /** Per-user JSON blob a module owns (e.g. einchat's tool selection). */
   getModuleSettings(sub: string, module: string): string | undefined;
   saveModuleSettings(sub: string, module: string, data: string): void;
-  /** Pending flows expire after 10 min — stale rows read as "no pending flow". */
+  /** Pending flows expire after 10 min — stale rows read as "no pending flow" and are pruned. */
   getPendingFlow(sub: string): PendingLoginFlow | undefined;
   savePendingFlow(flow: PendingLoginFlow): void;
+  /** Parks the completed upstream credential + claim hash on the flow row. */
+  completePendingFlow(
+    sub: string,
+    result: { loginName: string; server: string; appPasswordSealed: string; claimHash: string },
+  ): void;
   deletePendingFlow(sub: string): void;
+  /** Drops all pending flows a caller initiated (disconnect cleanup). */
+  deletePendingFlowsForInitiator(sub: string): void;
   /** Embedded-mode sessions: token is stored as its sha256 hash, never in clear. */
   saveSession(tokenHash: string, sub: string, expiresAt: string): void;
   /** The session's sub, or undefined for unknown/expired tokens (expired rows are pruned on read). */
@@ -168,6 +187,8 @@ export interface Store {
   markAllNotificationsRead(sub: string): void;
   /** einmusic (D48): track metadata; the audio file lives on disk. */
   listMusicTracks(sub: string): Omit<MusicTrackRow, "sub">[];
+  /** Aggregate upload usage (bytes + count) for quota enforcement. */
+  musicUsage(sub: string): { bytes: number; tracks: number };
   createMusicTrack(sub: string, title: string, bytes: number): Omit<MusicTrackRow, "sub">;
   getMusicTrack(sub: string, id: number): Omit<MusicTrackRow, "sub"> | undefined;
   /** Deletes the row + playlist references; false when the sub doesn't own `id`. */
@@ -196,6 +217,12 @@ CREATE TABLE IF NOT EXISTS login_flows (
   sub TEXT PRIMARY KEY,
   poll_token TEXT NOT NULL,
   poll_endpoint TEXT NOT NULL,
+  upstream_login TEXT,
+  initiator_sub TEXT,
+  claim_hash TEXT,
+  login_name TEXT,
+  server TEXT,
+  app_password_sealed TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS wiki_pages (
@@ -302,6 +329,19 @@ function migrate(db: DatabaseSync) {
   if (!cols.some((c) => c.name === "display_name")) {
     db.exec("ALTER TABLE nextcloud_credentials ADD COLUMN display_name TEXT");
   }
+  const flowCols = new Set(
+    (db.prepare("PRAGMA table_info(login_flows)").all() as { name: string }[]).map((c) => c.name),
+  );
+  for (const col of [
+    "upstream_login",
+    "initiator_sub",
+    "claim_hash",
+    "login_name",
+    "server",
+    "app_password_sealed",
+  ]) {
+    if (!flowCols.has(col)) db.exec(`ALTER TABLE login_flows ADD COLUMN ${col} TEXT`);
+  }
 }
 
 /** `path` may be ":memory:" for tests. */
@@ -339,19 +379,36 @@ export function openStore(path: string): Store {
      ON CONFLICT(sub, module) DO UPDATE SET data = excluded.data`,
   );
   const getFlow = db.prepare(
-    `SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint FROM login_flows
+    `SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint,
+            upstream_login AS upstreamLogin, initiator_sub AS initiatorSub,
+            claim_hash AS claimHash, login_name AS loginName, server,
+            app_password_sealed AS appPasswordSealed
+     FROM login_flows
      WHERE sub = ? AND created_at > datetime('now', '-10 minutes')`,
   );
   const putFlow = db.prepare(
-    `INSERT INTO login_flows (sub, poll_token, poll_endpoint) VALUES (?, ?, ?)
-     ON CONFLICT(sub) DO UPDATE SET poll_token = excluded.poll_token, poll_endpoint = excluded.poll_endpoint,
-       created_at = datetime('now')`,
+    `INSERT INTO login_flows (sub, poll_token, poll_endpoint, upstream_login, initiator_sub)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(sub) DO UPDATE SET poll_token = excluded.poll_token,
+       poll_endpoint = excluded.poll_endpoint, upstream_login = excluded.upstream_login,
+       initiator_sub = excluded.initiator_sub, created_at = datetime('now')`,
+  );
+  const completeFlow = db.prepare(
+    `UPDATE login_flows SET login_name = ?, server = ?, app_password_sealed = ?, claim_hash = ?
+     WHERE sub = ?`,
   );
   const delFlow = db.prepare("DELETE FROM login_flows WHERE sub = ?");
+  const delFlowsForInitiator = db.prepare("DELETE FROM login_flows WHERE initiator_sub = ?");
+  const delExpiredFlows = db.prepare(
+    "DELETE FROM login_flows WHERE created_at <= datetime('now', '-10 minutes')",
+  );
   const putSession = db.prepare(
     "INSERT INTO sessions (token_hash, sub, expires_at) VALUES (?, ?, ?)",
   );
-  const delExpiredSessions = db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')");
+  // expires_at is stored as ISO 'YYYY-MM-DDTHH:MM:SS.sssZ' — compare in the same format.
+  const delExpiredSessions = db.prepare(
+    "DELETE FROM sessions WHERE expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+  );
   const getSession = db.prepare("SELECT sub FROM sessions WHERE token_hash = ?");
   const delSessionsForSub = db.prepare("DELETE FROM sessions WHERE sub = ?");
   const listPages = db.prepare(
@@ -423,6 +480,9 @@ export function openStore(path: string): Store {
   const listTracks = db.prepare(
     "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? ORDER BY title",
   );
+  const trackUsage = db.prepare(
+    "SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS tracks FROM music_tracks WHERE sub = ?",
+  );
   const putTrack = db.prepare("INSERT INTO music_tracks (sub, title, bytes) VALUES (?, ?, ?)");
   const getTrack = db.prepare(
     "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? AND id = ?",
@@ -477,9 +537,22 @@ export function openStore(path: string): Store {
     getModuleSettings: (sub, module) =>
       (getModSettings.get(sub, module) as { data: string } | undefined)?.data,
     saveModuleSettings: (sub, module, data) => void putModSettings.run(sub, module, data),
-    getPendingFlow: (sub) => getFlow.get(sub) as PendingLoginFlow | undefined,
-    savePendingFlow: (f) => void putFlow.run(f.sub, f.pollToken, f.pollEndpoint),
+    getPendingFlow: (sub) => {
+      delExpiredFlows.run();
+      return getFlow.get(sub) as PendingLoginFlow | undefined;
+    },
+    savePendingFlow: (f) =>
+      void putFlow.run(
+        f.sub,
+        f.pollToken,
+        f.pollEndpoint,
+        f.upstreamLogin ?? null,
+        f.initiatorSub ?? null,
+      ),
+    completePendingFlow: (sub, r) =>
+      void completeFlow.run(r.loginName, r.server, r.appPasswordSealed, r.claimHash, sub),
     deletePendingFlow: (sub) => void delFlow.run(sub),
+    deletePendingFlowsForInitiator: (sub) => void delFlowsForInitiator.run(sub),
     saveSession: (tokenHash, sub, expiresAt) => void putSession.run(tokenHash, sub, expiresAt),
     getSessionSub: (tokenHash) => {
       delExpiredSessions.run();
@@ -580,6 +653,7 @@ export function openStore(path: string): Store {
     markNotificationRead: (sub, id) => markNotif.run(id, sub).changes > 0,
     markAllNotificationsRead: (sub) => void markAllNotifs.run(sub),
     listMusicTracks: (sub) => listTracks.all(sub) as Omit<MusicTrackRow, "sub">[],
+    musicUsage: (sub) => trackUsage.get(sub) as { bytes: number; tracks: number },
     createMusicTrack: (sub, title, bytes) => {
       const id = Number(putTrack.run(sub, title, bytes).lastInsertRowid);
       return getTrack.get(sub, id) as Omit<MusicTrackRow, "sub">;

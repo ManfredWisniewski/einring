@@ -85,6 +85,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   await app.register(cors, { origin: allowedOrigins(deps.config), credentials: false });
 
+  if (new URL(deps.config.NEXTCLOUD_URL).protocol !== "https:") {
+    app.log.warn("NEXTCLOUD_URL is not https — upstream traffic is interceptable");
+  }
+
   app.setErrorHandler((err: Error & { statusCode?: number }, request, reply) => {
     if (err instanceof NextcloudError) {
       request.log.warn({ status: err.status, msg: err.message }, "nextcloud error");
@@ -163,17 +167,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     });
     let indexHtml: string | undefined;
     // The instance's own Nextcloud may frame the app (External sites embed).
-    const frameAncestors = `frame-ancestors 'self' ${new URL(deps.config.NEXTCLOUD_URL).origin}`;
+    // img-src bounds which origins the app may load images from — upstream media
+    // always arrives through the BFF proxy, so 'self' + data/blob suffice.
+    const csp = `frame-ancestors 'self' ${new URL(deps.config.NEXTCLOUD_URL).origin}; img-src 'self' data: blob:`;
     app.setNotFoundHandler(async (request, reply) => {
       if (request.method === "GET" && !request.url.startsWith("/api/")) {
         indexHtml ??= patchIndexHtml(
           await readFile(resolve(staticDir, "index.html"), "utf8"),
           deps.config,
         );
-        return reply
-          .header("Content-Security-Policy", frameAncestors)
-          .type("text/html")
-          .send(indexHtml);
+        return reply.header("Content-Security-Policy", csp).type("text/html").send(indexHtml);
       }
       return reply.code(404).send({ error: "not found" });
     });

@@ -50,6 +50,10 @@
     "openAgain": "Rouvrir la page de connexion",
     "connectedAs": "Connecté en tant que {{user}} sur {{server}}",
     "disconnect": "Déconnecter",
+    "claimHint": "Un fichier « einring-sign-in-XXXXXX.txt » se trouve maintenant dans vos fichiers Nextcloud — saisissez le code à six chiffres qu'il contient.",
+    "claimPlaceholder": "Code à 6 chiffres",
+    "claim": "Vérifier le code",
+    "claimFailed": "Le code ne correspond pas ou le flux a expiré.",
     "error": "La requête Nextcloud a échoué ({{status}})."
   },
   "modules": {

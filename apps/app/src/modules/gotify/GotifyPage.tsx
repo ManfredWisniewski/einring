@@ -1,4 +1,8 @@
 import DOMPurify from "dompurify";
+
+/** External-content markup: strip images — remote <img> would beacon the viewer IP out. */
+const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
+
 import { marked } from "marked";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,7 +40,7 @@ function MessageRow({ msg, appName }: { msg: GotifyMessage; appName: string | un
   const del = useGotifyDeleteMessage();
   const html =
     open && msg.contentType === "text/markdown"
-      ? DOMPurify.sanitize(marked.parse(msg.message) as string)
+      ? DOMPurify.sanitize(marked.parse(msg.message) as string, SANITIZE_OPTS)
       : null;
 
   return (

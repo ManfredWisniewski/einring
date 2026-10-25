@@ -130,6 +130,13 @@ export function registerConnectorRoutes(
     }
     const finalSecret =
       typeof verified === "object" && verified.secret ? verified.secret : secret.secret;
+    // Revoke the superseded credential upstream — otherwise the old token stays live.
+    const old = connectorCred(ctx, req.user.sub, opts.service);
+    if (old && opts.onDisconnect) {
+      await opts.onDisconnect(fetchImpl, old.url, old.secret).catch((err) => {
+        api.log.warn({ err, service: opts.service }, "credential revoke on overwrite failed");
+      });
+    }
     store.saveServiceCredential({
       sub: req.user.sub,
       service: opts.service,
@@ -139,10 +146,18 @@ export function registerConnectorRoutes(
     return { connected: true, url };
   });
 
-  api.delete("/credentials", async (req) => {
+  api.delete("/credentials", async (req, reply) => {
     if (opts.onDisconnect) {
       const cred = connectorCred(ctx, req.user.sub, opts.service);
-      if (cred) await opts.onDisconnect(fetchImpl, cred.url, cred.secret).catch(() => {});
+      if (cred) {
+        try {
+          await opts.onDisconnect(fetchImpl, cred.url, cred.secret);
+        } catch (err) {
+          // Surface the failure — a silently orphaned token stays valid upstream.
+          api.log.warn({ err, service: opts.service }, "credential revoke failed");
+          return reply.code(502).send({ error: `${opts.service} revocation failed` });
+        }
+      }
     }
     store.deleteServiceCredential(req.user.sub, opts.service);
     return { connected: false };

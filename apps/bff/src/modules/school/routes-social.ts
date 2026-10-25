@@ -4,8 +4,17 @@ import { z } from "zod";
 import type { AppContext } from "../../app.js";
 import { audit, now } from "./db.js";
 import { deliver } from "./delivery.js";
-import { allowedPeerSubs, audienceSubs, guardianStudentIds, uuid } from "./domain.js";
-import { callerOf, forbidden, isAdmin, isStaff, ownStudentId, type SchoolConfig } from "./scope.js";
+import { allowedPeerSubs, audienceSubs, guardianStudentIds, uuid, validStudent } from "./domain.js";
+import {
+  type Caller,
+  callerOf,
+  forbidden,
+  isAdmin,
+  isStaff,
+  ownStudentId,
+  ownTeacherId,
+  type SchoolConfig,
+} from "./scope.js";
 
 const threadIn = z.object({
   kind: z.enum(["direct", "announcement"]).default("direct"),
@@ -61,6 +70,16 @@ function memberOf(db: DatabaseSync, threadId: string, sub: string): boolean {
   return !!db
     .prepare("SELECT 1 FROM school_thread_members WHERE thread_id = ? AND sub = ?")
     .get(threadId, sub);
+}
+
+/** Event ownership: admin or the event's teacher may mutate it. */
+function ownsEvent(db: DatabaseSync, c: Caller, eventId: string): "not_found" | boolean {
+  const row = db.prepare("SELECT teacher_id AS t FROM school_events WHERE id = ?").get(eventId) as
+    | { t: string | null }
+    | undefined;
+  if (!row) return "not_found";
+  if (isAdmin(c)) return true;
+  return row.t != null && row.t === ownTeacherId(c);
 }
 
 export function registerSocialRoutes(
@@ -179,7 +198,11 @@ export function registerSocialRoutes(
       .prepare("SELECT kind, created_by_sub AS creator FROM school_threads WHERE id = ?")
       .get(id) as { kind: string; creator: string } | undefined;
     if (!thread) return reply.code(404).send({ error: "not found" });
-    // Announcements are one-way: only staff (creator or admin) may append.
+    // Announcements are one-way: only the creator or an admin may append —
+    // every append fans out to all members incl. Matrix DMs.
+    if (thread.kind === "announcement" && !isAdmin(c) && thread.creator !== c.sub) {
+      return forbidden(reply);
+    }
     if (thread.kind === "announcement" && !isStaff(c)) return forbidden(reply);
     const parsed = messageIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
@@ -272,6 +295,10 @@ export function registerSocialRoutes(
     const parsed = eventIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const e = parsed.data;
+    // Non-admins may only create events attributed to themselves.
+    const teacherId = isAdmin(c) ? (e.teacherId ?? null) : ownTeacherId(c);
+    if (!isAdmin(c) && !teacherId) return forbidden(reply);
+    if (!isAdmin(c) && e.teacherId && e.teacherId !== teacherId) return forbidden(reply);
     const id = uuid();
     db.prepare(
       `INSERT INTO school_events (id, kind, title, date, start_time, end_time, location, description, teacher_id, created_at)
@@ -285,7 +312,7 @@ export function registerSocialRoutes(
       e.endTime ?? null,
       e.location ?? null,
       e.description ?? null,
-      e.teacherId ?? null,
+      teacherId,
       now(),
     );
     audit(db, c.sub, "create", "event", id, e);
@@ -296,9 +323,14 @@ export function registerSocialRoutes(
     const c = caller(req);
     if (!isStaff(c)) return forbidden(reply);
     const id = (req.params as { id: string }).id;
+    const owned = ownsEvent(db, c, id);
+    if (owned === "not_found") return reply.code(404).send({ error: "not found" });
+    if (!owned) return forbidden(reply);
     const parsed = eventPatch.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const e = parsed.data;
+    // Re-attribution is admin-only.
+    if (!isAdmin(c) && e.teacherId !== undefined) return forbidden(reply);
     const fields: Record<string, SQLInputValue | undefined> = {
       kind: e.kind,
       title: e.title,
@@ -326,6 +358,9 @@ export function registerSocialRoutes(
     const c = caller(req);
     if (!isStaff(c)) return forbidden(reply);
     const id = (req.params as { id: string }).id;
+    const owned = ownsEvent(db, c, id);
+    if (owned === "not_found") return reply.code(404).send({ error: "not found" });
+    if (!owned) return forbidden(reply);
     db.prepare("DELETE FROM school_event_participants WHERE event_id = ?").run(id);
     db.prepare("DELETE FROM school_event_rehearsals WHERE event_id = ?").run(id);
     const res = db.prepare("DELETE FROM school_events WHERE id = ?").run(id);
@@ -339,11 +374,16 @@ export function registerSocialRoutes(
     const c = caller(req);
     if (!isStaff(c)) return forbidden(reply);
     const id = (req.params as { id: string }).id;
-    if (!db.prepare("SELECT 1 FROM school_events WHERE id = ?").get(id)) {
-      return reply.code(404).send({ error: "not found" });
-    }
+    const owned = ownsEvent(db, c, id);
+    if (owned === "not_found") return reply.code(404).send({ error: "not found" });
+    if (!owned) return forbidden(reply);
     const parsed = participantsIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
+    for (const p of parsed.data.participants) {
+      if (!validStudent(db, p.studentId)) {
+        return reply.code(422).send({ error: `unknown student ${p.studentId}` });
+      }
+    }
     const keep = new Set(parsed.data.participants.map((p) => p.studentId));
     const existing = db
       .prepare("SELECT student_id AS id FROM school_event_participants WHERE event_id = ?")
@@ -388,9 +428,9 @@ export function registerSocialRoutes(
     const c = caller(req);
     if (!isStaff(c)) return forbidden(reply);
     const id = (req.params as { id: string }).id;
-    if (!db.prepare("SELECT 1 FROM school_events WHERE id = ?").get(id)) {
-      return reply.code(404).send({ error: "not found" });
-    }
+    const owned = ownsEvent(db, c, id);
+    if (owned === "not_found") return reply.code(404).send({ error: "not found" });
+    if (!owned) return forbidden(reply);
     const parsed = rehearsalIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const r = parsed.data;
@@ -406,7 +446,10 @@ export function registerSocialRoutes(
   api.delete("/events/:id/rehearsals/:rid", async (req, reply) => {
     const c = caller(req);
     if (!isStaff(c)) return forbidden(reply);
-    const { rid } = req.params as { id: string; rid: string };
+    const { id, rid } = req.params as { id: string; rid: string };
+    const owned = ownsEvent(db, c, id);
+    if (owned === "not_found") return reply.code(404).send({ error: "not found" });
+    if (!owned) return forbidden(reply);
     const res = db.prepare("DELETE FROM school_event_rehearsals WHERE id = ?").run(rid);
     if (Number(res.changes) === 0) return reply.code(404).send({ error: "not found" });
     return { ok: true };

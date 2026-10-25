@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { z } from "zod";
 import type { AppContext } from "../app.js";
+import type { AuthUser } from "../auth.js";
 
 /**
  * A tool a module lends to EinChat (D41). Names should carry the module prefix
@@ -12,7 +13,7 @@ export interface ChatTool {
   description: string;
   /** JSON Schema object for `call`'s argument. */
   parameters: Record<string, unknown>;
-  call(args: Record<string, unknown>, sub: string): Promise<unknown>;
+  call(args: Record<string, unknown>, sub: string, user?: AuthUser): Promise<unknown>;
 }
 
 /**

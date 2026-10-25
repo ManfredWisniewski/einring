@@ -1,7 +1,7 @@
 import { Browser } from "@capacitor/browser";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
+import { useClaimLoginFlow, usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,36 +15,45 @@ async function openLogin(url: string) {
   else window.open(url, "_blank", "noopener");
 }
 
-/** "Connect Nextcloud" card: starts Login Flow v2 via the BFF and polls until Nextcloud reports success. */
+/** "Connect Nextcloud" card: starts Login Flow v2 via the BFF, polls until Nextcloud
+ *  reports success, then asks for the claim code dropped into the user's own files. */
 export function NextcloudConnect() {
   const { t } = useTranslation();
   const name = useInstanceName();
   const { setSession } = useAuth();
   const start = useStartLoginFlow();
   const poll = usePollLoginFlow();
+  const claim = useClaimLoginFlow();
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
-  /** Anonymous (embedded) flows get a flow id that must be echoed on each poll. */
   const [flowId, setFlowId] = useState<string | undefined>();
+  const [awaitingClaim, setAwaitingClaim] = useState(false);
+  const [code, setCode] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!loginUrl) return;
+    if (!loginUrl || awaitingClaim || !flowId) return;
     timer.current = setInterval(() => {
       if (!poll.isPending) poll.mutate(flowId);
     }, POLL_INTERVAL_MS);
     return () => {
       if (timer.current) clearInterval(timer.current);
     };
-  }, [loginUrl, poll, flowId]);
+  }, [loginUrl, poll, flowId, awaitingClaim]);
 
   useEffect(() => {
-    if (poll.data?.status === "connected") {
+    const data = poll.data ?? claim.data;
+    if (poll.data?.status === "awaiting_claim") {
+      setAwaitingClaim(true);
+      if (timer.current) clearInterval(timer.current);
+    }
+    if (data?.status === "connected") {
       setLoginUrl(null);
+      setAwaitingClaim(false);
       if (isNative) void Browser.close().catch(() => {});
       // Anonymous embedded flow: adopt the minted session as our auth.
-      if (poll.data.sessionToken) void setSession(poll.data.sessionToken);
+      if (data.sessionToken) void setSession(data.sessionToken);
     }
-  }, [poll.data, setSession]);
+  }, [poll.data, claim.data, setSession]);
 
   const begin = async () => {
     const { login, flow } = await start.mutateAsync();
@@ -53,13 +62,35 @@ export function NextcloudConnect() {
     await openLogin(login);
   };
 
+  const submitCode = () => {
+    if (flowId && code.trim()) claim.mutate({ flow: flowId, code: code.trim() });
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t("nextcloud.title")}</CardTitle>
       </CardHeader>
       <CardContent className="stack">
-        {loginUrl ? (
+        {awaitingClaim ? (
+          <>
+            <p className="muted">{t("nextcloud.claimHint")}</p>
+            <div className="row">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder={t("nextcloud.claimPlaceholder")}
+              />
+              <Button onClick={submitCode} disabled={claim.isPending || code.length !== 6}>
+                {t("nextcloud.claim")}
+              </Button>
+            </div>
+            {claim.isError && <p className="text-danger">{t("nextcloud.claimFailed")}</p>}
+          </>
+        ) : loginUrl ? (
           <>
             <p className="muted">{t("nextcloud.waiting")}</p>
             <div className="row">

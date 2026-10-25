@@ -50,6 +50,10 @@
     "openAgain": "Anmeldeseite erneut öffnen",
     "connectedAs": "Verbunden als {{user}} auf {{server}}",
     "disconnect": "Verbindung trennen",
+    "claimHint": "In deinen Nextcloud-Dateien liegt jetzt eine Datei „einring-sign-in-XXXXXX.txt“ — gib den sechsstelligen Code daraus ein.",
+    "claimPlaceholder": "6-stelliger Code",
+    "claim": "Code prüfen",
+    "claimFailed": "Der Code stimmt nicht oder der Vorgang ist abgelaufen.",
     "error": "Nextcloud-Anfrage fehlgeschlagen ({{status}})."
   },
   "modules": {

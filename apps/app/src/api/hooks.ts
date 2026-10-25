@@ -160,8 +160,24 @@ export function usePollLoginFlow() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (flow?: string) =>
-      api.post<ConnectionStatus>("/nextcloud/login-flow/poll", flow ? { flow } : undefined),
+    mutationFn: (flow: string) =>
+      api.post<ConnectionStatus>("/nextcloud/login-flow/poll", { flow }),
+    onSuccess: (data) => {
+      if (data.status === "connected") {
+        qc.setQueryData(keys.connection, data);
+        void qc.invalidateQueries({ queryKey: ["tables"] });
+      }
+    },
+  });
+}
+
+/** Claim a completed login flow with the code from the user's own Nextcloud files. */
+export function useClaimLoginFlow() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { flow: string; code: string }) =>
+      api.post<ConnectionStatus>("/nextcloud/login-flow/claim", input),
     onSuccess: (data) => {
       if (data.status === "connected") {
         qc.setQueryData(keys.connection, data);

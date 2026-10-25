@@ -9,6 +9,7 @@ import {
   now,
   PERSON_MAP,
   type Person,
+  person,
   type Role,
   SERIES_MAP,
   type Series,
@@ -505,6 +506,12 @@ export function audienceSubs(db: DatabaseSync, audience: string): Set<string> {
   return new Set(rows.map((r) => r.sub));
 }
 
+/** True when `id` is an existing, active student person — enrollment writes must check this. */
+export function validStudent(db: DatabaseSync, id: string): boolean {
+  const p = person(db, id);
+  return p?.kind === "student" && p.active === 1;
+}
+
 /** Student ids a teacher instructs (via series membership or lesson assignment). */
 export function teacherStudentIds(db: DatabaseSync, teacherPersonId: string): Set<string> {
   const out = new Set<string>();
@@ -512,14 +519,18 @@ export function teacherStudentIds(db: DatabaseSync, teacherPersonId: string): Se
     .prepare(
       `SELECT DISTINCT ss.student_id AS id FROM school_series_students ss
        JOIN school_lesson_series s ON s.id = ss.series_id
-       WHERE s.teacher_id = ? AND s.deleted_at IS NULL`,
+       JOIN school_persons p ON p.id = ss.student_id
+       WHERE s.teacher_id = ? AND s.deleted_at IS NULL
+         AND p.kind = 'student' AND p.active = 1 AND p.deleted_at IS NULL`,
     )
     .all(teacherPersonId) as { id: string }[];
   const b = db
     .prepare(
       `SELECT DISTINCT ls.student_id AS id FROM school_lesson_students ls
        JOIN school_lessons l ON l.id = ls.lesson_id
-       WHERE l.teacher_id = ? OR l.substitute_teacher_id = ?`,
+       JOIN school_persons p ON p.id = ls.student_id
+       WHERE (l.teacher_id = ? OR l.substitute_teacher_id = ?)
+         AND p.kind = 'student' AND p.active = 1 AND p.deleted_at IS NULL`,
     )
     .all(teacherPersonId, teacherPersonId) as { id: string }[];
   for (const r of [...a, ...b]) out.add(r.id);
@@ -627,13 +638,15 @@ export function allowedPeerSubs(
       .all(personId) as { sub: string }[];
     for (const r of teachers) peers.add(r.sub);
   }
-  // Everyone may reach admins
-  const admins = db
-    .prepare(
-      "SELECT sub FROM school_persons WHERE sub IS NOT NULL AND kind = 'staff' AND deleted_at IS NULL",
-    )
-    .all() as { sub: string }[];
-  for (const r of admins) peers.add(r.sub);
+  // Anyone holding a school role may reach admins — role-less principals get nobody.
+  if (roles.length > 0) {
+    const admins = db
+      .prepare(
+        "SELECT sub FROM school_persons WHERE sub IS NOT NULL AND kind = 'staff' AND deleted_at IS NULL",
+      )
+      .all() as { sub: string }[];
+    for (const r of admins) peers.add(r.sub);
+  }
   peers.delete(sub);
   return peers;
 }

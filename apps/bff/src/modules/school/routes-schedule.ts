@@ -7,8 +7,11 @@ import {
   getSeries,
   guardianStudentIds,
   materializeLessons,
+  teacherStudentIds,
+  todayBerlin,
   toMin,
   uuid,
+  validStudent,
   weekdayOf,
 } from "./domain.js";
 import {
@@ -126,7 +129,16 @@ const checkIn = z.object({
   excludeLessonId: z.string().optional(),
 });
 
-const lessonOut = (l: Lesson) => l;
+const lessonOut = <T>(l: T) => l;
+
+/** Out-of-scope lessons reduce to an opaque busy slot — no rosters, names or notes. */
+const busySlot = (l: Lesson) => ({
+  id: l.id,
+  date: l.date,
+  startTime: l.startTime,
+  durationMin: l.durationMin,
+  status: l.status,
+});
 
 function lessonStudents(db: DatabaseSync, lessonId: string) {
   return db
@@ -305,6 +317,11 @@ export function registerScheduleRoutes(
       ts,
       ts,
     );
+    for (const sid of s.studentIds) {
+      if (!validStudent(db, sid)) {
+        return reply.code(422).send({ error: `unknown student ${sid}` });
+      }
+    }
     const ins = db.prepare(
       "INSERT INTO school_series_students (series_id, student_id) VALUES (?, ?)",
     );
@@ -357,6 +374,11 @@ export function registerScheduleRoutes(
         ).map((r) => r.id),
       );
       const after = new Set(s.studentIds);
+      for (const sid of after) {
+        if (!validStudent(db, sid)) {
+          return reply.code(422).send({ error: `unknown student ${sid}` });
+        }
+      }
       db.prepare("DELETE FROM school_series_students WHERE series_id = ?").run(id);
       const ins = db.prepare(
         "INSERT INTO school_series_students (series_id, student_id) VALUES (?, ?)",
@@ -451,24 +473,29 @@ export function registerScheduleRoutes(
       if (q.studentId && !l.students.some((s) => String(s.studentId) === q.studentId)) return false;
       return true;
     });
-    // Teacher viewing other teachers' lessons: strip student details (conflict view only)
     const out = visible.map((l) => {
+      if (!isAdmin(c) && !scope.teacherId && scope.studentIds) {
+        // Parents/students see only their own students' rows — no private fields.
+        return {
+          ...l,
+          students: l.students
+            .filter((s) => scope.studentIds?.has(String(s.studentId)))
+            .map((s) => ({
+              studentId: s.studentId,
+              studentName: s.studentName,
+              attendance: s.attendance,
+              publicNote: s.publicNote,
+            })),
+        };
+      }
+      // Teacher viewing other teachers' lessons: opaque busy slots only.
       if (
         scope.teacherId &&
         l.teacherId !== scope.teacherId &&
         l.substituteTeacherId !== scope.teacherId &&
         !isAdmin(c)
       ) {
-        return {
-          ...l,
-          students: l.students.map((s) => ({
-            ...s,
-            studentName: undefined,
-            privateNote: undefined,
-            publicNote: undefined,
-            practice: undefined,
-          })),
-        };
+        return busySlot(l);
       }
       return l;
     });
@@ -481,6 +508,14 @@ export function registerScheduleRoutes(
     const parsed = checkIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const b = parsed.data;
+    // Non-admin probes are scoped to the caller's own teacher/students — otherwise
+    // the conflict details are an existence oracle into colleagues' schedules.
+    if (!isAdmin(c)) {
+      const own = ownTeacherId(c);
+      if (!own || b.teacherId !== own) return forbidden(reply);
+      const mine = teacherStudentIds(db, own);
+      if (b.studentIds.some((sid) => !mine.has(sid))) return forbidden(reply);
+    }
     return {
       conflicts: detectConflicts(db, {
         date: b.date,
@@ -536,13 +571,28 @@ export function registerScheduleRoutes(
       ts,
       ts,
     );
+    for (const sid of b.studentIds) {
+      if (!validStudent(db, sid)) {
+        return reply.code(422).send({ error: `unknown student ${sid}` });
+      }
+    }
+    if (b.makeupRequestId) {
+      const mr = db
+        .prepare("SELECT student_id AS sid, status FROM school_makeup_requests WHERE id = ?")
+        .get(b.makeupRequestId) as { sid: string; status: string } | undefined;
+      if (mr?.status !== "open" || !b.studentIds.includes(mr.sid)) {
+        return reply
+          .code(422)
+          .send({ error: "makeupRequestId is not an open request of a listed student" });
+      }
+    }
     const ins = db.prepare(
       "INSERT INTO school_lesson_students (lesson_id, student_id) VALUES (?, ?)",
     );
     for (const sid of b.studentIds) ins.run(id, sid);
     if (b.makeupRequestId) {
       db.prepare(
-        "UPDATE school_makeup_requests SET status = 'scheduled', makeup_lesson_id = ? WHERE id = ?",
+        "UPDATE school_makeup_requests SET status = 'scheduled', makeup_lesson_id = ? WHERE id = ? AND status = 'open'",
       ).run(id, b.makeupRequestId);
     }
     audit(db, c.sub, "create", "lesson", id, { ...b, conflicts });
@@ -572,19 +622,27 @@ export function registerScheduleRoutes(
       const hasStudent =
         scope.studentIds?.size &&
         lessonStudents(db, id).some((s) => scope.studentIds?.has(String(s.studentId)));
-      // Teachers get a student-free conflict view of foreign lessons.
-      if (scope.teacherId && !hasStudent) {
-        return {
-          lesson: {
-            ...l,
-            teacherName: row.teacherName,
-            substituteName: row.substituteName,
-            typeName: row.typeName,
-            students: [],
-          },
-        };
-      }
+      // Teachers get an opaque busy slot for foreign lessons.
+      if (scope.teacherId && !hasStudent) return { lesson: busySlot(l) };
       if (!hasStudent) return forbidden(reply);
+      // Parents/students see only their own students' rows — no private fields.
+      const students = lessonStudents(db, id)
+        .filter((s) => scope.studentIds?.has(String(s.studentId)))
+        .map((s) => ({
+          studentId: s.studentId,
+          studentName: s.studentName,
+          attendance: s.attendance,
+          publicNote: s.publicNote,
+        }));
+      return {
+        lesson: {
+          ...l,
+          teacherName: row.teacherName,
+          substituteName: row.substituteName,
+          typeName: row.typeName,
+          students,
+        },
+      };
     }
     return {
       lesson: {
@@ -608,12 +666,40 @@ export function registerScheduleRoutes(
     const parsed = lessonPatch.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const b = parsed.data;
-    // Parents may only cancel their own children's participation, not the lesson.
-    const manage = canManageLesson(c, l);
-    if (!manage) {
-      if (!isAdmin(c)) return forbidden(reply);
+    const own = ownTeacherId(c);
+    const isOwner = isAdmin(c) || (own != null && l.teacherId === own);
+    const isSub = !isOwner && own != null && l.substituteTeacherId === own;
+    if (!isOwner && !isSub) return forbidden(reply);
+    if (isSub) {
+      // Substitutes mark attendance; lesson fields are limited to notes/cancel reason.
+      const restricted = [
+        b.date,
+        b.startTime,
+        b.durationMin,
+        b.location,
+        b.teacherId,
+        b.substituteTeacherId,
+        b.status,
+        b.addStudentIds,
+        b.removeStudentIds,
+        b.force,
+      ].some((v) => v !== undefined);
+      if (restricted) return forbidden(reply);
     }
-    if (b.status && !isAdmin(c) && !manage) return forbidden(reply);
+    // Billing-significant status + ownership reassignment are admin-only.
+    if (!isAdmin(c)) {
+      if (b.status === "cancelled_school") return forbidden(reply);
+      if (b.teacherId !== undefined || b.substituteTeacherId !== undefined) {
+        return forbidden(reply);
+      }
+    }
+    if (b.addStudentIds) {
+      for (const sid of b.addStudentIds) {
+        if (!validStudent(db, sid)) {
+          return reply.code(422).send({ error: `unknown student ${sid}` });
+        }
+      }
+    }
     const date = b.date ?? l.date;
     const startTime = b.startTime ?? l.startTime;
     const durationMin = b.durationMin ?? l.durationMin;
@@ -732,17 +818,30 @@ export function registerScheduleRoutes(
       | Record<string, unknown>
       | undefined;
     if (!row) return reply.code(404).send({ error: "not found" });
+    const l = mapRow<Lesson>(row, LESSON_MAP);
     const parsed = reportAbsenceIn.safeParse(req.body);
     if (!parsed.success) return reply.code(422).send({ error: parsed.error.issues });
     const a = parsed.data;
     const mine = a.studentId === ownStudentId(c) || guardianStudentIds(db, c.sub).has(a.studentId);
     if (!isAdmin(c) && !mine) return forbidden(reply);
+    // Absences are reported for scheduled current/future lessons only — rewriting
+    // recorded past attendance alters billed amounts.
+    if (!isAdmin(c) && (l.status !== "scheduled" || l.date < todayBerlin())) {
+      return reply.code(409).send({ error: "lesson is not reportable" });
+    }
     const enrolled = db
-      .prepare("SELECT 1 FROM school_lesson_students WHERE lesson_id = ? AND student_id = ?")
-      .get(id, a.studentId);
+      .prepare(
+        "SELECT attendance FROM school_lesson_students WHERE lesson_id = ? AND student_id = ?",
+      )
+      .get(id, a.studentId) as { attendance: string | null } | undefined;
     if (!enrolled) return reply.code(404).send({ error: "student not in lesson" });
+    // Never overwrite recorded attendance (correction is a teacher/admin action).
+    if (enrolled.attendance !== null && !isAdmin(c)) {
+      return reply.code(409).send({ error: "attendance already recorded" });
+    }
     db.prepare(
-      `UPDATE school_lesson_students SET attendance = 'absent_excused', marked_by_sub = ?, marked_at = ?
+      `UPDATE school_lesson_students SET attendance = 'absent_excused',
+           marked_by_sub = COALESCE(marked_by_sub, ?), marked_at = COALESCE(marked_at, ?)
        WHERE lesson_id = ? AND student_id = ?`,
     ).run(c.sub, now(), id, a.studentId);
     // Lesson-level cancellation only when ALL students are now absent/cancelled

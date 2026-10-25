@@ -93,13 +93,24 @@ export function scanCsv(text: string, delimiter: string): string[][] {
 }
 
 /** First record = headers (trimmed); blank records are dropped; rows are padded to header width. */
-export function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+export function parseCsv(
+  text: string,
+  maxCols = 500,
+  maxCells = 250_000,
+): { headers: string[]; rows: string[][] } {
   const records = scanCsv(text, detectDelimiter(text)).filter((r) => r.some((c) => c !== ""));
   const headers = (records[0] ?? []).map((h) => h.trim());
   if (headers.length === 0 || headers.every((h) => h === "")) {
     throw new CsvParseError("csv has no header row");
   }
   const width = headers.length;
+  // Bound before materialization: padding is O(rows × width) — an attacker-controlled
+  // width turns a small upload into a process-killing allocation.
+  if (width > maxCols) throw new CsvParseError(`csv exceeds ${maxCols} columns`);
+  const recordsLeft = records.length - 1;
+  if (recordsLeft * width > maxCells) {
+    throw new CsvParseError(`csv exceeds ${maxCells} cells`);
+  }
   const rows = records.slice(1).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ""));
   return { headers, rows };
 }
@@ -113,6 +124,8 @@ const configSchema = z.object({
     .default(5 * 1024 * 1024),
   /** Max data rows accepted per import. */
   MAX_ROWS: z.coerce.number().int().positive().default(20000),
+  /** Max header columns; row padding materializes rows × cols cells. */
+  MAX_COLS: z.coerce.number().int().positive().default(500),
 });
 
 const cells = (v: unknown): string[] | null =>
@@ -155,7 +168,7 @@ export const csvManagerModule: BffModule<z.infer<typeof configSchema>> = {
       }
       let parsed: ReturnType<typeof parseCsv>;
       try {
-        parsed = parseCsv(csv);
+        parsed = parseCsv(csv, config.MAX_COLS);
       } catch (err) {
         const msg = err instanceof CsvParseError ? err.message : "invalid csv";
         return reply.code(400).send({ error: msg });

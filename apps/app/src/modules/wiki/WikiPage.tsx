@@ -1,4 +1,8 @@
 import DOMPurify from "dompurify";
+
+/** External-content markup: strip images — remote <img> would beacon the viewer IP out. */
+const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
+
 import { marked } from "marked";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -133,7 +137,9 @@ function WikiContent() {
     );
   }
 
-  const rendered = page.data ? DOMPurify.sanitize(marked.parse(page.data.content) as string) : null;
+  const rendered = page.data
+    ? DOMPurify.sanitize(marked.parse(page.data.content) as string, SANITIZE_OPTS)
+    : null;
 
   return (
     <div className="stack">
@@ -220,7 +226,9 @@ function AskPanel({ onSelectPage }: { onSelectPage: (path: string) => void }) {
     const q = question.trim();
     if (q) ask.mutate(q);
   };
-  const answerHtml = ask.data ? DOMPurify.sanitize(marked.parse(ask.data.answer) as string) : null;
+  const answerHtml = ask.data
+    ? DOMPurify.sanitize(marked.parse(ask.data.answer) as string, SANITIZE_OPTS)
+    : null;
   const askStatus = ask.error instanceof ApiError ? ask.error.status : null;
 
   return (

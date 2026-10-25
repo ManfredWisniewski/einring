@@ -50,6 +50,10 @@
     "openAgain": "Открыть страницу входа снова",
     "connectedAs": "Подключено как {{user}} на {{server}}",
     "disconnect": "Отключить",
+    "claimHint": "В ваших файлах Nextcloud теперь лежит файл «einring-sign-in-XXXXXX.txt» — введите шестизначный код из него.",
+    "claimPlaceholder": "6-значный код",
+    "claim": "Проверить код",
+    "claimFailed": "Код не совпал или процесс истёк.",
     "error": "Ошибка запроса к Nextcloud ({{status}})."
   },
   "modules": {
