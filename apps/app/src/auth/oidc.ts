@@ -49,7 +49,11 @@ export async function login(returnTo = "/"): Promise<void> {
     return;
   }
   const client = new OidcClient(await resolveSettings());
-  const request = await client.createSigninRequest({ state: { returnTo } });
+  const request = await client.createSigninRequest({
+    state: { returnTo },
+    // signinCallback routes on this marker (UserManager sets it internally for redirects).
+    request_type: "si:r",
+  });
   await Browser.open({ url: request.url, presentationStyle: "popover" });
 }
 
@@ -63,11 +67,20 @@ export async function logout(): Promise<void> {
 
 export function listenForNativeCallback(onUser: () => void): () => void {
   if (!isNative) return () => {};
-  const handle = CapApp.addListener("appUrlOpen", async ({ url }) => {
+  const handleUrl = async (url: string) => {
     if (!url.startsWith(config.nativeRedirectUri)) return;
     await Browser.close().catch(() => {});
-    await (await getUserManager()).signinCallback(url);
-    onUser();
+    try {
+      await (await getUserManager()).signinCallback(url);
+      onUser();
+    } catch (e) {
+      console.error("OIDC sign-in callback failed", e);
+    }
+  };
+  const handle = CapApp.addListener("appUrlOpen", ({ url }) => void handleUrl(url));
+  // Cold start with a deep link: appUrlOpen can fire before this listener attaches.
+  void CapApp.getLaunchUrl().then((res) => {
+    if (res?.url) void handleUrl(res.url);
   });
   return () => void handle.then((h) => h.remove());
 }

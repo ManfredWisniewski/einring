@@ -13,6 +13,11 @@ const config: CapacitorConfig = {
     ...(devServerUrl ? { url: devServerUrl, cleartext: devServerUrl.startsWith("http:") } : {}),
   },
   android: { allowMixedContent: false },
+  plugins: {
+    // Route fetch() through native HTTP on Android: the Authentik OIDC endpoints
+    // send no CORS headers, which makes WebView fetch fail with "Failed to fetch".
+    CapacitorHttp: { enabled: true },
+  },
 };
 
 export default config;

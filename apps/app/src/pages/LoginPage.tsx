@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/auth/AuthProvider";
@@ -10,6 +11,7 @@ import { useInstanceTagline } from "@/instance";
 
 export function LoginPage() {
   const { t } = useTranslation();
+  const [loginError, setLoginError] = useState<string>();
   const tagline = useInstanceTagline();
   const { user, loading, login } = useAuth();
   const location = useLocation();
@@ -36,8 +38,20 @@ export function LoginPage() {
           </p>
         ) : (
           <div className="row">
-            <Button onClick={() => void login(returnTo)}>{t("auth.login")}</Button>
+            <Button
+              onClick={() => {
+                setLoginError(undefined);
+                login(returnTo).catch((e) =>
+                  setLoginError(e instanceof Error ? e.message : String(e)),
+                );
+              }}
+            >
+              {t("auth.login")}
+            </Button>
           </div>
+        )}
+        {loginError && (
+          <p className="alert alert--danger">{t("auth.failed", { reason: loginError })}</p>
         )}
       </CardContent>
     </Card>
