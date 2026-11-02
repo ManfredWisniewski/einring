@@ -112,6 +112,8 @@ export interface Store {
   deleteCredential(sub: string): void;
   /** Connector-module credentials, sealed like Nextcloud app passwords. */
   getServiceCredential(sub: string, service: string): ServiceCredential | undefined;
+  /** All of a user's service credentials; `prefix` filters `service LIKE '<prefix>%'`. */
+  listServiceCredentials(sub: string, prefix?: string): ServiceCredential[];
   saveServiceCredential(cred: ServiceCredential): void;
   deleteServiceCredential(sub: string, service: string): void;
   /** Per-user JSON blob a module owns (e.g. einchat's tool selection). */
@@ -371,6 +373,9 @@ export function openStore(path: string): Store {
        secret_sealed = excluded.secret_sealed, created_at = datetime('now')`,
   );
   const delSvcCred = db.prepare("DELETE FROM service_credentials WHERE sub = ? AND service = ?");
+  const listSvcCred = db.prepare(
+    "SELECT sub, service, url, secret_sealed AS secretSealed FROM service_credentials WHERE sub = ? AND service LIKE ?",
+  );
   const getModSettings = db.prepare(
     "SELECT data FROM module_settings WHERE sub = ? AND module = ?",
   );
@@ -532,6 +537,8 @@ export function openStore(path: string): Store {
     deleteCredential: (sub) => void delCred.run(sub),
     getServiceCredential: (sub, service) =>
       getSvcCred.get(sub, service) as ServiceCredential | undefined,
+    listServiceCredentials: (sub, prefix) =>
+      listSvcCred.all(sub, `${prefix ?? ""}%`) as unknown as ServiceCredential[],
     saveServiceCredential: (c) => void putSvcCred.run(c.sub, c.service, c.url, c.secretSealed),
     deleteServiceCredential: (sub, service) => void delSvcCred.run(sub, service),
     getModuleSettings: (sub, module) =>

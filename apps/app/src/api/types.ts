@@ -225,11 +225,23 @@ export interface EmailAddress {
 }
 
 export interface EmailSummary {
-  /** IMAP uid or JMAP email id, depending on the connected backend. */
+  /** Composite `accountId|messageId` (D60). */
   id: string;
+  /** Owning account id — "default" for the legacy single connection. */
+  account?: string;
   subject: string | null;
   from: EmailAddress | null;
   date: string | null;
+}
+
+export interface EmailAccount {
+  id: string;
+  username: string;
+  url: string | null;
+}
+
+export interface EmailAccounts {
+  accounts: EmailAccount[];
 }
 
 export interface EmailList {

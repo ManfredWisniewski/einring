@@ -5,9 +5,10 @@ export interface MailAddress {
   address: string | null;
 }
 
-/** One inbox line: `id` is the IMAP uid or the JMAP email id. */
+/** One inbox line: `id` is the IMAP uid or JMAP email id; `account` is set by the merge (D60). */
 export interface MailSummary {
   id: string;
+  account?: string;
   subject: string | null;
   from: MailAddress | null;
   date: string | null;

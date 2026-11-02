@@ -2195,9 +2195,11 @@ describe("email", () => {
 
     const list = await app.inject({ method: "GET", url: "/api/email/list", headers: auth });
     expect(list.statusCode).toBe(200);
-    const emails = list.json().emails as { id: string; subject: string }[];
+    const emails = list.json().emails as { id: string; account?: string; subject: string }[];
     expect(emails).toHaveLength(5); // 7 exist → newest 5
-    expect(emails[0]?.id).toBe("42"); // reversed: newest first
+    // Composite id `accountId|messageId` — the bare `email` credential is account "default" (D60).
+    expect(emails[0]?.id).toBe("default|42"); // reversed: newest first
+    expect(emails[0]?.account).toBe("default");
     expect(emails[0]?.subject).toBe("Mail 7");
   });
 
@@ -2212,7 +2214,11 @@ describe("email", () => {
     });
     expect(imap.calls.port).toBe(9993);
 
-    const msg = await app.inject({ method: "GET", url: "/api/email/message/42", headers: auth });
+    const msg = await app.inject({
+      method: "GET",
+      url: "/api/email/message/default%7C42",
+      headers: auth,
+    });
     expect(msg.statusCode).toBe(200);
     expect(msg.json()).toMatchObject({
       subject: "Ring status",
@@ -2221,19 +2227,29 @@ describe("email", () => {
     });
 
     expect(
-      (await app.inject({ method: "GET", url: "/api/email/message/99", headers: auth })).statusCode,
+      (await app.inject({ method: "GET", url: "/api/email/message/default%7C99", headers: auth }))
+        .statusCode,
     ).toBe(404);
     expect(
       (await app.inject({ method: "GET", url: "/api/email/message/x", headers: auth })).statusCode,
     ).toBe(400);
 
-    const del = await app.inject({ method: "DELETE", url: "/api/email/message/42", headers: auth });
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/email/message/default%7C42",
+      headers: auth,
+    });
     expect(del.statusCode).toBe(200);
     expect(del.json()).toEqual({ deleted: true });
     expect(imap.moved).toEqual([[42, "Trash"]]);
     expect(
-      (await app.inject({ method: "DELETE", url: "/api/email/message/99", headers: auth }))
-        .statusCode,
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/email/message/default%7C99",
+          headers: auth,
+        })
+      ).statusCode,
     ).toBe(404);
 
     const { app: bare, auth: bareAuth } = await testApp({ imapOpen: imap.open });
@@ -2277,7 +2293,7 @@ describe("email", () => {
       from: { name: string; address: string } | null;
     }[];
     expect(emails).toHaveLength(5);
-    expect(emails[0]?.id).toBe("m7");
+    expect(emails[0]?.id).toBe("default|m7");
     expect(emails[0]?.subject).toBe("Mail 7");
     expect(emails[0]?.from).toEqual({ name: "Sender 7", address: "s7@test" });
     // Mailbox lookup, then one batched query+get against the session apiUrl.
@@ -2296,7 +2312,11 @@ describe("email", () => {
       secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
     });
 
-    const msg = await app.inject({ method: "GET", url: "/api/email/message/m3", headers: auth });
+    const msg = await app.inject({
+      method: "GET",
+      url: "/api/email/message/default%7Cm3",
+      headers: auth,
+    });
     expect(msg.statusCode).toBe(200);
     expect(msg.json()).toMatchObject({
       subject: "Mail 3",
@@ -2305,18 +2325,32 @@ describe("email", () => {
       html: "<p>Body of m3</p>",
     });
     expect(
-      (await app.inject({ method: "GET", url: "/api/email/message/unknown", headers: auth }))
-        .statusCode,
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/email/message/default%7Cunknown",
+          headers: auth,
+        })
+      ).statusCode,
     ).toBe(404);
 
-    const del = await app.inject({ method: "DELETE", url: "/api/email/message/m3", headers: auth });
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/email/message/default%7Cm3",
+      headers: auth,
+    });
     expect(del.statusCode).toBe(200);
     expect(del.json()).toEqual({ deleted: true });
     const set = jmap.seen.calls.find((c) => c.name === "Email/set");
     expect(set?.args.update).toEqual({ m3: { mailboxIds: { "mb-tr": true } } });
     expect(
-      (await app.inject({ method: "DELETE", url: "/api/email/message/none", headers: auth }))
-        .statusCode,
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/email/message/default%7Cnone",
+          headers: auth,
+        })
+      ).statusCode,
     ).toBe(404);
   });
 
@@ -2365,6 +2399,85 @@ describe("email", () => {
     ).filter((n) => n.module === "email");
     expect(items).toHaveLength(5);
     expect(items.find((n) => n.title === "Mail 7")).toMatchObject({ body: "Sender 7" });
+  });
+
+  it("adds a second account, merges the inbox, and removes it again (D60)", async () => {
+    const imap = fakeImap();
+    const jmap = fakeJmap();
+    const { app, auth, store, secrets } = await testApp({
+      imapOpen: imap.open,
+      fetchImpl: jmap.fetchImpl,
+    });
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "email",
+      url: "imaps://imap.test",
+      secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
+    });
+
+    // Add a jmap account — verified via session + capability, stored as email:<slug>.
+    const add = await app.inject({
+      method: "POST",
+      url: "/api/email/accounts",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: "jmap://mail.test" },
+    });
+    expect(add.statusCode).toBe(200);
+    expect(add.json()).toMatchObject({ id: "frodo-mail.test", connected: true });
+    expect(
+      store.getServiceCredential(TEST_USER.sub, "email:frodo-mail.test")?.secretSealed,
+    ).not.toContain("ring");
+
+    const accs = await app.inject({ method: "GET", url: "/api/email/accounts", headers: auth });
+    expect(accs.json().accounts).toEqual([
+      { id: "default", username: "u", url: "imaps://imap.test" },
+      { id: "frodo-mail.test", username: "frodo", url: "https://mail.test" },
+    ]);
+
+    // Merged inbox: composite ids, both accounts present.
+    const list = await app.inject({ method: "GET", url: "/api/email/list", headers: auth });
+    const emails = list.json().emails as { id: string; account: string }[];
+    expect(emails).toHaveLength(5);
+    expect(emails.some((e) => e.id.startsWith("default|"))).toBe(true);
+    expect(emails.some((e) => e.id.startsWith("frodo-mail.test|"))).toBe(true);
+
+    // Read on the second account via its composite id.
+    const msg = await app.inject({
+      method: "GET",
+      url: "/api/email/message/frodo-mail.test%7Cm3",
+      headers: auth,
+    });
+    expect(msg.statusCode).toBe(200);
+    expect(msg.json().subject).toBe("Mail 3");
+
+    // Remove; unknown account id then 404s on both levels.
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/email/accounts/frodo-mail.test",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/email/accounts/frodo-mail.test",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/email/message/frodo-mail.test%7Cm3",
+          headers: auth,
+        })
+      ).statusCode,
+    ).toBe(404);
   });
 });
 

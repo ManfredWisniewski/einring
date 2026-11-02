@@ -303,3 +303,13 @@
 - Wiki sync/index/ask and einchat message enforce per-sub request budgets (429).
 - External-sender markdown/HTML (Gotify, Wiki, EinChat, Email) is rendered with `<img>` stripped; the served index CSP includes `img-src 'self' data: blob:`.
 - Upstream HTTP calls carry default timeouts; login-flow poll refuses redirects (`redirect: "error"`).
+
+### A37 Multiple email accounts (D60)
+
+- `GET /api/email/accounts` lists the caller's mail accounts `{id, username, url}`; a legacy bare `email` credential appears as account `default`.
+- `POST /api/email/accounts {username, password, url}` verifies per protocol (IMAP login; JMAP session + `urn:ietf:params:jmap:mail` capability), stores sealed under `email:<slug>` (`username@host` — re-adding the same account overwrites). 401 auth failure, 502 unreachable; the secret is never echoed.
+- `DELETE /api/email/accounts/<id>` removes the account; 404 unknown id.
+- `GET /api/email/list` merges the newest messages across all the caller's accounts (composite id `accountId|messageId`, each item carries `account`), newest first; 424 when no accounts exist; one failing account does not break the list.
+- `GET`/`DELETE /api/email/message/<accountId|messageId>` operate on the owning account — 404 for unknown message or account.
+- EinHub dedupes by composite `sourceId` across accounts; `email_recent`/`email_read` accept composite ids.
+- The email settings page (D59) lists accounts with add/remove; the `/email` inbox shows the merged list with an account tag. DE + EN + RU + FR.

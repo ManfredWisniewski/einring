@@ -6,14 +6,14 @@ const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
-import { useConnectorStatus, useEmailDelete, useEmailList, useEmailMessage } from "@/api/hooks";
+import { useEmailAccounts, useEmailDelete, useEmailList, useEmailMessage } from "@/api/hooks";
 import type { EmailSummary } from "@/api/types";
 import { ConnectorPage } from "@/components/ConnectorPage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 /** One expandable mail row: header always visible, body lazy-fetched on expand. */
-function MailRow({ id, subject, from, date }: EmailSummary) {
+function MailRow({ id, account, subject, from, date }: EmailSummary) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const msg = useEmailMessage(open ? id : null);
@@ -33,6 +33,7 @@ function MailRow({ id, subject, from, date }: EmailSummary) {
           <CardDescription>
             {sender}
             {date ? ` · ${new Date(date).toLocaleString()}` : ""}
+            {account && account !== "default" ? ` · ${account}` : ""}
           </CardDescription>
         </CardHeader>
       </button>
@@ -85,11 +86,12 @@ function MailRow({ id, subject, from, date }: EmailSummary) {
 
 export function EmailPage() {
   const { t } = useTranslation();
-  const status = useConnectorStatus("email");
-  const list = useEmailList(status.data?.connected === true);
+  const accounts = useEmailAccounts();
+  const list = useEmailList((accounts.data?.accounts.length ?? 0) > 0);
 
-  if (status.isPending) return <p className="muted">{t("common.loading")}</p>;
-  if (status.isError || !status.data?.connected) return <ConnectorPage service="email" userPass />;
+  if (accounts.isPending) return <p className="muted">{t("common.loading")}</p>;
+  if (accounts.isError || !accounts.data?.accounts.length)
+    return <ConnectorPage service="email" userPass />;
 
   if (list.isPending) return <p className="muted">{t("common.loading")}</p>;
   if (list.isError) {

@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { AppContext } from "../app.js";
 import {
   type ConnectorOptions,
-  connectorCred,
   normalizeBase,
   registerConnectorRoutes,
   userPassSecret,
@@ -25,6 +24,8 @@ const configSchema = z.object({
   URL: z.string().optional(),
 });
 type EmailConfig = z.infer<typeof configSchema>;
+
+const LIST_LIMIT = 5;
 
 /**
  * Canonical mail connector URL. IMAP: `imaps://`/`imap://`/bare `host[:port]`
@@ -56,24 +57,72 @@ function mailProtocol(url: string): "imap" | "jmap" {
   return url.startsWith("http") ? "jmap" : "imap";
 }
 
-function credFor(ctx: AppContext, sub: string): MailCred | null {
-  const c = connectorCred(ctx, sub, "email");
-  if (!c) return null;
-  try {
-    const s = JSON.parse(c.secret) as MailCred["secret"];
-    return s.username && s.password ? { url: c.url, secret: s } : null;
-  } catch {
-    return null;
+/** One connected mail account (D60): `email:<slug>` rows; the bare `email` row is "default". */
+interface MailAccount extends MailCred {
+  id: string;
+  username: string;
+}
+
+/** Stable account id from login + host — re-adding the same account overwrites (update path). */
+export function accountSlug(username: string, url: string): string {
+  const host = new URL(url).hostname;
+  return `${username}@${host}`
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function listAccounts(ctx: AppContext, sub: string): MailAccount[] {
+  const out: MailAccount[] = [];
+  for (const r of ctx.store.listServiceCredentials(sub, "email")) {
+    if (r.service !== "email" && !r.service.startsWith("email:")) continue;
+    if (!r.url) continue;
+    const id = r.service === "email" ? "default" : r.service.slice("email:".length);
+    try {
+      const s = JSON.parse(ctx.secrets.open(r.secretSealed)) as MailCred["secret"];
+      if (s.username && s.password) {
+        out.push({ id, url: r.url, username: s.username, secret: s });
+      }
+    } catch {
+      // Unparseable secret — skip the account rather than breaking the inbox.
+    }
   }
+  return out;
+}
+
+/**
+ * Message ids are composite `accountId|messageId` (D60) — routes, EinHub dedupe
+ * and chat tools stay single-value while disambiguating accounts.
+ */
+const composite = (accountId: string, msgId: string) => `${accountId}|${msgId}`;
+
+function splitComposite(id: string): { accountId: string; msgId: string } | null {
+  const i = id.indexOf("|");
+  return i > 0 && i < id.length - 1 ? { accountId: id.slice(0, i), msgId: id.slice(i + 1) } : null;
 }
 
 async function listRecent(
   ctx: AppContext,
   sub: string,
 ): Promise<MailSummary[] | { notConnected: true } | { failed: string }> {
-  const cred = credFor(ctx, sub);
-  if (!cred) return { notConnected: true };
-  return mailProtocol(cred.url) === "jmap" ? jmapListRecent(ctx, cred) : imapListRecent(ctx, cred);
+  const accounts = listAccounts(ctx, sub);
+  if (!accounts.length) return { notConnected: true };
+  const merged: MailSummary[] = [];
+  for (const acc of accounts) {
+    const res =
+      mailProtocol(acc.url) === "jmap"
+        ? await jmapListRecent(ctx, acc)
+        : await imapListRecent(ctx, acc);
+    // A broken account must not take the whole inbox down.
+    if ("failed" in res) continue;
+    for (const m of res) merged.push({ ...m, id: composite(acc.id, m.id), account: acc.id });
+  }
+  merged.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return merged.slice(0, LIST_LIMIT);
+}
+
+function accountFor(ctx: AppContext, sub: string, accountId: string): MailAccount | undefined {
+  return listAccounts(ctx, sub).find((a) => a.id === accountId);
 }
 
 async function readMessage(
@@ -81,11 +130,14 @@ async function readMessage(
   sub: string,
   id: string,
 ): Promise<MailResult<MailMessage>> {
-  const cred = credFor(ctx, sub);
-  if (!cred) return { notConnected: true };
-  return mailProtocol(cred.url) === "jmap"
-    ? jmapReadMessage(ctx, cred, id)
-    : imapReadMessage(ctx, cred, id);
+  const c = splitComposite(id);
+  if (!c) return { badId: true };
+  if (!listAccounts(ctx, sub).length) return { notConnected: true };
+  const acc = accountFor(ctx, sub, c.accountId);
+  if (!acc) return { notFound: true };
+  return mailProtocol(acc.url) === "jmap"
+    ? jmapReadMessage(ctx, acc, c.msgId)
+    : imapReadMessage(ctx, acc, c.msgId);
 }
 
 async function deleteMessage(
@@ -93,11 +145,14 @@ async function deleteMessage(
   sub: string,
   id: string,
 ): Promise<MailResult<{ ok: true }>> {
-  const cred = credFor(ctx, sub);
-  if (!cred) return { notConnected: true };
-  return mailProtocol(cred.url) === "jmap"
-    ? jmapDeleteMessage(ctx, cred, id)
-    : imapDeleteMessage(ctx, cred, id);
+  const c = splitComposite(id);
+  if (!c) return { badId: true };
+  if (!listAccounts(ctx, sub).length) return { notConnected: true };
+  const acc = accountFor(ctx, sub, c.accountId);
+  if (!acc) return { notFound: true };
+  return mailProtocol(acc.url) === "jmap"
+    ? jmapDeleteMessage(ctx, acc, c.msgId)
+    : imapDeleteMessage(ctx, acc, c.msgId);
 }
 
 export const emailModule: BffModule<EmailConfig> = {
@@ -106,14 +161,14 @@ export const emailModule: BffModule<EmailConfig> = {
 
   notifications(ctx) {
     return {
-      // New INBOX messages → einhub items; dedupe by message id.
+      // New INBOX messages → einhub items; dedupe by composite message id.
       async poll(sub) {
         const res = await listRecent(ctx, sub);
         if (!Array.isArray(res)) return [];
         return res.map((m) => ({
           sourceId: m.id,
           title: m.subject ?? "(no subject)",
-          body: m.from?.name ?? m.from?.address ?? undefined,
+          body: m.from?.name ?? m.from?.address ?? m.account,
           at: m.date ?? undefined,
         }));
       },
@@ -125,7 +180,7 @@ export const emailModule: BffModule<EmailConfig> = {
       {
         name: "email_recent",
         description:
-          "List the user's 5 most recent inbox emails (id, subject, sender, date). Use for 'any new mail?' questions.",
+          "List the user's 5 most recent inbox emails across all mail accounts (id, account, subject, sender, date). Use for 'any new mail?' questions.",
         parameters: { type: "object", properties: {} },
         async call(_args, sub) {
           const res = await listRecent(ctx, sub);
@@ -171,6 +226,63 @@ export const emailModule: BffModule<EmailConfig> = {
           : imapVerify(ctx, url, secretJson),
     };
     registerConnectorRoutes(api, ctx, options);
+
+    // Multi-account API (D60). The legacy /credentials route manages the "default" account.
+    api.get("/accounts", async (req) => ({
+      accounts: listAccounts(ctx, req.user.sub).map(({ id, username, url }) => ({
+        id,
+        username,
+        url,
+      })),
+    }));
+
+    api.post("/accounts", async (req, reply) => {
+      const body = z
+        .object({
+          username: z.string().min(1),
+          password: z.string().min(1),
+          url: z.string().optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: "expected {username, password, url?}" });
+      }
+      const url = parseMailUrl(body.data.url ?? config.URL);
+      if (!url) return reply.code(400).send({ error: "no email url configured" });
+      const secretJson = JSON.stringify({
+        username: body.data.username,
+        password: body.data.password,
+      });
+      const status =
+        mailProtocol(url) === "jmap"
+          ? await jmapVerify(ctx, url, secretJson)
+          : await imapVerify(ctx, url, secretJson);
+      if (status === 401 || status === 403) {
+        return reply.code(401).send({ error: "invalid credential" });
+      }
+      if (status >= 400) {
+        api.log.warn({ url, status }, "email account verify failed");
+        return reply.code(502).send({ error: `email unreachable (${status})` });
+      }
+      const id = accountSlug(body.data.username, url);
+      ctx.store.saveServiceCredential({
+        sub: req.user.sub,
+        service: `email:${id}`,
+        url,
+        secretSealed: ctx.secrets.seal(secretJson),
+      });
+      return { id, connected: true, url };
+    });
+
+    api.delete("/accounts/:id", async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const service = id === "default" ? "email" : `email:${id}`;
+      if (!ctx.store.getServiceCredential(req.user.sub, service)) {
+        return reply.code(404).send({ error: "account not found" });
+      }
+      ctx.store.deleteServiceCredential(req.user.sub, service);
+      return { deleted: true };
+    });
 
     api.get("/list", async (req, reply) => {
       const res = await listRecent(ctx, req.user.sub);

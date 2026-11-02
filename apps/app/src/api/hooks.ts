@@ -26,6 +26,7 @@ import type {
   EinMusicPlaylists,
   EinMusicTrack,
   EinMusicTracks,
+  EmailAccounts,
   EmailList,
   EmailMessage,
   GitHubNotifications,
@@ -109,6 +110,7 @@ export const keys = {
   einchatTools: ["einchat", "tools"] as const,
   emailList: ["email", "list"] as const,
   emailMessage: (id: string) => ["email", "message", id] as const,
+  emailAccounts: ["email", "accounts"] as const,
   gotifyMessages: ["gotify", "messages"] as const,
   gotifyApps: ["gotify", "applications"] as const,
   gotifyUser: ["gotify", "user"] as const,
@@ -528,6 +530,41 @@ export function useEmailDelete() {
     onSuccess: (_d, id) => {
       void qc.invalidateQueries({ queryKey: keys.emailList });
       void qc.removeQueries({ queryKey: keys.emailMessage(id) });
+    },
+  });
+}
+
+export function useEmailAccounts() {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.emailAccounts,
+    queryFn: () => api.get<EmailAccounts>("/email/accounts"),
+  });
+}
+
+export function useEmailAddAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string; url?: string }) =>
+      api.post("/email/accounts", body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.emailAccounts });
+      void qc.invalidateQueries({ queryKey: keys.emailList });
+      void qc.invalidateQueries({ queryKey: ["connector", "email"] });
+    },
+  });
+}
+
+export function useEmailRemoveAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/email/accounts/${encodeURIComponent(id)}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.emailAccounts });
+      void qc.invalidateQueries({ queryKey: keys.emailList });
+      void qc.invalidateQueries({ queryKey: ["connector", "email"] });
     },
   });
 }
