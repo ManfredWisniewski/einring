@@ -28,6 +28,7 @@ BFF counterpart (`apps/bff/src/modules/registry.ts`).
 | matrix | Matrix chat + file upload | testing | one | matrix.org |
 | eindav | Contacts/calendar/files via DAV (Android sync) | testing | via Nextcloud | nextcloud.com (CardDAV/CalDAV/WebDAV) |
 | recipes | Nextcloud Cookbook recipes (read-only) | testing | via Nextcloud | nextcloud.com (Cookbook) |
+| stalwart | Stalwart mail server: principals, mail domains, JMAP capabilities (read-only) | testing | one | stalw.art |
 | school | Music-school management (people, lessons, invoicing, messaging) | dev | — (Authentik groups) | — (internal) |
 
 **State** reflects implementation maturity (acceptance criteria + test coverage), not a
