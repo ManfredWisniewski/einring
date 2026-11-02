@@ -1,0 +1,70 @@
+name: release-apk
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Signed release APK + GitHub release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # +wit is not needed for the build; its ssh remote is unreachable from CI.
+          submodules: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          # Explicit package list — implicit defaults try to install the
+          # deprecated legacy "tools" package, which no longer exists.
+          # Single line, space-separated: a multiline block is passed to
+          # sdkmanager as ONE argument and fails package resolution.
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 cmdline-tools;latest
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tokens:build
+      - run: pnpm --filter @einring/app build
+        env:
+          VITE_AUTHENTIK_ISSUER: ${{ vars.VITE_AUTHENTIK_ISSUER }}
+          VITE_AUTHENTIK_CLIENT_ID: ${{ vars.VITE_AUTHENTIK_CLIENT_ID }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - run: pnpm --filter @einring/app cap sync android
+
+      # Keystore lives base64-encoded in secrets; every release must be signed by
+      # the same key or Android rejects Obtainium-driven updates.
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/einring.keystore"
+
+      - name: Assemble signed release APK
+        working-directory: apps/app/android
+        env:
+          EINRING_KEYSTORE_FILE: ${{ runner.temp }}/einring.keystore
+          EINRING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          EINRING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          EINRING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          EINRING_VERSION_CODE: ${{ github.run_number }}
+          EINRING_VERSION_NAME: ${{ github.ref_name }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/einring-${EINRING_VERSION_NAME}.apk"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk="$RUNNER_TEMP/einring-${{ github.ref_name }}.apk"
+          gh release create "${{ github.ref_name }}" --generate-notes "$apk" \
+            || gh release upload "${{ github.ref_name }}" "$apk" --clobber

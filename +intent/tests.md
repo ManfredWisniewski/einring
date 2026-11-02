@@ -321,3 +321,11 @@
 - `GET /api/stalwart/principals` returns principals grouped `{accounts, groups, lists, roles, domains}` plus `mailDomains` — batched `Principal/query`+`get` (and `Domain/query`+`get`), each item `{id, name, email?, description?}`; only `query`/`get` calls are issued.
 - The `/stalwart` page renders the capabilities and one section per principal type; `stalwart_info`/`stalwart_principals` chat tools answer the same data (`not_connected` without a credential).
 - All traffic through `ctx.fetchImpl`; secret never in responses. DE + EN + RU + FR.
+
+### A39 Release APK pipeline (D63)
+
+- Pushing a `v*` tag produces a GitHub release named after the tag carrying exactly one signed `einring-<tag>.apk`.
+- The APK's `versionName` equals the tag and `versionCode` increases across releases, so Android accepts Obtainium-driven updates.
+- Signing uses only the Actions-secret keystore; the keystore file is never committed and never uploaded as an artifact.
+- The APK's bundled web assets are built with `VITE_API_URL` pointing at the deployment BFF; OIDC config still resolves at runtime via `/api/config`.
+- Without the `EINRING_*` env vars `assembleRelease` still builds (unsigned, `versionCode` 1) — local builds and the CI debug-APK job are unaffected.
