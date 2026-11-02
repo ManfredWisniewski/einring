@@ -1,6 +1,6 @@
 {
   "nav": "GitLab",
-  "intro": "Verbinde GitLab, damit deine offenen Aufgaben (Zuweisungen, Erwähnungen, Reviews, fehlgeschlagene Pipelines) in EinHub und hier erscheinen. Erstelle ein persönliches Zugriffstoken in GitLab unter Einstellungen → Zugriffstoken (Scope: read_api oder api).",
+  "intro": "Verbinde GitLab, damit deine offenen Aufgaben (Zuweisungen, Erwähnungen, Reviews, fehlgeschlagene Pipelines) in EinHub und hier erscheinen. Erstelle ein persönliches Zugriffstoken in GitLab unter Einstellungen → Zugriff → Persönlicher Zugriffstoken → Legacy-Token (Scope: read_api). Nur die Server-Domain wird benötigt — kein Benutzername.",
   "apiKey": "Persönliches Zugriffstoken",
   "apiKeyPlaceholder": "glpat-…",
   "url": "GitLab-URL",
