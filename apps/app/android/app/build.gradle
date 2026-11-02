@@ -9,8 +9,8 @@ android {
         applicationId "de.wit.einring"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("EINRING_VERSION_CODE") ?: "1").toInteger()
-        versionName System.getenv("EINRING_VERSION_NAME") ?: "1.0"
+        versionCode = (System.getenv("EINRING_VERSION_CODE") ?: "1").toInteger()
+        versionName = System.getenv("EINRING_VERSION_NAME") ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
