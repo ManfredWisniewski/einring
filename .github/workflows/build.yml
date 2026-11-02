@@ -39,6 +39,7 @@ jobs:
           tags: |
             type=sha
             type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
 
       # Single-arch build loaded into the runner for the smoke test; the push
       # build below reuses this buildx cache.
