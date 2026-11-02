@@ -13,10 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 /** One expandable mail row: header always visible, body lazy-fetched on expand. */
-function MailRow({ uid, subject, from, date }: EmailSummary) {
+function MailRow({ id, subject, from, date }: EmailSummary) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const msg = useEmailMessage(open ? uid : null);
+  const msg = useEmailMessage(open ? id : null);
   const del = useEmailDelete();
   const sender = from?.name || from?.address || t("modules.email.unknownSender");
 
@@ -71,7 +71,7 @@ function MailRow({ uid, subject, from, date }: EmailSummary) {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => del.mutate(uid)}
+              onClick={() => del.mutate(id)}
               disabled={del.isPending}
             >
               {del.isPending ? t("modules.email.deleting") : t("modules.email.delete")}
@@ -102,7 +102,7 @@ export function EmailPage() {
   return (
     <div className="stack">
       {emails.map((m) => (
-        <MailRow key={m.uid} {...m} />
+        <MailRow key={m.id} {...m} />
       ))}
     </div>
   );

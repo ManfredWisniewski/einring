@@ -108,7 +108,7 @@ export const keys = {
   einchatStatus: ["einchat", "status"] as const,
   einchatTools: ["einchat", "tools"] as const,
   emailList: ["email", "list"] as const,
-  emailMessage: (uid: number) => ["email", "message", uid] as const,
+  emailMessage: (id: string) => ["email", "message", id] as const,
   gotifyMessages: ["gotify", "messages"] as const,
   gotifyApps: ["gotify", "applications"] as const,
   gotifyUser: ["gotify", "user"] as const,
@@ -511,12 +511,12 @@ export function useEmailList(enabled = true) {
 }
 
 /** Lazy per-message fetch — run only when a mail row is expanded. */
-export function useEmailMessage(uid: number | null) {
+export function useEmailMessage(id: string | null) {
   const api = useApi();
   return useQuery({
-    queryKey: keys.emailMessage(uid ?? 0),
-    queryFn: () => api.get<EmailMessage>(`/email/message/${uid}`),
-    enabled: uid !== null,
+    queryKey: keys.emailMessage(id ?? ""),
+    queryFn: () => api.get<EmailMessage>(`/email/message/${encodeURIComponent(id ?? "")}`),
+    enabled: id !== null,
   });
 }
 
@@ -524,10 +524,10 @@ export function useEmailDelete() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (uid: number) => api.delete(`/email/message/${uid}`),
-    onSuccess: (_d, uid) => {
+    mutationFn: (id: string) => api.delete(`/email/message/${encodeURIComponent(id)}`),
+    onSuccess: (_d, id) => {
       void qc.invalidateQueries({ queryKey: keys.emailList });
-      void qc.removeQueries({ queryKey: keys.emailMessage(uid) });
+      void qc.removeQueries({ queryKey: keys.emailMessage(id) });
     },
   });
 }

@@ -85,7 +85,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_AUDIOBOOKSHELF_URL=  # same for the other connectors
 # MODULE_NAVIDROME_URL=
 # MODULE_TREK_URL=
-# MODULE_EMAIL_URL=           # default IMAP server, e.g. imaps://imap.example.com:993
+# MODULE_EMAIL_URL=           # default mail server: imaps://imap.example.com:993 (IMAP) or jmap://mail.example.com / https://mail.example.com (JMAP)
 # MODULE_GOTIFY_URL=          # default Gotify server, e.g. https://push.example.com
 # MODULE_GITLAB_URL=          # default GitLab instance, e.g. https://gitlab.example.com
 # MODULE_GITHUB_URL=          # default GitHub instance, e.g. https://github.com or a GHES host
@@ -237,7 +237,7 @@ Connectors share one pattern (D41): each user links their own account in the app
 | `audiobookshelf` | API token (Settings → Users → API Token) | `audiobookshelf_search` (library search → listening progress), `audiobookshelf_in_progress` |
 | `navidrome` | username + password (Subsonic token auth) | `navidrome_search` (artists/albums/songs), `navidrome_albums` (newest/recent/starred/random) |
 | `trek` | API key `trek_…` (Settings → Integrations → API Keys) | `trek_list_trips`, `trek_trip_details`, `trek_bucket_list` |
-| `email` | IMAP username + password + server (`imaps://host:993` or bare host; the `url` field accepts non-HTTP addresses via the connector's `parseUrl` override) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
+| `email` | mail username + password + server: `imaps://host:993` or bare host for IMAP, `https://`/`jmap://` host for JMAP (Basic auth; Stalwart app passwords work). Delete moves to Trash on both protocols (D58) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
 | `gotify` | username + password — a client token is minted upstream (`POST /client`) and stored instead of the password; disconnect deletes the client | `gotify_recent_messages`, `gotify_applications` — plus `/gotify`: live message stream (WS→SSE proxy), priority/app view, delete one/all, application management |
 
 ## School module (music-school management)

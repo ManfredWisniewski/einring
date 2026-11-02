@@ -2031,7 +2031,7 @@ describe("email", () => {
       },
     }));
     const calls: { host?: string; port?: number; user?: string } = {};
-    const deleted: number[] = [];
+    const moved: [number, string][] = [];
     const open = async (c: { host: string; port: number; user: string }) => {
       Object.assign(calls, c);
       if (opts.authFail) {
@@ -2056,13 +2056,127 @@ describe("email", () => {
           }
           return false;
         },
-        messageDelete: async (range: number | string) => {
-          deleted.push(Number(range));
-          return true;
+        async *list() {
+          yield { path: "INBOX" };
+          yield { path: "Trash", specialUse: "\\Trash" };
+        },
+        mailboxCreate: async () => ({}),
+        messageMove: async (range: number | string, dest: string) => {
+          moved.push([Number(range), dest]);
+          return {};
         },
       };
     };
-    return { open, calls, deleted };
+    return { open, calls, moved };
+  }
+
+  const JMAP_MAIL_CAP = "urn:ietf:params:jmap:mail";
+
+  /** Fake JMAP server over fetchImpl: session + Mailbox/get + batched Email/* calls. */
+  function fakeJmap(opts: { authFail?: boolean; noMail?: boolean } = {}) {
+    const emails = Array.from({ length: 7 }, (_, i) => ({
+      id: `m${i + 1}`,
+      subject: `Mail ${i + 1}`,
+      from: [{ name: `Sender ${i + 1}`, email: `s${i + 1}@test` }],
+      receivedAt: `2026-10-${10 + i}T08:00:00Z`,
+    }));
+    const seen: {
+      auth?: string | null;
+      calls: { name: string; args: Record<string, unknown> }[];
+    } = { calls: [] };
+    const session = {
+      apiUrl: "https://mail.test/jmap/",
+      capabilities: opts.noMail
+        ? { "urn:ietf:params:jmap:core": {} }
+        : { "urn:ietf:params:jmap:core": {}, [JMAP_MAIL_CAP]: {} },
+      accounts: { u1: {} },
+      primaryAccounts: { [JMAP_MAIL_CAP]: "u1" },
+    };
+    const fetchImpl = fakeFetch(async (url, init) => {
+      if (opts.authFail) return new Response("unauthorized", { status: 401 });
+      if (url.endsWith("/.well-known/jmap")) {
+        seen.auth = (init?.headers as Record<string, string> | undefined)?.Authorization ?? null;
+        return json(session);
+      }
+      if (url === session.apiUrl && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as {
+          methodCalls: [string, Record<string, unknown>, string][];
+        };
+        const methodResponses = body.methodCalls.map(([name, args, callId]) => {
+          seen.calls.push({ name, args });
+          if (name === "Mailbox/get") {
+            return [
+              "Mailbox/get",
+              {
+                accountId: "u1",
+                list: [
+                  { id: "mb-in", role: "inbox" },
+                  { id: "mb-tr", role: "trash" },
+                ],
+                notFound: [],
+              },
+              callId,
+            ];
+          }
+          if (name === "Email/query") {
+            return [
+              "Email/query",
+              {
+                accountId: "u1",
+                ids: emails
+                  .slice(-5)
+                  .reverse()
+                  .map((e) => e.id),
+                position: 0,
+              },
+              callId,
+            ];
+          }
+          if (name === "Email/get") {
+            const wanted =
+              (args.ids as string[] | undefined) ??
+              emails
+                .slice(-5)
+                .reverse()
+                .map((e) => e.id);
+            const found = wanted.flatMap((w) => emails.filter((e) => e.id === w));
+            const list = args.ids
+              ? found.map((e) => ({
+                  ...e,
+                  textBody: [{ partId: "t" }],
+                  htmlBody: [{ partId: "h" }],
+                  bodyValues: {
+                    t: { value: `Body of ${e.id}` },
+                    h: { value: `<p>Body of ${e.id}</p>` },
+                  },
+                }))
+              : found;
+            return [
+              "Email/get",
+              {
+                accountId: "u1",
+                list,
+                notFound: wanted.filter((w) => !found.some((f) => f.id === w)),
+              },
+              callId,
+            ];
+          }
+          if (name === "Email/set") {
+            const updated: Record<string, null> = {};
+            const notUpdated: Record<string, { type: string }> = {};
+            for (const id of Object.keys((args.update ?? {}) as Record<string, unknown>)) {
+              if (emails.some((e) => e.id === id)) updated[id] = null;
+              else notUpdated[id] = { type: "notFound" };
+            }
+            return ["Email/set", { accountId: "u1", updated, notUpdated }, callId];
+          }
+          return ["error", { type: "unknownMethod" }, callId];
+        });
+        return json({ methodResponses });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    return { fetchImpl, seen, emails };
   }
 
   it("connects with a bare host, verifies via IMAP login, lists last 5", async () => {
@@ -2081,9 +2195,9 @@ describe("email", () => {
 
     const list = await app.inject({ method: "GET", url: "/api/email/list", headers: auth });
     expect(list.statusCode).toBe(200);
-    const emails = list.json().emails as { uid: number; subject: string }[];
+    const emails = list.json().emails as { id: string; subject: string }[];
     expect(emails).toHaveLength(5); // 7 exist → newest 5
-    expect(emails[0]?.uid).toBe(42); // reversed: newest first
+    expect(emails[0]?.id).toBe("42"); // reversed: newest first
     expect(emails[0]?.subject).toBe("Mail 7");
   });
 
@@ -2116,7 +2230,7 @@ describe("email", () => {
     const del = await app.inject({ method: "DELETE", url: "/api/email/message/42", headers: auth });
     expect(del.statusCode).toBe(200);
     expect(del.json()).toEqual({ deleted: true });
-    expect(imap.deleted).toEqual([42]);
+    expect(imap.moved).toEqual([[42, "Trash"]]);
     expect(
       (await app.inject({ method: "DELETE", url: "/api/email/message/99", headers: auth }))
         .statusCode,
@@ -2139,6 +2253,118 @@ describe("email", () => {
     });
     expect(conn.statusCode).toBe(401);
     expect(store.getServiceCredential(TEST_USER.sub, "email")).toBeUndefined();
+  });
+
+  it("connects a jmap:// url, verifies via session + mail capability, lists last 5", async () => {
+    const jmap = fakeJmap();
+    const { app, auth, store } = await testApp({ fetchImpl: jmap.fetchImpl });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth,
+      payload: { username: "frodo", password: "ring", url: "jmap://mail.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(conn.json()).toEqual({ connected: true, url: "https://mail.test" });
+    expect(jmap.seen.auth).toBe(`Basic ${Buffer.from("frodo:ring").toString("base64")}`);
+    expect(store.getServiceCredential(TEST_USER.sub, "email")?.secretSealed).not.toContain("ring");
+
+    const list = await app.inject({ method: "GET", url: "/api/email/list", headers: auth });
+    expect(list.statusCode).toBe(200);
+    const emails = list.json().emails as {
+      id: string;
+      subject: string;
+      from: { name: string; address: string } | null;
+    }[];
+    expect(emails).toHaveLength(5);
+    expect(emails[0]?.id).toBe("m7");
+    expect(emails[0]?.subject).toBe("Mail 7");
+    expect(emails[0]?.from).toEqual({ name: "Sender 7", address: "s7@test" });
+    // Mailbox lookup, then one batched query+get against the session apiUrl.
+    expect(jmap.seen.calls.map((c) => c.name)).toEqual(["Mailbox/get", "Email/query", "Email/get"]);
+    const q = jmap.seen.calls.find((c) => c.name === "Email/query");
+    expect(q?.args.filter).toEqual({ inMailbox: "mb-in" });
+  });
+
+  it("reads a jmap message by id and moves it to Trash on delete", async () => {
+    const jmap = fakeJmap();
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: jmap.fetchImpl });
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "email",
+      url: "https://mail.test",
+      secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
+    });
+
+    const msg = await app.inject({ method: "GET", url: "/api/email/message/m3", headers: auth });
+    expect(msg.statusCode).toBe(200);
+    expect(msg.json()).toMatchObject({
+      subject: "Mail 3",
+      from: { address: "s3@test" },
+      text: "Body of m3",
+      html: "<p>Body of m3</p>",
+    });
+    expect(
+      (await app.inject({ method: "GET", url: "/api/email/message/unknown", headers: auth }))
+        .statusCode,
+    ).toBe(404);
+
+    const del = await app.inject({ method: "DELETE", url: "/api/email/message/m3", headers: auth });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toEqual({ deleted: true });
+    const set = jmap.seen.calls.find((c) => c.name === "Email/set");
+    expect(set?.args.update).toEqual({ m3: { mailboxIds: { "mb-tr": true } } });
+    expect(
+      (await app.inject({ method: "DELETE", url: "/api/email/message/none", headers: auth }))
+        .statusCode,
+    ).toBe(404);
+  });
+
+  it("maps a rejected JMAP login to 401 and a missing mail capability to 502", async () => {
+    const fail = fakeJmap({ authFail: true });
+    const { app, auth, store } = await testApp({ fetchImpl: fail.fetchImpl });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth,
+      payload: { username: "x", password: "y", url: "jmap://mail.test" },
+    });
+    expect(conn.statusCode).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "email")).toBeUndefined();
+
+    const noMail = fakeJmap({ noMail: true });
+    const { app: app2, auth: auth2 } = await testApp({ fetchImpl: noMail.fetchImpl });
+    const conn2 = await app2.inject({
+      method: "POST",
+      url: "/api/email/credentials",
+      headers: auth2,
+      payload: { username: "x", password: "y", url: "https://mail.test" },
+    });
+    expect(conn2.statusCode).toBe(502);
+  });
+
+  it("feeds jmap messages into einhub with the email id as sourceId", async () => {
+    const jmap = fakeJmap();
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_EINHUB_REFRESH_SECONDS: "0" }),
+      fetchImpl: jmap.fetchImpl,
+    });
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "email",
+      url: "https://mail.test",
+      secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    const items = (
+      res.json().notifications as { module: string; title: string; body: string }[]
+    ).filter((n) => n.module === "email");
+    expect(items).toHaveLength(5);
+    expect(items.find((n) => n.title === "Mail 7")).toMatchObject({ body: "Sender 7" });
   });
 });
 
@@ -2465,7 +2691,9 @@ describe("einhub", () => {
         };
       },
       fetchOne: async () => false,
-      messageDelete: async () => true,
+      list: async function* () {},
+      mailboxCreate: async () => ({}),
+      messageMove: async () => ({}),
     });
     const { app, auth, store, secrets } = await testApp({
       config: loadConfig(hubEnv()),

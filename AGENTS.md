@@ -6,6 +6,8 @@ Before making changes, read the shared WIT development guidance in `+wit/develop
 
 - `pnpm install` - workspace install (pnpm 10, Node >= 22.13 or >= 23.4; Node 23.0–23.3 is unsupported because `node:sqlite` is unavailable)
 - `pnpm tokens:build` - must run before `apps/app` builds (generates `packages/tokens/build/css/tokens.css`)
+- `make dev` - full local test setup: `pnpm install` + `pnpm tokens:build` + `pnpm dev` (vite :5173 + BFF :3000)
+- `make deploy` - local Docker test deploy: `docker build -t einring:dev` + restart the `einring-dev` container on :3000 with the root `.env`
 - `pnpm lint` / `pnpm lint:fix` - Biome (format + lint)
 - `pnpm typecheck`, `pnpm test`, `pnpm build` - all workspaces
 - `pnpm --filter @einring/bff test` - BFF tests (Fastify `inject`, in-memory SQLite). On Node 23.x < 23.4 prefix with `NODE_OPTIONS=--experimental-sqlite`

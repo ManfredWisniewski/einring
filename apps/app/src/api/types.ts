@@ -225,7 +225,8 @@ export interface EmailAddress {
 }
 
 export interface EmailSummary {
-  uid: number;
+  /** IMAP uid or JMAP email id, depending on the connected backend. */
+  id: string;
   subject: string | null;
   from: EmailAddress | null;
   date: string | null;

@@ -1,9 +1,9 @@
 {
   "nav": "E-Mail",
-  "intro": "Verbinde dein IMAP-Postfach, damit einring deine neuesten E-Mails anzeigen kann. Nutze Benutzername und Passwort deines Mail-Kontos — verschlüsselt gespeichert und nur für den IMAP-Login verwendet.",
+  "intro": "Verbinde dein IMAP- oder JMAP-Postfach, damit einring deine neuesten E-Mails anzeigen kann. Nutze Benutzername und Passwort deines Mail-Kontos — verschlüsselt gespeichert und nur für den Mail-Login verwendet.",
   "username": "Benutzername",
   "password": "Passwort",
-  "url": "IMAP-Server",
+  "url": "Mailserver (imaps:// oder jmap://)",
   "connect": "Verbinden",
   "connecting": "Verbinde…",
   "connected": "Verbunden mit {{url}}.",
