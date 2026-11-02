@@ -18,6 +18,7 @@ import { passmanModule } from "./passman.js";
 import { recipesModule } from "./recipes.js";
 import { schoolModule } from "./school.js";
 import { settingsModule } from "./settings.js";
+import { stalwartModule } from "./stalwart.js";
 import { tablesModule } from "./tables.js";
 import { talkModule } from "./talk.js";
 import { trekModule } from "./trek.js";
@@ -51,6 +52,7 @@ export const bffModules: BffModule[] = [
   eindavModule,
   recipesModule,
   schoolModule,
+  stalwartModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

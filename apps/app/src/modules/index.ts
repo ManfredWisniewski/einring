@@ -18,6 +18,7 @@ import { passmanModule } from "./passman";
 import { pdfModule } from "./pdf";
 import { recipesModule } from "./recipes";
 import { schoolModule } from "./school";
+import { stalwartModule } from "./stalwart";
 import { tablesModule } from "./tables";
 import { talkModule } from "./talk";
 import { trekModule } from "./trek";
@@ -53,6 +54,7 @@ export const appModules: AppModule[] = [
   eindavModule,
   recipesModule,
   schoolModule,
+  stalwartModule,
 ];
 
 /**

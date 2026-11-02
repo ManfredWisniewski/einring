@@ -1579,6 +1579,8 @@ describe("einchat", () => {
         "eindav_contacts",
         "recipes_search",
         "school_today",
+        "stalwart_info",
+        "stalwart_principals",
       ],
     });
   });
@@ -1696,7 +1698,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(23);
+    expect(all.json().tools.length).toBe(25);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -2599,6 +2601,158 @@ describe("email", () => {
       payload: { username: "u", password: "p", url: "nowhere.test" },
     });
     expect(p4.statusCode).toBe(502);
+  });
+});
+
+describe("stalwart", () => {
+  const SURL = "https://stalwart.test";
+
+  function fakeStalwart(over: { authFail?: boolean; noPrincipals?: boolean } = {}) {
+    const seen: { name: string; auth?: string }[] = [];
+    const fetchImpl = fakeFetch(async (url, init) => {
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url === `${SURL}/.well-known/jmap`) {
+        seen.push({ name: "session", auth });
+        if (over.authFail) return json({ error: "auth" }, 401);
+        const caps: Record<string, unknown> = {
+          "urn:ietf:params:jmap:core": {},
+          "urn:ietf:params:jmap:mail": {},
+        };
+        if (!over.noPrincipals) caps["urn:ietf:params:jmap:principals"] = {};
+        return json({ apiUrl: `${SURL}/jmap`, capabilities: caps, accounts: { u1: {} } });
+      }
+      if (url === `${SURL}/jmap` && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as {
+          methodCalls: [string, Record<string, unknown>, string][];
+        };
+        const methodResponses = body.methodCalls.map(([name, _args, callId]) => {
+          seen.push({ name });
+          if (name === "Principal/query") {
+            return ["Principal/query", { ids: ["a1", "g1", "l1", "r1", "d1"] }, callId];
+          }
+          if (name === "Principal/get") {
+            return [
+              "Principal/get",
+              {
+                list: [
+                  {
+                    id: "a1",
+                    type: "individual",
+                    name: "admin@x.test",
+                    email: "admin@x.test",
+                    description: "Admin",
+                  },
+                  { id: "g1", type: "group", name: "staff@x.test", email: "staff@x.test" },
+                  { id: "l1", type: "list", name: "news@x.test" },
+                  { id: "r1", type: "role", name: "admin" },
+                  { id: "d1", type: "domain", name: "x.test" },
+                ],
+                notFound: [],
+              },
+              callId,
+            ];
+          }
+          if (name === "Domain/query") return ["Domain/query", { ids: ["x.test"] }, callId];
+          if (name === "Domain/get") {
+            return ["Domain/get", { list: [{ id: "x.test", name: "x.test" }] }, callId];
+          }
+          return ["error", { type: "unknownMethod" }, callId];
+        });
+        return json({ methodResponses });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    return { fetchImpl, seen };
+  }
+
+  it("connects via session + principals capability, Basic auth, secret sealed", async () => {
+    const st = fakeStalwart();
+    const { app, auth, store } = await testApp({ fetchImpl: st.fetchImpl });
+    const conn = await app.inject({
+      method: "POST",
+      url: "/api/stalwart/credentials",
+      headers: auth,
+      payload: { username: "admin", password: "secret", url: "https://stalwart.test" },
+    });
+    expect(conn.statusCode).toBe(200);
+    expect(conn.json()).toEqual({ connected: true, url: "https://stalwart.test" });
+    expect(st.seen.find((s) => s.name === "session")?.auth).toBe(
+      `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+    );
+    expect(store.getServiceCredential(TEST_USER.sub, "stalwart")?.secretSealed).not.toContain(
+      "secret",
+    );
+  });
+
+  it("maps auth failure to 401 and missing principals capability to 502", async () => {
+    const fail = fakeStalwart({ authFail: true });
+    const { app, auth, store } = await testApp({ fetchImpl: fail.fetchImpl });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/stalwart/credentials",
+          headers: auth,
+          payload: { username: "a", password: "b", url: "https://stalwart.test" },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(store.getServiceCredential(TEST_USER.sub, "stalwart")).toBeUndefined();
+
+    const noP = fakeStalwart({ noPrincipals: true });
+    const { app: app2, auth: auth2 } = await testApp({ fetchImpl: noP.fetchImpl });
+    expect(
+      (
+        await app2.inject({
+          method: "POST",
+          url: "/api/stalwart/credentials",
+          headers: auth2,
+          payload: { username: "a", password: "b", url: "https://stalwart.test" },
+        })
+      ).statusCode,
+    ).toBe(502);
+  });
+
+  it("lists principals grouped by type plus mail domains — read-only calls only", async () => {
+    const st = fakeStalwart();
+    const { app, auth, store, secrets } = await testApp({ fetchImpl: st.fetchImpl });
+    store.saveServiceCredential({
+      sub: TEST_USER.sub,
+      service: "stalwart",
+      url: "https://stalwart.test",
+      secretSealed: secrets.seal(JSON.stringify({ username: "u", password: "p" })),
+    });
+
+    const res = await app.inject({ method: "GET", url: "/api/stalwart/principals", headers: auth });
+    expect(res.statusCode).toBe(200);
+    const p = res.json();
+    expect(p.accounts).toEqual([
+      { id: "a1", name: "admin@x.test", email: "admin@x.test", description: "Admin" },
+    ]);
+    expect(p.groups.map((g: { name: string }) => g.name)).toEqual(["staff@x.test"]);
+    expect(p.lists.map((l: { name: string }) => l.name)).toEqual(["news@x.test"]);
+    expect(p.roles.map((r: { name: string }) => r.name)).toEqual(["admin"]);
+    expect(p.domains.map((d: { name: string }) => d.name)).toEqual(["x.test"]);
+    expect(p.mailDomains).toEqual([{ id: "x.test", name: "x.test" }]);
+    // Read-only by construction: only query/get calls were issued.
+    const names = st.seen.filter((s) => s.name !== "session").map((s) => s.name);
+    expect(names).toEqual(["Principal/query", "Principal/get", "Domain/query", "Domain/get"]);
+
+    const info = await app.inject({ method: "GET", url: "/api/stalwart/info", headers: auth });
+    expect(info.statusCode).toBe(200);
+    expect(info.json().capabilities).toContain("urn:ietf:params:jmap:principals");
+    expect(info.json().apiUrl).toBe(`${SURL}/jmap`);
+  });
+
+  it("424s when not connected", async () => {
+    const { app, auth } = await testApp();
+    expect(
+      (await app.inject({ method: "GET", url: "/api/stalwart/principals", headers: auth }))
+        .statusCode,
+    ).toBe(424);
+    expect(
+      (await app.inject({ method: "GET", url: "/api/stalwart/info", headers: auth })).statusCode,
+    ).toBe(424);
   });
 });
 
@@ -4602,6 +4756,7 @@ describe("module framework", () => {
         { id: "eindav", requires: ["nextcloud"] },
         { id: "recipes", requires: ["nextcloud"] },
         { id: "school", requires: [] },
+        { id: "stalwart", requires: [] },
       ],
     });
   });

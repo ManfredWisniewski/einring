@@ -244,6 +244,28 @@ export interface EmailAccounts {
   accounts: EmailAccount[];
 }
 
+export interface StalwartPrincipal {
+  id: string;
+  name: string | null;
+  email: string | null;
+  description: string | null;
+}
+
+export interface StalwartPrincipals {
+  accounts: StalwartPrincipal[];
+  groups: StalwartPrincipal[];
+  lists: StalwartPrincipal[];
+  roles: StalwartPrincipal[];
+  domains: StalwartPrincipal[];
+  mailDomains: { id: string; name: string }[];
+}
+
+export interface StalwartInfo {
+  capabilities: string[];
+  apiUrl: string;
+  accountIds: string[];
+}
+
 export interface EmailList {
   emails: EmailSummary[];
 }

@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school
+# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -91,6 +91,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_GITHUB_URL=          # default GitHub instance, e.g. https://github.com or a GHES host
 # MODULE_AUTHENTIK_URL=       # default Authentik instance, e.g. https://auth.example.com
 # MODULE_MATRIX_URL=          # default Matrix homeserver, e.g. https://matrix.example.com
+# MODULE_STALWART_URL=        # default Stalwart server, e.g. https://mail.example.com
 # MODULE_RECIPES_FOLDER=      # WebDAV folder of Cookbook recipe dirs (default Recipes)
 # MODULE_EINHUB_REFRESH_SECONDS=60  # min seconds between upstream notification polls per user
 # --- school module (D56) ----------------------------------------------------
@@ -239,6 +240,7 @@ Connectors share one pattern (D41): each user links their own account in the app
 | `trek` | API key `trek_…` (Settings → Integrations → API Keys) | `trek_list_trips`, `trek_trip_details`, `trek_bucket_list` |
 | `email` | mail username + password + server: `imaps://host:993` or bare host for IMAP, `https://`/`jmap://` host for JMAP (Basic auth; Stalwart app passwords work). Delete moves to Trash on both protocols (D58) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
 | `gotify` | username + password — a client token is minted upstream (`POST /client`) and stored instead of the password; disconnect deletes the client | `gotify_recent_messages`, `gotify_applications` — plus `/gotify`: live message stream (WS→SSE proxy), priority/app view, delete one/all, application management |
+| `stalwart` | mail account username + password (or app password) → JMAP Basic auth — use an account with management API access | `stalwart_info`, `stalwart_principals` — plus `/stalwart`: read-only server info — capabilities, accounts, groups, lists, roles, mail domains (D62) |
 
 ## School module (music-school management)
 

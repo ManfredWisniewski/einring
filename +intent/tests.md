@@ -313,3 +313,11 @@
 - `GET`/`DELETE /api/email/message/<accountId|messageId>` operate on the owning account — 404 for unknown message or account.
 - EinHub dedupes by composite `sourceId` across accounts; `email_recent`/`email_read` accept composite ids.
 - The email settings page (D59) lists accounts with add/remove; the `/email` inbox shows the merged list with an account tag. DE + EN + RU + FR.
+
+### A38 Stalwart module (read-only server info, D62)
+
+- `POST /api/stalwart/credentials {username, password, url}` verifies by fetching `/.well-known/jmap` with Basic auth and requiring the `principals` capability → connected; 401 auth failure, 502 unreachable/missing capability; secret sealed.
+- `GET /api/stalwart/info` returns `{capabilities, apiUrl, counts}` from the session; 424 when not connected.
+- `GET /api/stalwart/principals` returns principals grouped `{accounts, groups, lists, roles, domains}` plus `mailDomains` — batched `Principal/query`+`get` (and `Domain/query`+`get`), each item `{id, name, email?, description?}`; only `query`/`get` calls are issued.
+- The `/stalwart` page renders the capabilities and one section per principal type; `stalwart_info`/`stalwart_principals` chat tools answer the same data (`not_connected` without a credential).
+- All traffic through `ctx.fetchImpl`; secret never in responses. DE + EN + RU + FR.

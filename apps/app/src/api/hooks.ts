@@ -71,6 +71,8 @@ import type {
   SchoolThread,
   SchoolUser,
   ServerHealthResponse,
+  StalwartInfo,
+  StalwartPrincipals,
   TableNode,
   TableNodeType,
   TableRow,
@@ -111,6 +113,8 @@ export const keys = {
   emailList: ["email", "list"] as const,
   emailMessage: (id: string) => ["email", "message", id] as const,
   emailAccounts: ["email", "accounts"] as const,
+  stalwartInfo: ["stalwart", "info"] as const,
+  stalwartPrincipals: ["stalwart", "principals"] as const,
   gotifyMessages: ["gotify", "messages"] as const,
   gotifyApps: ["gotify", "applications"] as const,
   gotifyUser: ["gotify", "user"] as const,
@@ -539,6 +543,25 @@ export function useEmailAccounts() {
   return useQuery({
     queryKey: keys.emailAccounts,
     queryFn: () => api.get<EmailAccounts>("/email/accounts"),
+  });
+}
+
+/** Detect a bare server's mail protocol — JMAP first, then IMAP (D61). */
+export function useStalwartInfo(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.stalwartInfo,
+    queryFn: () => api.get<StalwartInfo>("/stalwart/info"),
+    enabled,
+  });
+}
+
+export function useStalwartPrincipals(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.stalwartPrincipals,
+    queryFn: () => api.get<StalwartPrincipals>("/stalwart/principals"),
+    enabled,
   });
 }
 
