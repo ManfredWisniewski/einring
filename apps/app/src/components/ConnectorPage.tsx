@@ -137,3 +137,13 @@ export function ConnectorPage({ service, userPass }: { service: string; userPass
     </div>
   );
 }
+
+/**
+ * Settings surface for a connector module (D59): assign the result to
+ * `AppModule.settings` — mounts the shared connect/disconnect form.
+ */
+export function connectorSettings(service: string, userPass?: boolean) {
+  return function ConnectorSettings() {
+    return <ConnectorPage service={service} userPass={userPass} />;
+  };
+}

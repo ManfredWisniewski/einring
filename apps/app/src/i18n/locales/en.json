@@ -9,6 +9,7 @@
     "search": "Search modules…",
     "tags": "Tags",
     "noMatches": "No modules match.",
+    "settings": "{{name}} settings",
     "group": {
       "core": "Core",
       "data": "Data",

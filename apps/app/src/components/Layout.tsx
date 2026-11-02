@@ -1,7 +1,8 @@
+import { Settings } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button, MenuTrigger, Popover } from "react-aria-components";
 import { useTranslation } from "react-i18next";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useLocation } from "react-router";
 import {
   useEinHubNotifications,
   useModulePrefs,
@@ -56,6 +57,12 @@ export function Layout() {
     }
     return seen;
   }, [navModules]);
+  const location = useLocation();
+  /** The module owning the current route — its gear stays visible incl. the settings page (D59). */
+  const isActiveModule = (m: (typeof navModules)[number]) =>
+    m.routes.some(
+      (r) => location.pathname === r.path || location.pathname.startsWith(`${r.path}/`),
+    );
   const q = query.trim().toLowerCase();
   const visible = navModules.filter(
     (m) =>
@@ -129,12 +136,23 @@ export function Layout() {
           {sorted.length === 0 && <p className="muted app-nav__empty">{t("nav.noMatches")}</p>}
           <div className="app-nav__links">
             {sorted.map((m) => (
-              <NavLink key={m.id} to={m.routes.at(0)?.path ?? "/"} className="app-nav__link">
-                {t(m.nav?.i18nKey ?? "")}
-                {m.id === "einhub" && unread > 0 && (
-                  <span className="app-nav__badge">{unread}</span>
+              <div key={m.id} className="app-nav__item">
+                <NavLink to={m.routes.at(0)?.path ?? "/"} className="app-nav__link">
+                  {t(m.nav?.i18nKey ?? "")}
+                  {m.id === "einhub" && unread > 0 && (
+                    <span className="app-nav__badge">{unread}</span>
+                  )}
+                </NavLink>
+                {m.settings && isActiveModule(m) && (
+                  <NavLink
+                    to={`/${m.id}/settings`}
+                    className="app-nav__settings"
+                    aria-label={t("nav.settings", { name: t(m.nav?.i18nKey ?? "") })}
+                  >
+                    <Settings size={14} aria-hidden />
+                  </NavLink>
                 )}
-              </NavLink>
+              </div>
             ))}
           </div>
         </nav>

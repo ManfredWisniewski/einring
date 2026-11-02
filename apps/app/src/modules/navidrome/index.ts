@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { connectorSettings } from "@/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
@@ -13,6 +14,7 @@ export const navidromeModule: AppModule = {
   id: "navidrome",
   hasBackend: true,
   nav: { i18nKey: "modules.navidrome.nav", group: "media" },
+  settings: connectorSettings("navidrome", true),
   routes: [{ path: "/navidrome", Component: NavidromePage }],
   i18n: { de, en, fr, ru },
 };

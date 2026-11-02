@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { connectorSettings } from "@/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
@@ -11,6 +12,7 @@ export const gotifyModule: AppModule = {
   id: "gotify",
   hasBackend: true,
   nav: { i18nKey: "modules.gotify.nav", group: "communication" },
+  settings: connectorSettings("gotify", true),
   routes: [{ path: "/gotify", Component: GotifyPage }],
   i18n: { de, en, fr, ru },
 };

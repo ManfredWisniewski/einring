@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { connectorSettings } from "@/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
@@ -11,6 +12,7 @@ export const matrixModule: AppModule = {
   id: "matrix",
   hasBackend: true,
   nav: { i18nKey: "modules.matrix.nav", group: "communication" },
+  settings: connectorSettings("matrix", true),
   routes: [{ path: "/matrix", Component: MatrixPage }],
   i18n: { de, en, fr, ru },
 };

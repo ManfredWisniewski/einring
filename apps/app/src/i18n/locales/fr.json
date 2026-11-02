@@ -9,6 +9,7 @@
     "search": "Rechercher des modules…",
     "tags": "Étiquettes",
     "noMatches": "Aucun module ne correspond.",
+    "settings": "Paramètres de {{name}}",
     "group": {
       "core": "Central",
       "data": "Données",

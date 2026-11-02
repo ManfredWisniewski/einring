@@ -61,6 +61,23 @@ function buildRouter(modules: AppModule[]) {
             ),
           })),
         ),
+        // D59: per-module settings surfaces at /<id>/settings (nav gear button).
+        ...modules.flatMap((m) =>
+          m.settings
+            ? [
+                {
+                  path: `/${m.id}/settings`,
+                  element: (
+                    <RequireAuth>
+                      <Suspense fallback={<ModuleLoading />}>
+                        <m.settings />
+                      </Suspense>
+                    </RequireAuth>
+                  ),
+                },
+              ]
+            : [],
+        ),
         {
           path: "/",
           element: (

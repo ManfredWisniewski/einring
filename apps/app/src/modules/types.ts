@@ -21,6 +21,8 @@ export interface AppModule {
    */
   nav?: { i18nKey: string; group: string };
   routes: ModuleRoute[];
+  /** Optional settings view (D59): the nav gear opens it at `/<id>/settings` inside `app-main`. */
+  settings?: ComponentType;
   /** Locale bundles merged under `modules.<id>` in the default namespace. */
   i18n?: Partial<Record<"de" | "en" | "ru" | "fr", Record<string, unknown>>>;
 }

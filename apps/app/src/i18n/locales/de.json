@@ -9,6 +9,7 @@
     "search": "Module suchen…",
     "tags": "Tags",
     "noMatches": "Keine passenden Module.",
+    "settings": "Einstellungen für {{name}}",
     "group": {
       "core": "Zentrale",
       "data": "Daten",

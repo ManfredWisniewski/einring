@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { connectorSettings } from "@/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
@@ -11,6 +12,7 @@ export const emailModule: AppModule = {
   id: "email",
   hasBackend: true,
   nav: { i18nKey: "modules.email.nav", group: "communication" },
+  settings: connectorSettings("email", true),
   routes: [{ path: "/email", Component: EmailPage }],
   i18n: { de, en, fr, ru },
 };

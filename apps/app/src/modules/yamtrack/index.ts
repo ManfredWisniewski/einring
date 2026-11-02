@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { connectorSettings } from "@/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";
@@ -13,6 +14,7 @@ export const yamtrackModule: AppModule = {
   id: "yamtrack",
   hasBackend: true,
   nav: { i18nKey: "modules.yamtrack.nav", group: "integrations" },
+  settings: connectorSettings("yamtrack"),
   routes: [{ path: "/yamtrack", Component: YamtrackPage }],
   i18n: { de, en, fr, ru },
 };
