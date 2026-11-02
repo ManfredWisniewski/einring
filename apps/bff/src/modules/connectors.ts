@@ -32,6 +32,13 @@ export interface ConnectorOptions {
     url: string,
     secret: string,
   ): Promise<number | { status: number; secret?: string }>;
+  /**
+   * Optional probe that resolves the input AND verifies (D61): returns the
+   * canonical `url` to store plus the verify `status`. Replaces parseUrl+verify
+   * in POST /credentials when set — use when a bare input can map to more than
+   * one backend (e.g. host → JMAP or IMAP).
+   */
+  resolve?(raw: unknown, secret: string): Promise<{ url: string | null; status: number }>;
   /** Best-effort upstream cleanup before the local credential row is deleted. */
   onDisconnect?(fetchImpl: Fetch, url: string, secret: string): Promise<void>;
 }
@@ -118,18 +125,33 @@ export function registerConnectorRoutes(
   api.post("/credentials", async (req, reply) => {
     const secret = opts.parseSecret(req.body);
     if ("error" in secret) return reply.code(400).send({ error: secret.error });
-    const url = urlOf(req.body);
-    if (!url) return reply.code(400).send({ error: `no ${opts.service} url configured` });
-    const verified = await opts.verify(fetchImpl, url, secret.secret);
-    const status = typeof verified === "number" ? verified : verified.status;
+    let url: string;
+    let status: number;
+    let resolvedSecret: string | undefined;
+    if (opts.resolve) {
+      const r = await opts.resolve(
+        (req.body as { url?: unknown })?.url ?? opts.defaultUrl,
+        secret.secret,
+      );
+      if (!r.url && r.status === 400) {
+        return reply.code(400).send({ error: `no ${opts.service} url configured` });
+      }
+      url = r.url ?? "";
+      status = r.status;
+    } else {
+      url = urlOf(req.body);
+      if (!url) return reply.code(400).send({ error: `no ${opts.service} url configured` });
+      const verified = await opts.verify(fetchImpl, url, secret.secret);
+      status = typeof verified === "number" ? verified : verified.status;
+      resolvedSecret = typeof verified === "object" ? verified.secret : undefined;
+    }
     if (status === 401 || status === 403)
       return reply.code(401).send({ error: "invalid credential" });
     if (status >= 400) {
       api.log.warn({ url, status }, `${opts.service} credential verify failed`);
       return reply.code(502).send({ error: `${opts.service} unreachable (${status})` });
     }
-    const finalSecret =
-      typeof verified === "object" && verified.secret ? verified.secret : secret.secret;
+    const finalSecret = resolvedSecret ?? secret.secret;
     // Revoke the superseded credential upstream — otherwise the old token stays live.
     const old = connectorCred(ctx, req.user.sub, opts.service);
     if (old && opts.onDisconnect) {

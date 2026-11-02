@@ -1,11 +1,23 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
-import { useEmailAccounts, useEmailAddAccount, useEmailRemoveAccount } from "@/api/hooks";
+import {
+  useEmailAccounts,
+  useEmailAddAccount,
+  useEmailProbe,
+  useEmailRemoveAccount,
+} from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Email settings surface (D59): manage mail accounts — list, add, remove (D60). */
 export function EmailSettings() {
@@ -13,12 +25,15 @@ export function EmailSettings() {
   const accounts = useEmailAccounts();
   const add = useEmailAddAccount();
   const remove = useEmailRemoveAccount();
+  const probe = useEmailProbe();
   const userId = useId();
   const passId = useId();
   const urlId = useId();
+  const protoId = useId();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [url, setUrl] = useState("");
+  const [server, setServer] = useState("");
+  const [proto, setProto] = useState<"auto" | "jmap" | "imap">("auto");
 
   if (accounts.isPending) return <p className="muted">{t("common.loading")}</p>;
   if (accounts.isError) {
@@ -26,6 +41,16 @@ export function EmailSettings() {
     return <div className="alert alert--danger">{t("modules.email.error", { status: s })}</div>;
   }
   const list = accounts.data?.accounts ?? [];
+
+  /**
+   * Protocol detection (D61): on leaving the server field with all credentials
+   * filled, the app probes JMAP then IMAP and sets the dropdown to the winner.
+   */
+  const maybeProbe = () => {
+    const s = server.trim();
+    if (proto !== "auto" || !s || s.includes("://") || !username || !password) return;
+    probe.mutate({ username, password, url: s }, { onSuccess: (d) => setProto(d.protocol) });
+  };
 
   return (
     <div className="stack">
@@ -39,7 +64,7 @@ export function EmailSettings() {
             <div key={a.id} className="row" style={{ justifyContent: "space-between" }}>
               <span>
                 {a.username}
-                {a.url ? ` · ${a.url}` : ""}
+                {a.url ? ` · ${a.url.startsWith("http") ? "JMAP" : "IMAP"} · ${a.url}` : ""}
               </span>
               <Button
                 variant="destructive"
@@ -71,7 +96,15 @@ export function EmailSettings() {
             style={{ alignItems: "end" }}
             onSubmit={(e) => {
               e.preventDefault();
-              add.mutate({ username, password, url: url || undefined });
+              const s = server.trim();
+              const url = s.includes("://")
+                ? s
+                : proto === "jmap"
+                  ? `jmap://${s}`
+                  : proto === "imap"
+                    ? `imaps://${s}`
+                    : s || undefined;
+              add.mutate({ username, password, url });
             }}
           >
             <div className="stack" style={{ gap: "var(--space-1)" }}>
@@ -80,6 +113,7 @@ export function EmailSettings() {
                 id={userId}
                 value={username}
                 onChange={(e) => setUsername(e.currentTarget.value)}
+                onBlur={maybeProbe}
                 required
                 autoComplete="username"
               />
@@ -91,6 +125,7 @@ export function EmailSettings() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.currentTarget.value)}
+                onBlur={maybeProbe}
                 required
                 autoComplete="current-password"
               />
@@ -99,15 +134,41 @@ export function EmailSettings() {
               <Label htmlFor={urlId}>{t("modules.email.url")}</Label>
               <Input
                 id={urlId}
-                value={url}
-                onChange={(e) => setUrl(e.currentTarget.value)}
-                placeholder="jmap://mail.example.com"
+                value={server}
+                onChange={(e) => setServer(e.currentTarget.value)}
+                onBlur={maybeProbe}
+                required
+                placeholder="mail.example.com"
               />
             </div>
-            <Button type="submit" disabled={add.isPending}>
-              {add.isPending ? t("modules.email.adding") : t("modules.email.addAccount")}
+            <div className="stack" style={{ gap: "var(--space-1)" }}>
+              <Label htmlFor={protoId}>{t("modules.email.protocol")}</Label>
+              <Select value={proto} onValueChange={(v) => setProto(v as typeof proto)}>
+                <SelectTrigger id={protoId} aria-label={t("modules.email.protocol")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t("modules.email.protocolAuto")}</SelectItem>
+                  <SelectItem value="jmap">JMAP</SelectItem>
+                  <SelectItem value="imap">IMAP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" disabled={add.isPending || probe.isPending}>
+              {probe.isPending
+                ? t("modules.email.probing")
+                : add.isPending
+                  ? t("modules.email.adding")
+                  : t("modules.email.addAccount")}
             </Button>
           </form>
+          {probe.isError && (
+            <div className="alert alert--danger">
+              {t("modules.email.probeFailed", {
+                status: probe.error instanceof ApiError ? probe.error.status : "?",
+              })}
+            </div>
+          )}
           {add.isError && (
             <div className="alert alert--danger">
               {add.error instanceof ApiError && add.error.status === 401

@@ -2181,7 +2181,11 @@ describe("email", () => {
 
   it("connects with a bare host, verifies via IMAP login, lists last 5", async () => {
     const imap = fakeImap();
-    const { app, auth, store } = await testApp({ imapOpen: imap.open });
+    const { app, auth, store } = await testApp({
+      imapOpen: imap.open,
+      // Bare host → JMAP probe runs first; 404 → falls back to IMAP (D61).
+      fetchImpl: () => Promise.resolve(new Response("nf", { status: 404 })),
+    });
     const conn = await app.inject({
       method: "POST",
       url: "/api/email/credentials",
@@ -2260,7 +2264,10 @@ describe("email", () => {
 
   it("maps an IMAP auth failure to 401 and never stores the secret", async () => {
     const imap = fakeImap({ authFail: true });
-    const { app, auth, store } = await testApp({ imapOpen: imap.open });
+    const { app, auth, store } = await testApp({
+      imapOpen: imap.open,
+      fetchImpl: () => Promise.resolve(new Response("nf", { status: 404 })),
+    });
     const conn = await app.inject({
       method: "POST",
       url: "/api/email/credentials",
@@ -2478,6 +2485,120 @@ describe("email", () => {
         })
       ).statusCode,
     ).toBe(404);
+  });
+
+  it("auto-probes a bare host: jmap first, then imap (D61)", async () => {
+    // JMAP wins when session + mail capability check pass → https:// stored.
+    const jmap = fakeJmap();
+    const { app, auth, store } = await testApp({ fetchImpl: jmap.fetchImpl });
+    const add = await app.inject({
+      method: "POST",
+      url: "/api/email/accounts",
+      headers: auth,
+      payload: { username: "u", password: "p", url: "mail.test" },
+    });
+    expect(add.statusCode).toBe(200);
+    expect(add.json().url).toBe("https://mail.test");
+    expect(store.getServiceCredential(TEST_USER.sub, "email:u-mail.test")?.url).toBe(
+      "https://mail.test",
+    );
+
+    // No JMAP endpoint → falls back to IMAP.
+    const imap = fakeImap();
+    const dead = () => Promise.resolve(new Response("nf", { status: 404 }));
+    const {
+      app: app2,
+      auth: auth2,
+      store: store2,
+    } = await testApp({
+      imapOpen: imap.open,
+      fetchImpl: dead,
+    });
+    const add2 = await app2.inject({
+      method: "POST",
+      url: "/api/email/accounts",
+      headers: auth2,
+      payload: { username: "u", password: "p", url: "imap.test" },
+    });
+    expect(add2.statusCode).toBe(200);
+    expect(store2.getServiceCredential(TEST_USER.sub, "email:u-imap.test")?.url).toBe(
+      "imaps://imap.test",
+    );
+
+    // A JMAP 401 means wrong credentials — the IMAP backend is never tried.
+    const rej = fakeJmap({ authFail: true });
+    const imap2 = fakeImap();
+    const { app: app3, auth: auth3 } = await testApp({
+      imapOpen: imap2.open,
+      fetchImpl: rej.fetchImpl,
+    });
+    const add3 = await app3.inject({
+      method: "POST",
+      url: "/api/email/accounts",
+      headers: auth3,
+      payload: { username: "u", password: "p", url: "mail.test" },
+    });
+    expect(add3.statusCode).toBe(401);
+    expect(imap2.calls.host).toBeUndefined();
+  });
+
+  it("detects the protocol for a bare server without storing (D61)", async () => {
+    const jmap = fakeJmap();
+    const { app, auth } = await testApp({ fetchImpl: jmap.fetchImpl });
+    const p = await app.inject({
+      method: "POST",
+      url: "/api/email/probe",
+      headers: auth,
+      payload: { username: "u", password: "p", url: "mail.test" },
+    });
+    expect(p.statusCode).toBe(200);
+    expect(p.json()).toEqual({ protocol: "jmap", url: "https://mail.test" });
+    // Detection only — no account stored.
+    const accs = await app.inject({ method: "GET", url: "/api/email/accounts", headers: auth });
+    expect(accs.json().accounts).toEqual([]);
+
+    // No JMAP endpoint → IMAP detected.
+    const imap = fakeImap();
+    const dead = () => Promise.resolve(new Response("nf", { status: 404 }));
+    const { app: app2, auth: auth2 } = await testApp({
+      imapOpen: imap.open,
+      fetchImpl: dead,
+    });
+    const p2 = await app2.inject({
+      method: "POST",
+      url: "/api/email/probe",
+      headers: auth2,
+      payload: { username: "u", password: "p", url: "imap.test" },
+    });
+    expect(p2.statusCode).toBe(200);
+    expect(p2.json()).toEqual({ protocol: "imap", url: "imaps://imap.test" });
+
+    // Auth rejected by a live JMAP endpoint still means JMAP — auth surfaces at save.
+    const rej = fakeJmap({ authFail: true });
+    const { app: app3, auth: auth3 } = await testApp({ fetchImpl: rej.fetchImpl });
+    const p3 = await app3.inject({
+      method: "POST",
+      url: "/api/email/probe",
+      headers: auth3,
+      payload: { username: "u", password: "wrong", url: "mail.test" },
+    });
+    expect(p3.statusCode).toBe(200);
+    expect(p3.json().protocol).toBe("jmap");
+
+    // Neither reachable → 502.
+    const { app: app4, auth: auth4 } = await testApp({
+      imapOpen: async () => {
+        throw new Error("refused");
+      },
+      fetchImpl: dead,
+    });
+    const p4 = await app4.inject({
+      method: "POST",
+      url: "/api/email/probe",
+      headers: auth4,
+      payload: { username: "u", password: "p", url: "nowhere.test" },
+    });
+    expect(p4.statusCode).toBe(502);
   });
 });
 

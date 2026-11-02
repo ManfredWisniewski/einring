@@ -542,6 +542,15 @@ export function useEmailAccounts() {
   });
 }
 
+/** Detect a bare server's mail protocol — JMAP first, then IMAP (D61). */
+export function useEmailProbe() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string; url: string }) =>
+      api.post<{ protocol: "jmap" | "imap"; url: string }>("/email/probe", body),
+  });
+}
+
 export function useEmailAddAccount() {
   const api = useApi();
   const qc = useQueryClient();

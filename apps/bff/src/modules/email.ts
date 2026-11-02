@@ -57,6 +57,42 @@ function mailProtocol(url: string): "imap" | "jmap" {
   return url.startsWith("http") ? "jmap" : "imap";
 }
 
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+/**
+ * Connect-time resolve (D61): a bare host probes JMAP first (session + mail
+ * capability), then IMAP — the winner's canonical url is what gets stored. An
+ * explicit scheme verifies that backend directly. A JMAP 401 short-circuits:
+ * a live endpoint rejected the credential, so IMAP would fail the same way.
+ */
+async function emailProbe(
+  ctx: AppContext,
+  raw: unknown,
+  secretJson: string,
+): Promise<{ url: string | null; status: number }> {
+  if (typeof raw !== "string" || !raw.trim()) return { url: null, status: 400 };
+  const s = raw.trim();
+  if (HAS_SCHEME.test(s)) {
+    const url = parseMailUrl(s);
+    if (!url) return { url: null, status: 400 };
+    const status =
+      mailProtocol(url) === "jmap"
+        ? await jmapVerify(ctx, url, secretJson)
+        : await imapVerify(ctx, url, secretJson);
+    return { url, status };
+  }
+  const jmapUrl = `https://${s}`;
+  let status = await jmapVerify(ctx, jmapUrl, secretJson);
+  if (status < 400) return { url: jmapUrl, status };
+  // An answered 401 proves JMAP exists — the URL stays resolved so callers can
+  // report the detected protocol; only the credential is wrong.
+  if (status === 401 || status === 403) return { url: jmapUrl, status: 401 };
+  const imapUrl = parseImapUrl(s);
+  if (!imapUrl) return { url: null, status: 400 };
+  status = await imapVerify(ctx, imapUrl, secretJson);
+  return { url: imapUrl, status };
+}
+
 /** One connected mail account (D60): `email:<slug>` rows; the bare `email` row is "default". */
 interface MailAccount extends MailCred {
   id: string;
@@ -224,10 +260,37 @@ export const emailModule: BffModule<EmailConfig> = {
         mailProtocol(url) === "jmap"
           ? jmapVerify(ctx, url, secretJson)
           : imapVerify(ctx, url, secretJson),
+      resolve: (raw, secretJson) => emailProbe(ctx, raw, secretJson),
     };
     registerConnectorRoutes(api, ctx, options);
 
     // Multi-account API (D60). The legacy /credentials route manages the "default" account.
+    // Protocol detection (D61): probe a bare server without storing — JMAP
+    // first, then IMAP. A 401 still counts as detected (endpoint exists).
+    api.post("/probe", async (req, reply) => {
+      const body = z
+        .object({
+          username: z.string().min(1),
+          password: z.string().min(1),
+          url: z.string().min(1),
+        })
+        .safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: "expected {username, password, url}" });
+      }
+      const r = await emailProbe(
+        ctx,
+        body.data.url,
+        JSON.stringify({ username: body.data.username, password: body.data.password }),
+      );
+      if (r.status === 400) return reply.code(400).send({ error: "invalid server" });
+      // Detected = an endpoint answered, even with an auth rejection.
+      if (!r.url || (r.status >= 400 && r.status !== 401)) {
+        return reply.code(502).send({ error: "no mail service detected" });
+      }
+      return { protocol: mailProtocol(r.url), url: r.url };
+    });
+
     api.get("/accounts", async (req) => ({
       accounts: listAccounts(ctx, req.user.sub).map(({ id, username, url }) => ({
         id,
@@ -247,21 +310,17 @@ export const emailModule: BffModule<EmailConfig> = {
       if (!body.success) {
         return reply.code(400).send({ error: "expected {username, password, url?}" });
       }
-      const url = parseMailUrl(body.data.url ?? config.URL);
-      if (!url) return reply.code(400).send({ error: "no email url configured" });
       const secretJson = JSON.stringify({
         username: body.data.username,
         password: body.data.password,
       });
-      const status =
-        mailProtocol(url) === "jmap"
-          ? await jmapVerify(ctx, url, secretJson)
-          : await imapVerify(ctx, url, secretJson);
+      const { url, status } = await emailProbe(ctx, body.data.url ?? config.URL, secretJson);
+      if (status === 400) return reply.code(400).send({ error: "no email url configured" });
       if (status === 401 || status === 403) {
         return reply.code(401).send({ error: "invalid credential" });
       }
-      if (status >= 400) {
-        api.log.warn({ url, status }, "email account verify failed");
+      if (status >= 400 || !url) {
+        api.log.warn({ url: body.data.url, status }, "email account verify failed");
         return reply.code(502).send({ error: `email unreachable (${status})` });
       }
       const id = accountSlug(body.data.username, url);
