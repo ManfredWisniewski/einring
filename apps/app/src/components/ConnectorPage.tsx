@@ -25,6 +25,12 @@ export function ConnectorPage({ service, userPass }: { service: string; userPass
   const [password, setPassword] = useState("");
   const [url, setUrl] = useState("");
 
+  // D65: HTTPS is expected — a scheme-less host gets https:// prepended.
+  const withHttps = (v: string) => {
+    const s = v.trim();
+    return s && !s.includes("://") ? `https://${s}` : s;
+  };
+
   if (status.isPending) return <p className="muted">{t("common.loading")}</p>;
   if (status.isError) {
     const s = status.error instanceof ApiError ? status.error.status : "?";
@@ -104,6 +110,7 @@ export function ConnectorPage({ service, userPass }: { service: string; userPass
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            onBlur={() => setUrl(withHttps)}
             placeholder={status.data?.url ?? "https://…"}
           />
         </div>
@@ -111,8 +118,8 @@ export function ConnectorPage({ service, userPass }: { service: string; userPass
           onClick={() =>
             connect.mutate(
               userPass
-                ? { username, password, url: url.trim() || undefined }
-                : { apiKey, url: url.trim() || undefined },
+                ? { username, password, url: withHttps(url) || undefined }
+                : { apiKey, url: withHttps(url) || undefined },
             )
           }
           disabled={connect.isPending || !secretOk}

@@ -329,3 +329,8 @@
 - Signing uses only the Actions-secret keystore; the keystore file is never committed and never uploaded as an artifact.
 - The APK's bundled web assets are built with `VITE_API_URL` pointing at the deployment BFF; OIDC config still resolves at runtime via `/api/config`.
 - Without the `EINRING_*` env vars `assembleRelease` still builds (unsigned, `versionCode` 1) — local builds and the CI debug-APK job are unaffected.
+
+### A40 Scheme-less connector URLs (D65)
+
+- Entering `host.tld` in a `ConnectorPage` URL field normalizes to `https://host.tld` on blur and on submit; values that already contain `://` are unchanged.
+- The email add-account form does not prepend — a bare host still triggers the JMAP/IMAP probe (A37).
