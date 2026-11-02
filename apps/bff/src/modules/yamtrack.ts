@@ -87,19 +87,28 @@ async function listTracked(
   mediaType: string,
   limit: number,
 ): Promise<TrackedMedia[] | { status: number }> {
-  const { status, body } = await yamtrackGet<unknown>(
-    fetchImpl,
-    baseUrl,
-    apiKey,
-    `/media/${mediaType}/?limit=${limit}&offset=0`,
-  );
-  if (!body) return { status };
-  const items = Array.isArray(body)
-    ? body
-    : Array.isArray((body as { results?: unknown }).results)
-      ? (body as { results: unknown[] }).results
-      : [];
-  return items as TrackedMedia[];
+  // DRF pagination: follow offset pages until `next` is null. Capped so one
+  // tool call can't fan out into an unbounded request burst (A36).
+  const MAX_ITEMS = 1000;
+  const out: TrackedMedia[] = [];
+  for (let offset = 0; ; offset += limit) {
+    const { status, body } = await yamtrackGet<unknown>(
+      fetchImpl,
+      baseUrl,
+      apiKey,
+      `/media/${mediaType}/?limit=${limit}&offset=${offset}`,
+    );
+    if (!body) return out.length ? out : { status }; // first page fails → error; later page fails → keep partial
+    const page = Array.isArray(body)
+      ? body
+      : Array.isArray((body as { results?: unknown }).results)
+        ? (body as { results: unknown[] }).results
+        : [];
+    out.push(...(page as TrackedMedia[]));
+    const next = (body as { pagination?: { next?: unknown } }).pagination?.next;
+    if (!next || page.length < limit || out.length >= MAX_ITEMS) break;
+  }
+  return out;
 }
 
 const options = (config: YamtrackConfig): ConnectorOptions => ({
