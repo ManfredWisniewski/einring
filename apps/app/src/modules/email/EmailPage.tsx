@@ -8,9 +8,9 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
 import { useEmailAccounts, useEmailDelete, useEmailList, useEmailMessage } from "@/api/hooks";
 import type { EmailSummary } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmailAccountForm } from "./EmailAccountForm";
 
 /** One expandable mail row: header always visible, body lazy-fetched on expand. */
 function MailRow({ id, account, subject, from, date }: EmailSummary) {
@@ -90,8 +90,24 @@ export function EmailPage() {
   const list = useEmailList((accounts.data?.accounts.length ?? 0) > 0);
 
   if (accounts.isPending) return <p className="muted">{t("common.loading")}</p>;
-  if (accounts.isError || !accounts.data?.accounts.length)
-    return <ConnectorPage service="email" userPass />;
+  if (accounts.isError) {
+    const s = accounts.error instanceof ApiError ? accounts.error.status : "?";
+    return <div className="alert alert--danger">{t("modules.email.error", { status: s })}</div>;
+  }
+  // First account: the same add-account form the settings page uses (D60).
+  if (!accounts.data?.accounts.length) {
+    return (
+      <Card className="mx-auto max-w-md">
+        <CardHeader>
+          <CardTitle>{t("modules.email.addAccount")}</CardTitle>
+          <CardDescription>{t("modules.email.intro")}</CardDescription>
+        </CardHeader>
+        <CardContent className="stack">
+          <EmailAccountForm />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (list.isPending) return <p className="muted">{t("common.loading")}</p>;
   if (list.isError) {
