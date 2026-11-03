@@ -35,6 +35,14 @@ jobs:
             exit 0
           fi
 
-          gh pr create --base main --head work \
+          if out=$(gh pr create --base main --head work \
             --title "Merge work into main ($(date -u +'%Y-%m-%d %H:%M UTC'))" \
-            --body "Scheduled merge of \`work\` ($ahead commits ahead) into \`main\`."
+            --body "Scheduled merge of \`work\` ($ahead commits ahead) into \`main\`." 2>&1); then
+            echo "$out"
+          elif echo "$out" | grep -qi "no commits between"; then
+            echo "$out"
+            echo "::notice::work is no longer ahead of main (branches moved since the check) — nothing to do."
+          else
+            echo "$out" >&2
+            exit 1
+          fi
