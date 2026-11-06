@@ -30,6 +30,7 @@ BFF counterpart (`apps/bff/src/modules/registry.ts`).
 | recipes | Nextcloud Cookbook recipes (read-only) | testing | via Nextcloud | nextcloud.com (Cookbook) |
 | stalwart | Stalwart mail server: principals, mail domains, JMAP capabilities (read-only) | testing | one | stalw.art |
 | school | Music-school management (people, lessons, invoicing, messaging) | dev | — (Authentik groups) | — (internal) |
+| postges | PostgreSQL table browser — per-user connections, read-only by default | dev | one per user | any PostgreSQL server |
 
 **State** reflects implementation maturity (acceptance criteria + test coverage), not a
 formal release process — `dev` = under active construction, `testing` = implemented with

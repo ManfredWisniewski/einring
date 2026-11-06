@@ -48,6 +48,10 @@ import type {
   NextcloudSettingsResponse,
   PassmanVaultDetail,
   PassmanVaults,
+  PostgesColumn,
+  PostgesRows,
+  PostgesStatus,
+  PostgesTable,
   Recipe,
   RecipeListItem,
   SchoolAttendance,
@@ -1809,5 +1813,127 @@ export function useSchoolSubmitHomework() {
       );
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: [...SCHOOL, "assignments"] }),
+  });
+}
+
+// --- postges (Postgres admin) -------------------------------------------------
+
+export function usePostgesStatus(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["postges", "status"],
+    queryFn: () => api.get<PostgesStatus>("/postges/status"),
+    enabled,
+  });
+}
+
+export function usePostgesConnect() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.post<PostgesStatus>("/postges/credentials", { url }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["postges"] }),
+  });
+}
+
+export function usePostgesDisconnect() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<PostgesStatus>("/postges/credentials"),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: ["postges", "tables"] });
+      void qc.invalidateQueries({ queryKey: ["postges", "status"] });
+    },
+  });
+}
+
+export function usePostgesTables(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["postges", "tables"],
+    queryFn: () => api.get<{ tables: PostgesTable[] }>("/postges/tables").then((r) => r.tables),
+    enabled,
+  });
+}
+
+export interface PostgesRowsQuery {
+  q?: string;
+  sort?: string;
+  dir?: "asc" | "desc";
+  offset?: number;
+  limit?: number;
+}
+
+export function usePostgesRows(
+  table: { schema: string; name: string } | null,
+  query: PostgesRowsQuery,
+  enabled = true,
+) {
+  const api = useApi();
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.dir) params.set("dir", query.dir);
+  if (query.offset) params.set("offset", String(query.offset));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  return useQuery({
+    queryKey: ["postges", "rows", table?.schema, table?.name, qs],
+    queryFn: () =>
+      api.get<PostgesRows>(
+        `/postges/tables/${encodeURIComponent(table?.schema ?? "")}/${encodeURIComponent(table?.name ?? "")}/rows${qs ? `?${qs}` : ""}`,
+      ),
+    enabled: enabled && table !== null,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Row identity = primary-key column values in pk order. */
+export function postgesPk(
+  row: Record<string, unknown>,
+  columns: PostgesColumn[],
+): unknown[] | null {
+  const pks = columns.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk);
+  if (pks.length === 0) return null;
+  return pks.map((c) => row[c.name]);
+}
+
+export function usePostgesInsert(table: { schema: string; name: string } | null) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Record<string, unknown>) =>
+      api.post<{ row: Record<string, unknown> }>(
+        `/postges/tables/${encodeURIComponent(table?.schema ?? "")}/${encodeURIComponent(table?.name ?? "")}/rows`,
+        { values },
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["postges", "rows"] }),
+  });
+}
+
+export function usePostgesUpdate(table: { schema: string; name: string } | null) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { pk: unknown[]; values: Record<string, unknown> }) =>
+      api.patch<{ row: Record<string, unknown> }>(
+        `/postges/tables/${encodeURIComponent(table?.schema ?? "")}/${encodeURIComponent(table?.name ?? "")}/rows`,
+        input,
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["postges", "rows"] }),
+  });
+}
+
+export function usePostgesDelete(table: { schema: string; name: string } | null) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pk: unknown[]) =>
+      api.delete<{ deleted: boolean }>(
+        `/postges/tables/${encodeURIComponent(table?.schema ?? "")}/${encodeURIComponent(table?.name ?? "")}/rows`,
+        { pk },
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["postges", "rows"] }),
   });
 }

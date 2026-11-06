@@ -4757,6 +4757,7 @@ describe("module framework", () => {
         { id: "recipes", requires: ["nextcloud"] },
         { id: "school", requires: [] },
         { id: "stalwart", requires: [] },
+        { id: "postges", requires: [] },
       ],
     });
   });

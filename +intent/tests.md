@@ -334,3 +334,12 @@
 
 - Entering `host.tld` in a `ConnectorPage` URL field normalizes to `https://host.tld` on blur and on submit; values that already contain `://` are unchanged.
 - The email add-account form does not prepend — a bare host still triggers the JMAP/IMAP probe (A37).
+
+### A41 Postges module (per-user Postgres table browser)
+
+- `POST /api/postges/credentials {url}` accepts only `postgres://`/`postgresql://` strings (else 400), verifies by opening a connection and running `SELECT 1` (auth failure → 401, unreachable → 502), seals the full string per `sub` and stores a credential-free `host:port/db` display url; the secret never appears in any response.
+- `GET /api/postges/status` → `{connected, url, readOnly}`; `DELETE /credentials` disconnects. All data endpoints answer 424 while unconnected and require auth.
+- `GET /api/postges/tables` lists user-schema tables/views/materialized views with kind + planner row estimate; `GET /api/postges/tables/:schema/:name/rows` returns columns (name/type/nullable/pk position/internal flag), rows and total, with `q` ILIKE across text columns, `sort`/`dir`, `offset`/`limit` capped at `MODULE_POSTGES_MAX_PAGE`.
+- Columns with internal udts (e.g. pgvector `vector`) are flagged `internal` — never rendered, searched or writable.
+- Mutations (`POST`/`PATCH`/`DELETE .../rows`, addressed by primary-key values) are mounted only when `MODULE_POSTGES_READ_ONLY=false` (default `true`); pk-less tables → 400, unknown/internal columns → 400, unmatched pk → 404.
+- The `/postges` page: connect card → table list with client-side filter → searchable, sortable, paginated grid → row editor (text inputs, checkboxes for booleans; pk read-only on edit, omittable on insert). DE + EN + RU + FR; read-only deployments hide all mutation controls.

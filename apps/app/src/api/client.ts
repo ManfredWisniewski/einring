@@ -70,7 +70,12 @@ export function createApi(getToken: TokenProvider) {
         body: body === undefined ? undefined : JSON.stringify(body),
         headers: body === undefined ? {} : { "Content-Type": "application/json" },
       }),
-    delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+    delete: <T>(path: string, body?: unknown) =>
+      request<T>(path, {
+        method: "DELETE",
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      }),
   };
 }
 

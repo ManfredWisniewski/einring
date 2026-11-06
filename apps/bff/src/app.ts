@@ -12,6 +12,7 @@ import { createLlmService, LlmError, type LlmService } from "./llm/client.js";
 import type { ImapOpen } from "./modules/email.js";
 import { type ResolvedModule, resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
+import type { PgOpen } from "./pg/client.js";
 import { registerNextcloudPublicRoutes, registerNextcloudRoutes } from "./routes/nextcloud.js";
 
 export interface AppDeps {
@@ -22,6 +23,8 @@ export interface AppDeps {
   fetchImpl?: Fetch;
   /** IMAP opener for the email module; injectable for tests. */
   imapOpen?: ImapOpen;
+  /** Postgres opener for the postges module (and future pg-backed modules); injectable for tests. */
+  pgOpen?: PgOpen;
   logger?: boolean | object;
 }
 

@@ -15,6 +15,7 @@ import { monitorModule } from "./monitor.js";
 import { navidromeModule } from "./navidrome.js";
 import { nextcloudModule } from "./nextcloud.js";
 import { passmanModule } from "./passman.js";
+import { postgesModule } from "./postges.js";
 import { recipesModule } from "./recipes.js";
 import { schoolModule } from "./school.js";
 import { settingsModule } from "./settings.js";
@@ -53,6 +54,7 @@ export const bffModules: BffModule[] = [
   recipesModule,
   schoolModule,
   stalwartModule,
+  postgesModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

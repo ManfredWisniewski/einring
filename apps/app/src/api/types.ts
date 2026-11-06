@@ -961,3 +961,34 @@ export interface SchoolHomeworkAssignment {
   createdAt: string;
   submissions: SchoolHomeworkSubmission[];
 }
+
+export interface PostgesStatus {
+  connected: boolean;
+  url: string | null;
+  readOnly: boolean;
+}
+
+export interface PostgesTable {
+  schema: string;
+  name: string;
+  kind: "table" | "view" | "materialized view";
+  rowEstimate: number;
+}
+
+export interface PostgesColumn {
+  name: string;
+  type: string;
+  /** Embedding/internal columns are never rendered or editable. */
+  internal: boolean;
+  nullable: boolean;
+  /** 1-based primary-key position; 0 = not part of the pk. */
+  pk: number;
+}
+
+export interface PostgesRows {
+  columns: PostgesColumn[];
+  rows: Record<string, unknown>[];
+  total: number;
+  offset: number;
+  limit: number;
+}

@@ -16,6 +16,7 @@ import { navidromeModule } from "./navidrome";
 import { nextcloudModule } from "./nextcloud";
 import { passmanModule } from "./passman";
 import { pdfModule } from "./pdf";
+import { postgesModule } from "./postges";
 import { recipesModule } from "./recipes";
 import { schoolModule } from "./school";
 import { stalwartModule } from "./stalwart";
@@ -55,6 +56,7 @@ export const appModules: AppModule[] = [
   recipesModule,
   schoolModule,
   stalwartModule,
+  postgesModule,
 ];
 
 /**
