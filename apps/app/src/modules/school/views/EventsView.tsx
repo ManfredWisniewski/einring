@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSchoolConfirmParticipation, useSchoolEvents, useSchoolSaveEvent } from "@/api/hooks";
-import type { SchoolPerson } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSchoolConfirmParticipation, useSchoolEvents, useSchoolSaveEvent } from "~/api/hooks";
+import type { SchoolPerson } from "~/api/types";
 import { fmtDate } from "./shared";
 
 /** Recitals/exams: list + detail + parent confirmation (D56). */
@@ -24,7 +24,7 @@ export default function EventsView({
       <div className="row">
         <h2>{t("modules.school.events.title")}</h2>
         {staff && (
-          <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+          <Button size="sm" variant="outlined" onClick={() => setShowForm(!showForm)}>
             {t("modules.school.events.new")}
           </Button>
         )}
@@ -54,7 +54,7 @@ export default function EventsView({
                       <>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="outlined"
                           disabled={confirm.isPending}
                           onClick={() =>
                             confirm.mutate({
@@ -68,7 +68,7 @@ export default function EventsView({
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="text"
                           disabled={confirm.isPending}
                           onClick={() =>
                             confirm.mutate({

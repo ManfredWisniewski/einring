@@ -1,15 +1,5 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useSchoolHouseholds,
-  useSchoolLinkPerson,
-  useSchoolPersons,
-  useSchoolSaveHousehold,
-  useSchoolSavePerson,
-  useSchoolSetMembers,
-  useSchoolUsers,
-} from "@/api/hooks";
-import type { SchoolPersonKind } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  useSchoolHouseholds,
+  useSchoolLinkPerson,
+  useSchoolPersons,
+  useSchoolSaveHousehold,
+  useSchoolSavePerson,
+  useSchoolSetMembers,
+  useSchoolUsers,
+} from "~/api/hooks";
+import type { SchoolPersonKind } from "~/api/types";
 
 /** People administration: persons, login links, households (admin only). */
 export default function PeopleView({ admin }: { admin: boolean }) {
@@ -49,14 +49,14 @@ export default function PeopleView({ admin }: { admin: boolean }) {
           <>
             <Button
               size="sm"
-              variant="outline"
+              variant="outlined"
               onClick={() => setForm(form === "person" ? null : "person")}
             >
               {t("modules.school.people.newPerson")}
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="outlined"
               onClick={() => setForm(form === "household" ? null : "household")}
             >
               {t("modules.school.people.newHousehold")}
@@ -95,7 +95,7 @@ export default function PeopleView({ admin }: { admin: boolean }) {
               {admin && (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="text"
                   onClick={() =>
                     setForm(form === `members:${h.id}` ? null : (`members:${h.id}` as "members"))
                   }

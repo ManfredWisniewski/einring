@@ -6,17 +6,17 @@ const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
 import { marked } from "marked";
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
 import {
   useEinChatMessage,
   useEinChatSetTools,
   useEinChatStatus,
   useEinChatTools,
-} from "@/api/hooks";
-import type { EinChatMessage, EinChatTool } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "~/api/hooks";
+import type { EinChatMessage, EinChatTool } from "~/api/types";
 
 function Bubble({ msg }: { msg: EinChatMessage }) {
   if (msg.role === "assistant") {

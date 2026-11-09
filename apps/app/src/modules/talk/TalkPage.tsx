@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ApiError } from "~/api/client";
 import {
   useApi,
   useNextcloudConnection,
@@ -8,11 +10,9 @@ import {
   useSendTalkMessage,
   useTalkMessages,
   useTalkRooms,
-} from "@/api/hooks";
-import type { TalkFileParam, TalkMessage } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "~/api/hooks";
+import type { TalkFileParam, TalkMessage } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 /** First `file` rich-object parameter on a message, if any (D51). */
 function fileParam(m: TalkMessage): TalkFileParam | null {
@@ -105,7 +105,7 @@ function MessagePane({
   return (
     <div className="stack talk-pane">
       <div className="row">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+        <Button variant="text" size="sm" onClick={onBack}>
           {t("modules.talk.back")}
         </Button>
         <h2 className="text-lg" style={{ flex: 1 }}>
@@ -169,7 +169,7 @@ function MessagePane({
           onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)}
         />
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           disabled={sendImage.isPending}
           onClick={() => document.getElementById(attachId)?.click()}
@@ -177,7 +177,7 @@ function MessagePane({
           {t("modules.talk.attach")}
         </Button>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           disabled={!file || sendImage.isPending}
           onClick={() => {
@@ -197,7 +197,7 @@ function MessagePane({
           {t("modules.talk.sendImage")}
         </Button>
         <Button
-          variant="default"
+          variant="filled"
           size="sm"
           onClick={submit}
           disabled={!text.trim() || send.isPending}

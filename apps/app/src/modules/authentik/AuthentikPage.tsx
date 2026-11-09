@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { useConnectorDisconnect, useConnectorStatus } from "@/api/hooks";
-import { AuthentikStatusView } from "@/components/AuthentikStatus";
-import { ConnectorPage } from "@/components/ConnectorPage";
 import { Button } from "@/components/ui/button";
+import { useConnectorDisconnect, useConnectorStatus } from "~/api/hooks";
+import { AuthentikStatusView } from "~/components/AuthentikStatus";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 export function AuthentikPage() {
   const { t } = useTranslation();
@@ -17,7 +17,7 @@ export function AuthentikPage() {
       <div className="row einhub-header">
         <p className="muted">{t("modules.authentik.connectedAs", { url: status.data?.url })}</p>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}

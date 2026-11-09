@@ -1,7 +1,5 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useEmailAddAccount, useEmailProbe } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ApiError } from "~/api/client";
+import { useEmailAddAccount, useEmailProbe } from "~/api/hooks";
 
 /**
  * Add-account form (D60/D61) — one reusable form for the first account

@@ -6,7 +6,11 @@ const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
 import { marked } from "marked";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
 import {
   useConnectorDisconnect,
   useConnectorStatus,
@@ -18,13 +22,9 @@ import {
   useGotifyMessages,
   useGotifyStream,
   useGotifyUser,
-} from "@/api/hooks";
-import type { GotifyMessage } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "~/api/hooks";
+import type { GotifyMessage } from "~/api/types";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 /** Priority dot: Gotify priorities — ≥8 alert, ≥4 noticeable, else low. */
 function prioClass(priority: number): string {
@@ -72,7 +72,8 @@ function MessageRow({ msg, appName }: { msg: GotifyMessage; appName: string | un
           )}
           <div className="row">
             <Button
-              variant="destructive"
+              variant="filled"
+              className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
               size="sm"
               onClick={() => del.mutate(msg.id)}
               disabled={del.isPending}
@@ -108,7 +109,7 @@ function ApplicationsSection() {
               <div className="muted">{a.description || a.token}</div>
             </div>
             <Button
-              variant="outline"
+              variant="outlined"
               size="sm"
               onClick={() => del.mutate(a.id)}
               disabled={del.isPending}
@@ -164,7 +165,7 @@ export function GotifyPage() {
           <p className="muted">{t("modules.gotify.connectedAs", { name: user.data.name })}</p>
         )}
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           className="ml-auto"
           onClick={() => disconnect.mutate()}
@@ -179,7 +180,7 @@ export function GotifyPage() {
         {(apps.data?.applications ?? []).length > 1 && (
           <>
             <Button
-              variant={filter === null ? "default" : "outline"}
+              variant={filter === null ? "filled" : "outlined"}
               size="sm"
               onClick={() => setFilter(null)}
             >
@@ -188,7 +189,7 @@ export function GotifyPage() {
             {(apps.data?.applications ?? []).map((a) => (
               <Button
                 key={a.id}
-                variant={filter === a.id ? "default" : "outline"}
+                variant={filter === a.id ? "filled" : "outlined"}
                 size="sm"
                 onClick={() => setFilter(a.id)}
               >
@@ -198,7 +199,7 @@ export function GotifyPage() {
           </>
         )}
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           className="ml-auto"
           onClick={() => delAll.mutate()}

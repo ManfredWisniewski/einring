@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { TableColumn, TableRow } from "@/api/types";
+import type { TableColumn, TableRow } from "~/api/types";
 
 export function formatCell(value: unknown, t: (key: string) => string): string {
   if (value === null || value === undefined || value === "") return "";

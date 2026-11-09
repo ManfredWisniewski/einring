@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { getUserManager } from "@/auth/oidc";
+import { getUserManager } from "~/auth/oidc";
 
 /** Web-only: Authentik redirects here with `?code=…&state=…`. */
 export function CallbackPage() {

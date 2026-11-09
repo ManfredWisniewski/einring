@@ -12,11 +12,11 @@ import {
   Popover,
 } from "react-aria-components";
 import { useTranslation } from "react-i18next";
-import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "@/api/hooks";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useInstanceName } from "@/instance";
+import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "~/api/hooks";
+import { useInstanceName } from "~/instance";
 
 type DialogId = "modules" | "info";
 
@@ -26,7 +26,7 @@ function DialogHeader({ title, close }: { title: string; close: () => void }) {
     <div className="info-popover__header">
       <Heading slot="title">{title}</Heading>
       <Button
-        className={buttonVariants({ variant: "ghost", size: "icon" })}
+        className={buttonVariants({ variant: "text", size: "icon" })}
         onPress={close}
         aria-label={t("info.close")}
       >
@@ -99,7 +99,7 @@ export function AppMenu() {
     <>
       <MenuTrigger>
         <Button
-          className={buttonVariants({ variant: "outline", size: "icon" })}
+          className={buttonVariants({ variant: "outlined", size: "icon" })}
           aria-label={t("menu.open")}
         >
           <MenuIcon className="size-4" aria-hidden />

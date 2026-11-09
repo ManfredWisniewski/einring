@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   useSchoolAddPayment,
   useSchoolGenerateInvoices,
@@ -9,9 +11,7 @@ import {
   useSchoolInvoices,
   useSchoolPatchInvoice,
   useSchoolRentals,
-} from "@/api/hooks";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "~/api/hooks";
 import { currentPeriod, fmtCents, fmtDate } from "./shared";
 
 /** Invoices + instruments/rentals. Parents see only their household (server scope). */
@@ -34,7 +34,7 @@ export default function BillingView({ admin }: { admin: boolean }) {
         {admin && (
           <Button
             size="sm"
-            variant="outline"
+            variant="outlined"
             disabled={generate.isPending}
             onClick={() => void generate.mutateAsync(period)}
           >
@@ -110,7 +110,7 @@ function InvoiceDetail({ id, admin }: { id: string; admin: boolean }) {
       <div className="row">
         <Button
           size="sm"
-          variant="outline"
+          variant="outlined"
           disabled={pdf.isPending}
           onClick={() => pdf.mutate({ id: inv.id, number: inv.number })}
         >
@@ -119,7 +119,7 @@ function InvoiceDetail({ id, admin }: { id: string; admin: boolean }) {
         {admin && inv.status === "draft" && (
           <Button
             size="sm"
-            variant="outline"
+            variant="outlined"
             onClick={() => patch.mutate({ id: inv.id, body: { status: "issued" } })}
           >
             {t("modules.school.billing.issue")}
@@ -136,7 +136,7 @@ function InvoiceDetail({ id, admin }: { id: string; admin: boolean }) {
             />
             <Button
               size="sm"
-              variant="outline"
+              variant="outlined"
               disabled={pay.isPending || !amount}
               onClick={() => pay.mutate({ id: inv.id, amountCents: Number(amount) })}
             >

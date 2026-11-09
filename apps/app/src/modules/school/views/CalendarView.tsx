@@ -1,5 +1,15 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useSchoolCheckConflicts,
   useSchoolCreateLesson,
@@ -11,18 +21,8 @@ import {
   useSchoolSaveHoliday,
   useSchoolSaveSeries,
   useSchoolSeries,
-} from "@/api/hooks";
-import type { SchoolPerson } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+} from "~/api/hooks";
+import type { SchoolPerson } from "~/api/types";
 import { addDaysLocal, fmtDate, todayLocal, weekStart } from "./shared";
 
 /** Week calendar + series/holiday management (staff sections gated by props). */
@@ -57,16 +57,16 @@ export default function CalendarView({
   return (
     <div className="stack">
       <div className="row">
-        <Button size="sm" variant="outline" onClick={() => setAnchor(addDaysLocal(start, -7))}>
+        <Button size="sm" variant="outlined" onClick={() => setAnchor(addDaysLocal(start, -7))}>
           ←
         </Button>
         <strong>
           {fmtDate(start, i18n.language)} – {fmtDate(end, i18n.language)}
         </strong>
-        <Button size="sm" variant="outline" onClick={() => setAnchor(addDaysLocal(start, 7))}>
+        <Button size="sm" variant="outlined" onClick={() => setAnchor(addDaysLocal(start, 7))}>
           →
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setAnchor(todayLocal())}>
+        <Button size="sm" variant="outlined" onClick={() => setAnchor(todayLocal())}>
           {t("modules.school.calendar.thisWeek")}
         </Button>
       </div>
@@ -94,14 +94,14 @@ export default function CalendarView({
         <div className="row">
           <Button
             size="sm"
-            variant="outline"
+            variant="outlined"
             onClick={() => setShowForm(showForm === "lesson" ? null : "lesson")}
           >
             {t("modules.school.calendar.newLesson")}
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="outlined"
             onClick={() => setShowForm(showForm === "series" ? null : "series")}
           >
             {t("modules.school.calendar.newSeries")}
@@ -109,7 +109,7 @@ export default function CalendarView({
           {admin && (
             <Button
               size="sm"
-              variant="outline"
+              variant="outlined"
               onClick={() => setShowForm(showForm === "holiday" ? null : "holiday")}
             >
               {t("modules.school.calendar.newHoliday")}
@@ -252,7 +252,12 @@ function LessonForm({ teacherId, onDone }: { teacherId: string | null; onDone: (
           {t("modules.school.form.save")}
         </Button>
         {conflicts.length > 0 && (
-          <Button size="sm" variant="destructive" onClick={() => void submit(true)}>
+          <Button
+            size="sm"
+            variant="filled"
+            className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
+            onClick={() => void submit(true)}
+          >
             {t("modules.school.form.saveForced")}
           </Button>
         )}

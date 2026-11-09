@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useConnectorDisconnect, useConnectorStatus, useGitLabTodos } from "@/api/hooks";
-import type { GitLabTodo } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
+import { useConnectorDisconnect, useConnectorStatus, useGitLabTodos } from "~/api/hooks";
+import type { GitLabTodo } from "~/api/types";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 /** One pending todo — clicking opens the upstream target (MR, issue, pipeline). */
 function TodoRow({ todo }: { todo: GitLabTodo }) {
@@ -48,7 +48,7 @@ export function GitLabPage() {
       <div className="row einhub-header">
         <p className="muted">{t("modules.gitlab.connectedAs", { url: status.data?.url })}</p>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}

@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { useNextcloudSettings, useSaveNextcloudSettings } from "@/api/hooks";
-import type { NextcloudFeatures } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useNextcloudSettings, useSaveNextcloudSettings } from "~/api/hooks";
+import type { NextcloudFeatures } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 const FEATURES = ["monitorTalk", "monitorServer", "tables", "wiki"] as const;
 

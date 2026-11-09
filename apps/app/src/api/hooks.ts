@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { useAuth } from "@/auth/AuthProvider";
-import { config } from "@/config";
+import { useAuth } from "~/auth/AuthProvider";
+import { config } from "~/config";
 import { createApi } from "./client";
 import type {
   AuthentikStatus,

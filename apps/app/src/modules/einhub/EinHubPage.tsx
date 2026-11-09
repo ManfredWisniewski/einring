@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
 import {
   useEinHubMarkRead,
   useEinHubNotifications,
   useEinHubReadAll,
   useModulePrefs,
   useModuleRegistry,
-} from "@/api/hooks";
-import type { EinHubNotification } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "~/api/hooks";
+import type { EinHubNotification } from "~/api/types";
 
 /** One notification row — click marks it read; "Open" jumps to the source module. */
 function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boolean }) {
@@ -40,7 +40,7 @@ function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boole
       </button>
       {enabled && (
         <div className="einhub-card__action">
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outlined" size="sm" asChild>
             <Link to={`/${n.module}`}>{t("modules.einhub.open")}</Link>
           </Button>
         </div>
@@ -69,14 +69,14 @@ export function EinHubPage() {
         <div className="row">
           <h2 className="text-lg">{t("modules.einhub.title")}</h2>
           <Button
-            variant={showAll ? "outline" : "default"}
+            variant={showAll ? "outlined" : "filled"}
             size="sm"
             onClick={() => setShowAll(false)}
           >
             {t("modules.einhub.filterUnread")}
           </Button>
           <Button
-            variant={showAll ? "default" : "outline"}
+            variant={showAll ? "filled" : "outlined"}
             size="sm"
             onClick={() => setShowAll(true)}
           >
@@ -85,7 +85,7 @@ export function EinHubPage() {
         </div>
         {unread > 0 && (
           <Button
-            variant="outline"
+            variant="outlined"
             size="sm"
             onClick={() => readAll.mutate()}
             disabled={readAll.isPending}

@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useConnectorDisconnect, useConnectorStatus, useGitHubNotifications } from "@/api/hooks";
-import type { GitHubNotification } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
+import { useConnectorDisconnect, useConnectorStatus, useGitHubNotifications } from "~/api/hooks";
+import type { GitHubNotification } from "~/api/types";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 /** One notification thread — clicking opens the upstream subject (PR, issue, …). */
 function ThreadRow({ n }: { n: GitHubNotification }) {
@@ -47,7 +47,7 @@ export function GitHubPage() {
       <div className="row einhub-header">
         <p className="muted">{t("modules.github.connectedAs", { url: status.data?.url })}</p>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}

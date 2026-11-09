@@ -2,18 +2,6 @@ import { useId, useMemo, useState } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { ApiError } from "@/api/client";
-import {
-  useConnectorStatus,
-  useModulePrefs,
-  useModuleRegistry,
-  useNextcloudSettings,
-  useServerHealth,
-  useTalkStatus,
-} from "@/api/hooks";
-import type { ServerBasics } from "@/api/types";
-import { AuthentikStatusView } from "@/components/AuthentikStatus";
-import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +12,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ApiError } from "~/api/client";
+import {
+  useConnectorStatus,
+  useModulePrefs,
+  useModuleRegistry,
+  useNextcloudSettings,
+  useServerHealth,
+  useTalkStatus,
+} from "~/api/hooks";
+import type { ServerBasics } from "~/api/types";
+import { AuthentikStatusView } from "~/components/AuthentikStatus";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 export function MonitorPage() {
   const { t } = useTranslation();
@@ -78,7 +78,7 @@ export function MonitorPage() {
         <div className="stack">
           <p className="muted">{t("modules.nextcloud.emptyHint")}</p>
           <div>
-            <Button variant="outline" asChild>
+            <Button variant="outlined" asChild>
               <Link to="/nextcloud">{t("modules.nextcloud.configure")}</Link>
             </Button>
           </div>
@@ -98,7 +98,7 @@ function AuthentikPanel() {
       <div className="stack">
         <p className="muted">{t("modules.authentik.monitorNotConnected")}</p>
         <div>
-          <Button variant="outline" asChild>
+          <Button variant="outlined" asChild>
             <Link to="/authentik">{t("modules.authentik.monitorConfigure")}</Link>
           </Button>
         </div>
@@ -176,7 +176,7 @@ function ServerPanel() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.monitor.server.error", { status })}</span>
-        <Button variant="outline" onClick={() => void health.refetch()}>
+        <Button variant="outlined" onClick={() => void health.refetch()}>
           {t("modules.monitor.server.retry")}
         </Button>
       </div>
@@ -345,7 +345,7 @@ function TalkPanel() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.monitor.talk.error", { status })}</span>
-        <Button variant="outline" onClick={() => void talk.refetch()}>
+        <Button variant="outlined" onClick={() => void talk.refetch()}>
           {t("modules.monitor.talk.retry")}
         </Button>
       </div>

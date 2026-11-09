@@ -1,4 +1,4 @@
-import type { ModuleInfo } from "@/api/types";
+import type { ModuleInfo } from "~/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
 import { authentikModule } from "./authentik";
 import { csvManagerModule } from "./csv-manager";

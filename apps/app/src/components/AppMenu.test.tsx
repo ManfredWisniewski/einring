@@ -1,9 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import i18n from "@/i18n";
+import i18n from "~/i18n";
 import { AppMenu } from "./AppMenu";
 
-vi.mock("@/api/hooks", () => ({
+vi.mock("~/api/hooks", () => ({
   useModuleRegistry: () => ({
     data: {
       modules: [

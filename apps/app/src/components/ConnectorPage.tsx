@@ -1,10 +1,10 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useConnectorConnect, useConnectorDisconnect, useConnectorStatus } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
+import { useConnectorConnect, useConnectorDisconnect, useConnectorStatus } from "~/api/hooks";
 
 /**
  * Shared connect/disconnect screen for connector modules (D41). `service` is the
@@ -49,7 +49,7 @@ export function ConnectorPage({ service, userPass }: { service: string; userPass
         </div>
         <div className="row">
           <Button
-            variant="outline"
+            variant="outlined"
             onClick={() => disconnect.mutate()}
             disabled={disconnect.isPending}
           >

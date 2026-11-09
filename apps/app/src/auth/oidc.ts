@@ -1,8 +1,8 @@
 import { App as CapApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { OidcClient, UserManager, WebStorageStateStore } from "oidc-client-ts";
-import { config, isNative, redirectUri } from "@/config";
-import { loadInstanceConfig } from "@/instance";
+import { config, isNative, redirectUri } from "~/config";
+import { loadInstanceConfig } from "~/instance";
 
 function buildSettings() {
   return {

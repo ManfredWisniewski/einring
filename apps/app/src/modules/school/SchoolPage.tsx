@@ -1,6 +1,6 @@
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
-import { useSchoolMe } from "@/api/hooks";
+import { useSchoolMe } from "~/api/hooks";
 import BillingView from "./views/BillingView";
 import CalendarView from "./views/CalendarView";
 import EventsView from "./views/EventsView";

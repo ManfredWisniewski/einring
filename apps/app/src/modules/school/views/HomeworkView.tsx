@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useApi,
   useSchoolAssignHomework,
@@ -11,18 +21,8 @@ import {
   useSchoolPersons,
   useSchoolSaveHomework,
   useSchoolSubmitHomework,
-} from "@/api/hooks";
-import type { SchoolHomeworkAssignment, SchoolHomeworkSubmission } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "~/api/hooks";
+import type { SchoolHomeworkAssignment, SchoolHomeworkSubmission } from "~/api/types";
 import { fmtDate } from "./shared";
 
 /**
@@ -40,7 +40,7 @@ export default function HomeworkView({ staff }: { staff: boolean }) {
       <div className="row">
         <h2>{t("modules.school.homework.assignments")}</h2>
         {staff && (
-          <Button size="sm" variant="outline" onClick={() => setShowLibrary(!showLibrary)}>
+          <Button size="sm" variant="outlined" onClick={() => setShowLibrary(!showLibrary)}>
             {t("modules.school.homework.library")}
           </Button>
         )}
@@ -229,7 +229,7 @@ function Library() {
     <div className="stack" style={{ gap: "var(--space-2)" }}>
       <div className="row">
         <h3>{t("modules.school.homework.library")}</h3>
-        <Button size="sm" variant="outline" onClick={() => setForm(form === "new" ? null : "new")}>
+        <Button size="sm" variant="outlined" onClick={() => setForm(form === "new" ? null : "new")}>
           {t("modules.school.homework.new")}
         </Button>
       </div>
@@ -243,16 +243,12 @@ function Library() {
               {h.hasMusicxml ? ` · ${h.musicxmlName ?? "MusicXML"}` : ""}
             </span>
             <div className="row">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setForm(form === h.id ? null : h.id)}
-              >
+              <Button size="sm" variant="text" onClick={() => setForm(form === h.id ? null : h.id)}>
                 {t("modules.school.homework.assign")}
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="text"
                 disabled={del.isPending}
                 onClick={() => void del.mutateAsync(h.id)}
               >

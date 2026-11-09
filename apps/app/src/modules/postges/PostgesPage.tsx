@@ -1,7 +1,11 @@
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
 import {
   type PostgesRowsQuery,
   postgesPk,
@@ -13,13 +17,9 @@ import {
   usePostgesStatus,
   usePostgesTables,
   usePostgesUpdate,
-} from "@/api/hooks";
-import type { PostgesColumn } from "@/api/types";
-import { formatCell } from "@/components/DataTable";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "~/api/hooks";
+import type { PostgesColumn } from "~/api/types";
+import { formatCell } from "~/components/DataTable";
 
 const PAGE_SIZE = 50;
 const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
@@ -105,7 +105,7 @@ function TableList({ readOnly, onOpen }: { readOnly: boolean; onOpen: (t: TableR
         <span className="muted grow" />
         {readOnly && <span className="muted">{t("modules.postges.readOnly")}</span>}
         <Button
-          variant="outline"
+          variant="outlined"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}
         >
@@ -124,7 +124,7 @@ function TableList({ readOnly, onOpen }: { readOnly: boolean; onOpen: (t: TableR
       {tables.isError && (
         <div className="alert alert--danger row">
           <span>{t("modules.postges.error", { status: statusOf(tables.error) })}</span>
-          <Button variant="outline" onClick={() => void tables.refetch()}>
+          <Button variant="outlined" onClick={() => void tables.refetch()}>
             {t("modules.postges.retry")}
           </Button>
         </div>
@@ -218,14 +218,14 @@ function TableView({
   return (
     <section className="stack">
       <div className="row">
-        <Button variant="ghost" size="clear" onClick={onBack}>
+        <Button variant="text" size="clear" onClick={onBack}>
           <ArrowLeft /> {t("modules.postges.back")}
         </Button>
         <h2>
           {table.schema}.{table.name}
         </h2>
         {!readOnly && (
-          <Button variant="outline" onClick={() => setEditing({ row: null })}>
+          <Button variant="outlined" onClick={() => setEditing({ row: null })}>
             <Plus /> {t("modules.postges.addRow")}
           </Button>
         )}
@@ -242,7 +242,7 @@ function TableView({
       {rows.isError && (
         <div className="alert alert--danger row">
           <span>{t("modules.postges.error", { status: statusOf(rows.error) })}</span>
-          <Button variant="outline" onClick={() => void rows.refetch()}>
+          <Button variant="outlined" onClick={() => void rows.refetch()}>
             {t("modules.postges.retry")}
           </Button>
         </div>
@@ -255,7 +255,12 @@ function TableView({
                 <tr>
                   {columns.map((c) => (
                     <th key={c.name} scope="col">
-                      <Button variant="link" size="clear" onClick={() => toggleSort(c.name)}>
+                      <Button
+                        variant="text"
+                        className="underline-offset-4 hover:underline"
+                        size="clear"
+                        onClick={() => toggleSort(c.name)}
+                      >
                         {c.name}
                         {sort === c.name ? (dir === "asc" ? " ↑" : " ↓") : ""}
                       </Button>
@@ -282,7 +287,7 @@ function TableView({
           </div>
           <div className="row">
             <Button
-              variant="outline"
+              variant="outlined"
               disabled={offset === 0 || rows.isFetching}
               onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
             >
@@ -292,7 +297,7 @@ function TableView({
               {t("modules.postges.page", { page, pages: totalPages, total: rows.data.total })}
             </span>
             <Button
-              variant="outline"
+              variant="outlined"
               disabled={offset + PAGE_SIZE >= rows.data.total || rows.isFetching}
               onClick={() => setOffset(offset + PAGE_SIZE)}
             >
@@ -409,7 +414,7 @@ function RowPanel({
       <div className="row">
         <h3>{isNew ? t("modules.postges.newRow") : `${table.schema}.${table.name}`}</h3>
         <span className="muted grow" />
-        <Button variant="ghost" size="clear" onClick={onClose}>
+        <Button variant="text" size="clear" onClick={onClose}>
           {t("modules.postges.close")}
         </Button>
       </div>
@@ -449,15 +454,20 @@ function RowPanel({
           {onDelete &&
             (confirmDelete ? (
               <>
-                <Button variant="destructive" onClick={onDelete} disabled={deleting}>
+                <Button
+                  variant="filled"
+                  className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
+                  onClick={onDelete}
+                  disabled={deleting}
+                >
                   {t("modules.postges.confirmDelete")}
                 </Button>
-                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+                <Button variant="text" onClick={() => setConfirmDelete(false)}>
                   {t("modules.postges.back")}
                 </Button>
               </>
             ) : (
-              <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
+              <Button variant="text" onClick={() => setConfirmDelete(true)}>
                 <Trash2 /> {t("modules.postges.deleteRow")}
               </Button>
             ))}

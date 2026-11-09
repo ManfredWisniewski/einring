@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useAuthentikHealth } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
+import { ApiError } from "~/api/client";
+import { useAuthentikHealth } from "~/api/hooks";
 
 function fmt(value: string | number | null | undefined): string {
   return value == null || value === "" ? "—" : String(value);
@@ -18,7 +18,7 @@ export function AuthentikStatusView() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.authentik.error", { status })}</span>
-        <Button variant="outline" onClick={() => void health.refetch()}>
+        <Button variant="outlined" onClick={() => void health.refetch()}>
           {t("modules.authentik.retry")}
         </Button>
       </div>

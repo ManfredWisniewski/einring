@@ -6,7 +6,10 @@ const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
 import { marked } from "marked";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
 import {
   useWikiAsk,
   useWikiLlmIndex,
@@ -15,12 +18,9 @@ import {
   useWikiSearch,
   useWikiSync,
   useWikiTree,
-} from "@/api/hooks";
-import type { WikiPageMeta } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "~/api/hooks";
+import type { WikiPageMeta } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 interface TreeNode {
   name: string;
@@ -79,7 +79,7 @@ function TreeList({
         <li key={n.path ?? `${n.name}/${depth}`}>
           {n.path ? (
             <Button
-              variant="ghost"
+              variant="text"
               size="clear"
               className={`wiki-tree__item${n.path === selected ? " wiki-tree__item--active" : ""}`}
               onClick={() => onSelect(n.path as string)}
@@ -130,7 +130,7 @@ function WikiContent() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.wiki.error", { status })}</span>
-        <Button variant="outline" onClick={() => void tree.refetch()}>
+        <Button variant="outlined" onClick={() => void tree.refetch()}>
           {t("modules.wiki.retry")}
         </Button>
       </div>
@@ -155,7 +155,7 @@ function WikiContent() {
             aria-label={t("modules.wiki.search")}
           />
         </div>
-        <Button variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}>
+        <Button variant="outlined" onClick={() => sync.mutate()} disabled={sync.isPending}>
           {sync.isPending ? t("modules.wiki.syncing") : t("modules.wiki.sync")}
         </Button>
         {tree.data.syncedAt && (
@@ -249,7 +249,7 @@ function AskPanel({ onSelectPage }: { onSelectPage: (path: string) => void }) {
           {ask.isPending ? t("modules.wiki.asking") : t("modules.wiki.ask")}
         </Button>
         <Button
-          variant="outline"
+          variant="outlined"
           onClick={() => index.mutate()}
           disabled={index.isPending || status.data.indexing}
         >
@@ -290,7 +290,8 @@ function AskPanel({ onSelectPage }: { onSelectPage: (path: string) => void }) {
               {ask.data.sources.map((s) => (
                 <Button
                   key={s.path}
-                  variant="link"
+                  variant="text"
+                  className="underline-offset-4 hover:underline"
                   size="clear"
                   onClick={() => onSelectPage(s.path)}
                 >
@@ -325,7 +326,12 @@ function SearchResults({
           className="status-item"
           style={{ flexDirection: "column", alignItems: "start" }}
         >
-          <Button variant="link" size="clear" onClick={() => onSelect(r.path)}>
+          <Button
+            variant="text"
+            className="underline-offset-4 hover:underline"
+            size="clear"
+            onClick={() => onSelect(r.path)}
+          >
             {r.title}
           </Button>
           <span className="muted">{r.collective}</span>

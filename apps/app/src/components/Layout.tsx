@@ -3,19 +3,19 @@ import { useMemo, useState } from "react";
 import { Button, MenuTrigger, Popover } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router";
+import { buttonVariants, Button as UiButton } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   useEinHubNotifications,
   useModulePrefs,
   useModuleRegistry,
   useNextcloudSettings,
-} from "@/api/hooks";
-import { useAuth } from "@/auth/AuthProvider";
-import { buttonVariants, Button as UiButton } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useInstanceName } from "@/instance";
-import { resolveAppModules } from "@/modules";
+} from "~/api/hooks";
+import { useAuth } from "~/auth/AuthProvider";
+import { useInstanceName } from "~/instance";
+import { resolveAppModules } from "~/modules";
 import { AppMenu } from "./AppMenu";
 import { LanguageSelect, ThemeSelect } from "./Settings";
 
@@ -86,7 +86,7 @@ export function Layout() {
         <LanguageSelect />
         <AppMenu />
         {user && (
-          <UiButton variant="ghost" onClick={() => void logout()}>
+          <UiButton variant="text" onClick={() => void logout()}>
             {t("nav.logout")}
           </UiButton>
         )}
@@ -104,7 +104,7 @@ export function Layout() {
             />
             <MenuTrigger>
               <Button
-                className={buttonVariants({ variant: "outline", size: "sm" })}
+                className={buttonVariants({ variant: "outlined", size: "sm" })}
                 aria-label={t("nav.tags")}
               >
                 {t("nav.tags")}

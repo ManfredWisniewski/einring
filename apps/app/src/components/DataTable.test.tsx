@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import i18n from "@/i18n";
+import i18n from "~/i18n";
 import { DataTable, formatCell } from "./DataTable";
 
 const t = (k: string) => k;

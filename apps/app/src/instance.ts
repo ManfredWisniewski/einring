@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { config } from "@/config";
+import { config } from "~/config";
 
 /** Deployment whitelabel from the BFF's public /api/config (INSTANCE_* env). */
 interface InstanceConfig {

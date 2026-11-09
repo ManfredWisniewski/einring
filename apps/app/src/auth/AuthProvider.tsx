@@ -1,7 +1,7 @@
 import type { UserManager } from "oidc-client-ts";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
-import { config } from "@/config";
-import { clearSessionToken, getSessionToken, isEmbedded, setSessionToken } from "@/embedded";
+import { config } from "~/config";
+import { clearSessionToken, getSessionToken, isEmbedded, setSessionToken } from "~/embedded";
 import { getUserManager, listenForNativeCallback, logout, login as oidcLogin } from "./oidc";
 
 /** Minimal identity — oidc profile fields for standalone, /api/me fields for embedded. */

@@ -1,15 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
 import {
   useConnectorDisconnect,
   useConnectorStatus,
   useStalwartInfo,
   useStalwartPrincipals,
-} from "@/api/hooks";
-import type { StalwartPrincipal } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+} from "~/api/hooks";
+import type { StalwartPrincipal } from "~/api/types";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 function PrincipalRow({ p }: { p: StalwartPrincipal }) {
   return (
@@ -71,7 +71,7 @@ export function StalwartPage() {
       <div className="row einhub-header">
         <p className="muted">{t("modules.stalwart.connectedAs", { url: status.data?.url })}</p>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}

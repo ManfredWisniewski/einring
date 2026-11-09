@@ -2,17 +2,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router";
-import { useModuleRegistry } from "@/api/hooks";
-import { AuthProvider, useAuth } from "@/auth/AuthProvider";
-import { Layout } from "@/components/Layout";
-import { NextcloudConnect } from "@/components/NextcloudConnect";
 import { Button } from "@/components/ui/button";
-import { config } from "@/config";
-import { isEmbedded } from "@/embedded";
-import { type AppModule, resolveAppModules } from "@/modules";
-import { CallbackPage } from "@/pages/CallbackPage";
-import { LoginPage } from "@/pages/LoginPage";
-import { ThemeProvider } from "@/theme/ThemeProvider";
+import { useModuleRegistry } from "~/api/hooks";
+import { AuthProvider, useAuth } from "~/auth/AuthProvider";
+import { Layout } from "~/components/Layout";
+import { NextcloudConnect } from "~/components/NextcloudConnect";
+import { config } from "~/config";
+import { isEmbedded } from "~/embedded";
+import { type AppModule, resolveAppModules } from "~/modules";
+import { CallbackPage } from "~/pages/CallbackPage";
+import { LoginPage } from "~/pages/LoginPage";
+import { ThemeProvider } from "~/theme/ThemeProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -103,7 +103,7 @@ function Routing() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.error")}</span>
-        <Button variant="outline" onClick={() => void registry.refetch()}>
+        <Button variant="outlined" onClick={() => void registry.refetch()}>
           {t("modules.retry")}
         </Button>
       </div>

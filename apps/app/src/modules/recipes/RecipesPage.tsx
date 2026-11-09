@@ -1,11 +1,11 @@
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useRecipe, useRecipeImage, useRecipes } from "@/api/hooks";
-import type { RecipeListItem } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useRecipe, useRecipeImage, useRecipes } from "~/api/hooks";
+import type { RecipeListItem } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 /** `PT1H10M` → "1 h 10 min" (schema.org durations are ISO-8601). */
 function fmtDuration(iso: string | null, t: TFunction) {
@@ -45,7 +45,7 @@ function RecipeDetail({ id, onBack }: { id: string; onBack: () => void }) {
   return (
     <div className="stack">
       <div className="row">
-        <Button size="sm" variant="ghost" onClick={onBack}>
+        <Button size="sm" variant="text" onClick={onBack}>
           {t("modules.recipes.back")}
         </Button>
       </div>

@@ -5,11 +5,11 @@ const SANITIZE_OPTS = { FORBID_TAGS: ["img"] };
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useEmailAccounts, useEmailDelete, useEmailList, useEmailMessage } from "@/api/hooks";
-import type { EmailSummary } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
+import { useEmailAccounts, useEmailDelete, useEmailList, useEmailMessage } from "~/api/hooks";
+import type { EmailSummary } from "~/api/types";
 import { EmailAccountForm } from "./EmailAccountForm";
 
 /** One expandable mail row: header always visible, body lazy-fetched on expand. */
@@ -70,7 +70,8 @@ function MailRow({ id, account, subject, from, date }: EmailSummary) {
           )}
           <div className="row">
             <Button
-              variant="destructive"
+              variant="filled"
+              className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
               size="sm"
               onClick={() => del.mutate(id)}
               disabled={del.isPending}

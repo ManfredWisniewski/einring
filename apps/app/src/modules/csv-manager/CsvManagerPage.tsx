@@ -1,7 +1,10 @@
 import { ArrowLeft, Minus, Plus, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ApiError } from "~/api/client";
 import {
   useCsvAddRow,
   useCsvDeleteFile,
@@ -10,11 +13,8 @@ import {
   useCsvFiles,
   useCsvImport,
   useCsvUpdateRow,
-} from "@/api/hooks";
-import type { CsvFileMeta, CsvRow } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+} from "~/api/hooks";
+import type { CsvFileMeta, CsvRow } from "~/api/types";
 
 /** The store's `datetime('now')` is "YYYY-MM-DD HH:MM:SS" UTC — normalize for `Date`. */
 const parseDbDate = (s: string) => new Date(`${s.replace(" ", "T")}Z`);
@@ -58,7 +58,7 @@ function FileList({ onOpen }: { onOpen: (id: number) => void }) {
           onChange={(e) => void onPick(e)}
         />
         <Button
-          variant="outline"
+          variant="outlined"
           onClick={() => picker.current?.click()}
           disabled={importCsv.isPending}
         >
@@ -77,7 +77,7 @@ function FileList({ onOpen }: { onOpen: (id: number) => void }) {
       {files.isError && (
         <div className="alert alert--danger row">
           <span>{t("modules.csv-manager.error", { status: statusOf(files.error) })}</span>
-          <Button variant="outline" onClick={() => void files.refetch()}>
+          <Button variant="outlined" onClick={() => void files.refetch()}>
             {t("modules.csv-manager.retry")}
           </Button>
         </div>
@@ -140,7 +140,12 @@ function FileListRow({
   return (
     <tr>
       <td>
-        <Button variant="link" size="clear" onClick={onOpen}>
+        <Button
+          variant="text"
+          className="underline-offset-4 hover:underline"
+          size="clear"
+          onClick={onOpen}
+        >
           {file.name}
         </Button>
       </td>
@@ -149,16 +154,21 @@ function FileListRow({
       <td>
         {confirming ? (
           <span className="row">
-            <Button variant="destructive" size="sm" onClick={onConfirmDelete}>
+            <Button
+              variant="filled"
+              className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
+              size="sm"
+              onClick={onConfirmDelete}
+            >
               {t("modules.csv-manager.confirmDelete")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={onCancelDelete}>
+            <Button variant="text" size="sm" onClick={onCancelDelete}>
               {t("modules.csv-manager.back")}
             </Button>
           </span>
         ) : (
           <Button
-            variant="ghost"
+            variant="text"
             size="clear"
             onClick={onDelete}
             aria-label={t("modules.csv-manager.deleteFile")}
@@ -186,11 +196,11 @@ function FileView({ id, onBack }: { id: number; onBack: () => void }) {
       <div className="stack">
         <div className="alert alert--danger row">
           <span>{t("modules.csv-manager.fileError", { status: statusOf(file.error) })}</span>
-          <Button variant="outline" onClick={() => void file.refetch()}>
+          <Button variant="outlined" onClick={() => void file.refetch()}>
             {t("modules.csv-manager.retry")}
           </Button>
         </div>
-        <Button variant="ghost" size="clear" onClick={onBack}>
+        <Button variant="text" size="clear" onClick={onBack}>
           <ArrowLeft /> {t("modules.csv-manager.back")}
         </Button>
       </div>
@@ -201,27 +211,28 @@ function FileView({ id, onBack }: { id: number; onBack: () => void }) {
   return (
     <section className="stack">
       <div className="row">
-        <Button variant="ghost" size="clear" onClick={onBack}>
+        <Button variant="text" size="clear" onClick={onBack}>
           <ArrowLeft /> {t("modules.csv-manager.back")}
         </Button>
         <h2>{data.name}</h2>
-        <Button variant="outline" onClick={() => addRow.mutate()} disabled={addRow.isPending}>
+        <Button variant="outlined" onClick={() => addRow.mutate()} disabled={addRow.isPending}>
           <Plus /> {t("modules.csv-manager.addRow")}
         </Button>
         {confirmDelete ? (
           <>
             <Button
-              variant="destructive"
+              variant="filled"
+              className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
               onClick={() => deleteFile.mutate(id, { onSuccess: onBack })}
             >
               {t("modules.csv-manager.confirmDelete")}
             </Button>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button variant="text" onClick={() => setConfirmDelete(false)}>
               {t("modules.csv-manager.back")}
             </Button>
           </>
         ) : (
-          <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
+          <Button variant="text" onClick={() => setConfirmDelete(true)}>
             <Trash2 /> {t("modules.csv-manager.deleteFile")}
           </Button>
         )}
@@ -295,7 +306,7 @@ function RowEditor({ row, headers, fileId }: { row: CsvRow; headers: string[]; f
       ))}
       <td>
         <Button
-          variant="ghost"
+          variant="text"
           size="clear"
           onClick={() => deleteRow.mutate(row.id)}
           aria-label={t("modules.csv-manager.deleteRow")}
@@ -331,7 +342,7 @@ function CellEditor({
     <span className="csv-cell">
       {numeric && (
         <Button
-          variant="ghost"
+          variant="text"
           size="clear"
           onClick={() => step(-1)}
           aria-label={t("modules.csv-manager.decrease")}
@@ -356,7 +367,7 @@ function CellEditor({
       />
       {numeric && (
         <Button
-          variant="ghost"
+          variant="text"
           size="clear"
           onClick={() => step(+1)}
           aria-label={t("modules.csv-manager.increase")}

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSchoolSendMessage, useSchoolThreadMessages, useSchoolThreads } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useSchoolSendMessage, useSchoolThreadMessages, useSchoolThreads } from "~/api/hooks";
 
 /** In-app messaging — threads list + conversation + compose. */
 export default function MessagesView() {
@@ -53,7 +53,7 @@ function Conversation({ threadId, onBack }: { threadId: string; onBack: () => vo
 
   return (
     <div className="stack">
-      <Button size="sm" variant="ghost" onClick={onBack} className="self-start">
+      <Button size="sm" variant="text" onClick={onBack} className="self-start">
         {t("modules.school.messages.back")}
       </Button>
       <ul className="stack" style={{ gap: "var(--space-2)" }}>

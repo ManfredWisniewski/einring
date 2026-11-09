@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import { useEmailAccounts, useEmailRemoveAccount } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApiError } from "~/api/client";
+import { useEmailAccounts, useEmailRemoveAccount } from "~/api/hooks";
 import { EmailAccountForm } from "./EmailAccountForm";
 
 /** Email settings surface (D59): manage mail accounts — list, add, remove (D60). */
@@ -33,7 +33,8 @@ export function EmailSettings() {
                 {a.url ? ` · ${a.url.startsWith("http") ? "JMAP" : "IMAP"} · ${a.url}` : ""}
               </span>
               <Button
-                variant="destructive"
+                variant="filled"
+                className="bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90"
                 size="sm"
                 onClick={() => remove.mutate(a.id)}
                 disabled={remove.isPending}

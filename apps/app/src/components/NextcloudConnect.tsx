@@ -1,12 +1,12 @@
 import { Browser } from "@capacitor/browser";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useClaimLoginFlow, usePollLoginFlow, useStartLoginFlow } from "@/api/hooks";
-import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { isNative } from "@/config";
-import { useInstanceName } from "@/instance";
+import { useClaimLoginFlow, usePollLoginFlow, useStartLoginFlow } from "~/api/hooks";
+import { useAuth } from "~/auth/AuthProvider";
+import { isNative } from "~/config";
+import { useInstanceName } from "~/instance";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -94,7 +94,7 @@ export function NextcloudConnect() {
           <>
             <p className="muted">{t("nextcloud.waiting")}</p>
             <div className="row">
-              <Button variant="outline" onClick={() => openLogin(loginUrl)}>
+              <Button variant="outlined" onClick={() => openLogin(loginUrl)}>
                 {t("nextcloud.openAgain")}
               </Button>
             </div>

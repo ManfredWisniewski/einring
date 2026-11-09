@@ -3,6 +3,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* biti submodule components live outside the package root — scan them for classes. */
+@source "../../../../biti/src/components/ui";
+
 @custom-variant dark (&:is([data-theme="dark"] *));
 
 /* biti component bridge: the ported src/components/ui/* components consume

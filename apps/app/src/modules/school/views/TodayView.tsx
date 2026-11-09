@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSchoolLessons, useSchoolMarkAttendance, useSchoolReportAbsence } from "@/api/hooks";
-import type { SchoolLesson, SchoolPerson, SchoolRole } from "@/api/types";
 import { Button } from "@/components/ui/button";
+import { useSchoolLessons, useSchoolMarkAttendance, useSchoolReportAbsence } from "~/api/hooks";
+import type { SchoolLesson, SchoolPerson, SchoolRole } from "~/api/types";
 import { todayLocal } from "./shared";
 
 /**
@@ -74,7 +74,7 @@ export default function TodayView({
                         <Button
                           key={a}
                           size="sm"
-                          variant={s.attendance === a ? "default" : "outline"}
+                          variant={s.attendance === a ? "filled" : "outlined"}
                           disabled={mark.isPending}
                           onClick={() =>
                             mark.mutate({ lessonId: l.id, studentId: s.studentId, attendance: a })
@@ -93,7 +93,7 @@ export default function TodayView({
                       <div key={s.studentId} className="row">
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="outlined"
                           disabled={report.isPending}
                           onClick={() =>
                             report.mutate({

@@ -1,18 +1,6 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
-import {
-  useNextcloudConnection,
-  useTableAddRow,
-  useTableDeleteRow,
-  useTableNode,
-  useTablePatchRow,
-  useTablesApplication,
-} from "@/api/hooks";
-import type { TableColumn, TableNode, TableRow, TableView } from "@/api/types";
-import { formatCell } from "@/components/DataTable";
-import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -23,6 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ApiError } from "~/api/client";
+import {
+  useNextcloudConnection,
+  useTableAddRow,
+  useTableDeleteRow,
+  useTableNode,
+  useTablePatchRow,
+  useTablesApplication,
+} from "~/api/hooks";
+import type { TableColumn, TableNode, TableRow, TableView } from "~/api/types";
+import { formatCell } from "~/components/DataTable";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
 
@@ -50,7 +50,7 @@ function TablesContent() {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.tables.error", { status: statusOf(app.error) })}</span>
-        <Button variant="outline" onClick={() => void app.refetch()}>
+        <Button variant="outlined" onClick={() => void app.refetch()}>
           {t("modules.tables.retry")}
         </Button>
       </div>
@@ -68,7 +68,7 @@ function TablesContent() {
         {data.nodes.map((n) => (
           <Button
             key={`${n.type}:${n.id}`}
-            variant={node?.type === n.type && node.id === n.id ? "outline" : "ghost"}
+            variant={node?.type === n.type && node.id === n.id ? "outlined" : "text"}
             onClick={() => setNode(n)}
           >
             {n.title}
@@ -91,7 +91,7 @@ function NodeGrid({ node }: { node: TableNode }) {
     return (
       <div className="alert alert--danger row">
         <span>{t("modules.tables.error", { status: statusOf(view.error) })}</span>
-        <Button variant="outline" onClick={() => void view.refetch()}>
+        <Button variant="outlined" onClick={() => void view.refetch()}>
           {t("modules.tables.retry")}
         </Button>
       </div>
@@ -110,7 +110,7 @@ function NodeGrid({ node }: { node: TableNode }) {
             {t("modules.tables.rowCount", { count: data.rows.length })}
           </span>
         </h3>
-        <Button variant="outline" onClick={() => addRow.mutate(node)} disabled={addRow.isPending}>
+        <Button variant="outlined" onClick={() => addRow.mutate(node)} disabled={addRow.isPending}>
           <Plus /> {t("modules.tables.addRow")}
         </Button>
       </div>
@@ -184,7 +184,7 @@ function RowEditor({
       ))}
       <td>
         <Button
-          variant="ghost"
+          variant="text"
           size="clear"
           onClick={onDelete}
           aria-label={t("modules.tables.deleteRow")}
@@ -248,7 +248,7 @@ function NumberCell({
   return (
     <span className="csv-cell">
       <Button
-        variant="ghost"
+        variant="text"
         size="clear"
         onClick={() => onCommit(num - 1)}
         aria-label={t("modules.tables.decrease")}
@@ -272,7 +272,7 @@ function NumberCell({
         }}
       />
       <Button
-        variant="ghost"
+        variant="text"
         size="clear"
         onClick={() => onCommit(num + 1)}
         aria-label={t("modules.tables.increase")}

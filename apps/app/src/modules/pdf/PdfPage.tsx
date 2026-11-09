@@ -3,9 +3,9 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
-import { useApi } from "@/api/hooks";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useApi } from "~/api/hooks";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 

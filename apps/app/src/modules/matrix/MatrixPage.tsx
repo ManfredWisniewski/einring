@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ApiError } from "~/api/client";
 import {
   useApi,
   useConnectorDisconnect,
@@ -10,11 +12,9 @@ import {
   useMatrixSelf,
   useSendMatrixFile,
   useSendMatrixMessage,
-} from "@/api/hooks";
-import type { MatrixMessage } from "@/api/types";
-import { ConnectorPage } from "@/components/ConnectorPage";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "~/api/hooks";
+import type { MatrixMessage } from "~/api/types";
+import { ConnectorPage } from "~/components/ConnectorPage";
 
 function fmtTime(ts?: number): string {
   if (!ts) return "";
@@ -117,7 +117,7 @@ function MessagePane({
   return (
     <div className="stack talk-pane">
       <div className="row">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+        <Button variant="text" size="sm" onClick={onBack}>
           {t("modules.matrix.back")}
         </Button>
         <h2 className="text-lg" style={{ flex: 1 }}>
@@ -181,7 +181,7 @@ function MessagePane({
           onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)}
         />
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           disabled={sendFile.isPending}
           onClick={() => document.getElementById(attachId)?.click()}
@@ -189,7 +189,7 @@ function MessagePane({
           {t("modules.matrix.attach")}
         </Button>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           disabled={!file || sendFile.isPending}
           onClick={() => {
@@ -209,7 +209,7 @@ function MessagePane({
           {t("modules.matrix.sendFile")}
         </Button>
         <Button
-          variant="default"
+          variant="filled"
           size="sm"
           onClick={submit}
           disabled={!text.trim() || send.isPending}
@@ -258,7 +258,7 @@ function MatrixInner() {
       <div className="row einhub-header">
         <p className="muted">{t("modules.matrix.connectedAs", { url: status.data?.url })}</p>
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           disabled={disconnect.isPending}
           onClick={() => disconnect.mutate()}

@@ -2,3 +2,7 @@
 	path = +wit
 	url = ssh://git@git.w1t.org:2222/wit/wit-common.git
 	branch = main
+[submodule "biti"]
+	path = biti
+	url = https://github.com/ManfredWisniewski/biti
+	branch = main

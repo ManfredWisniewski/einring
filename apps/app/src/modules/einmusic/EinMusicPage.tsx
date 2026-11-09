@@ -1,7 +1,18 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ApiError } from "~/api/client";
 import {
   useApi,
   useCreatePlaylist,
@@ -15,19 +26,8 @@ import {
   useNavidromePlaylists,
   useSavePlaylist,
   useUploadTrack,
-} from "@/api/hooks";
-import type { EinMusicPlaylistDetail, EinMusicTrack } from "@/api/types";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+} from "~/api/hooks";
+import type { EinMusicPlaylistDetail, EinMusicTrack } from "~/api/types";
 
 /** A playable item — `path` is fetched through the BFF and played via object URL (D48). */
 interface PlayItem {
@@ -85,7 +85,7 @@ function Player({
         </CardDescription>
       </CardHeader>
       <div className="row">
-        <Button variant="outline" size="sm" onClick={onPrev} disabled={index === 0}>
+        <Button variant="outlined" size="sm" onClick={onPrev} disabled={index === 0}>
           {t("modules.einmusic.prev")}
         </Button>
         {error ? (
@@ -96,7 +96,7 @@ function Player({
         ) : (
           <span className="muted">{t("common.loading")}</span>
         )}
-        <Button variant="outline" size="sm" onClick={onNext} disabled={index >= queue.length - 1}>
+        <Button variant="outlined" size="sm" onClick={onNext} disabled={index >= queue.length - 1}>
           {t("modules.einmusic.next")}
         </Button>
       </div>
@@ -151,7 +151,7 @@ function PlaylistSection({
       </CardHeader>
       <div className="row">
         <Button
-          variant="outline"
+          variant="outlined"
           size="sm"
           onClick={() => {
             setOpen(true);
@@ -162,7 +162,7 @@ function PlaylistSection({
           {t("modules.einmusic.play")}
         </Button>
         <Button
-          variant="ghost"
+          variant="text"
           size="sm"
           onClick={() => del.mutate(playlist.id)}
           disabled={del.isPending}
@@ -180,7 +180,7 @@ function PlaylistSection({
               <button type="button" className="linklike" onClick={() => onPlay(items, i)}>
                 {track.title}
               </button>
-              <Button variant="ghost" size="sm" onClick={() => removeTrack(track.id)}>
+              <Button variant="text" size="sm" onClick={() => removeTrack(track.id)}>
                 {t("modules.einmusic.remove")}
               </Button>
             </li>
@@ -234,7 +234,7 @@ function TrackRow({
         </Select>
       )}
       <Button
-        variant="ghost"
+        variant="text"
         size="sm"
         onClick={() => del.mutate(track.id)}
         disabled={del.isPending}
@@ -269,7 +269,7 @@ function NavidromeSection({ onPlay }: { onPlay: (items: PlayItem[], index: numbe
         <div className="stack">
           <p className="muted">{t("modules.einmusic.navidromeNotConnected")}</p>
           <div>
-            <Button variant="outline" asChild>
+            <Button variant="outlined" asChild>
               <Link to="/navidrome">{t("modules.einmusic.navidromeConfigure")}</Link>
             </Button>
           </div>
@@ -303,7 +303,7 @@ function NavidromeSection({ onPlay }: { onPlay: (items: PlayItem[], index: numbe
           </CardHeader>
           <div className="row">
             <Button
-              variant="outline"
+              variant="outlined"
               size="sm"
               onClick={() => {
                 setOpenId(p.id);
@@ -374,7 +374,7 @@ export function EinMusicPage() {
             onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)}
           />
           <Button
-            variant="outline"
+            variant="outlined"
             onClick={() => {
               if (file) {
                 upload.mutate(file, {
@@ -424,7 +424,7 @@ export function EinMusicPage() {
             />
           </div>
           <Button
-            variant="outline"
+            variant="outlined"
             onClick={() => {
               const trimmed = name.trim();
               if (trimmed) create.mutate(trimmed, { onSuccess: () => setName("") });

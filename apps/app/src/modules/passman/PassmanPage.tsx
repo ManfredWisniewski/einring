@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import sjcl from "sjcl";
-import { ApiError } from "@/api/client";
-import { usePassmanVault, usePassmanVaults } from "@/api/hooks";
-import type { PassmanCredential, PassmanVault } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError } from "~/api/client";
+import { usePassmanVault, usePassmanVaults } from "~/api/hooks";
+import type { PassmanCredential, PassmanVault } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 /** base64(SJCL JSON) → plaintext, or null on wrong key / bad data. SJCL embeds
  * its parameters (iter/ks/mode/ts) in the ciphertext, so no config is needed. */
@@ -118,7 +118,7 @@ function CopyButton({
   const id = `${label}:${value.length}`;
   return (
     <Button
-      variant="outline"
+      variant="outlined"
       size="sm"
       disabled={copied === id}
       onClick={() => {
@@ -313,7 +313,7 @@ function PassmanPageInner() {
                     onChange={(e) => setPwInput(e.currentTarget.value)}
                     onKeyDown={(e) => e.key === "Enter" && unlock(v)}
                   />
-                  <Button variant="outline" size="sm" onClick={() => unlock(v)}>
+                  <Button variant="outlined" size="sm" onClick={() => unlock(v)}>
                     {t("modules.passman.unlock")}
                   </Button>
                 </div>
@@ -330,7 +330,7 @@ function PassmanPageInner() {
             <h2 className="text-lg" style={{ flex: 1 }}>
               {selected?.name ?? ""}
             </h2>
-            <Button variant="outline" size="sm" onClick={lock}>
+            <Button variant="outlined" size="sm" onClick={lock}>
               {t("modules.passman.lock")}
             </Button>
           </div>

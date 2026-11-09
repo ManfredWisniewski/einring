@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { connectorSettings } from "@/components/ConnectorPage";
+import { connectorSettings } from "~/components/ConnectorPage";
 import type { AppModule } from "../types";
 import de from "./i18n/de.json";
 import en from "./i18n/en.json";

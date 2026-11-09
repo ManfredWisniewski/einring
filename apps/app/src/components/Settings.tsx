@@ -8,9 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type Language, supportedLanguages } from "@/i18n";
-import { useTheme } from "@/theme/ThemeProvider";
-import type { ThemePreference } from "@/theme/theme";
+import { type Language, supportedLanguages } from "~/i18n";
+import { useTheme } from "~/theme/ThemeProvider";
+import type { ThemePreference } from "~/theme/theme";
 
 const themes: ThemePreference[] = ["system", "light", "dark"];
 

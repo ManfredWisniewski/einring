@@ -2,6 +2,17 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useCallback, useEffect, useState } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useDeleteEinDavContact,
   useDeleteEinDavEvent,
@@ -16,20 +27,9 @@ import {
   useSaveEinDavContact,
   useSaveEinDavEvent,
   useUploadEinDavFile,
-} from "@/api/hooks";
-import type { EinDavContact, EinDavEvent } from "@/api/types";
-import { NextcloudGate } from "@/components/NextcloudGate";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "~/api/hooks";
+import type { EinDavContact, EinDavEvent } from "~/api/types";
+import { NextcloudGate } from "~/components/NextcloudGate";
 
 interface DirtyContact {
   id: number;
@@ -219,7 +219,7 @@ function ContactsPanel() {
           {t("modules.eindav.newContact")}
         </Button>
         {einDavNative && (
-          <Button size="sm" variant="secondary" onClick={() => void syncNow()}>
+          <Button size="sm" variant="tonal" onClick={() => void syncNow()}>
             {t("modules.eindav.syncContacts")}
           </Button>
         )}
@@ -257,7 +257,7 @@ function ContactsPanel() {
               <Button size="sm" onClick={() => void submit()} disabled={!form.fn || save.isPending}>
                 {t("modules.eindav.save")}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setForm(null)}>
+              <Button size="sm" variant="text" onClick={() => setForm(null)}>
                 {t("modules.eindav.cancel")}
               </Button>
             </div>
@@ -274,7 +274,7 @@ function ContactsPanel() {
             <div className="row">
               <Button
                 size="sm"
-                variant="ghost"
+                variant="text"
                 onClick={() =>
                   setForm({
                     href: c.href,
@@ -290,12 +290,12 @@ function ContactsPanel() {
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="text"
                 onClick={() => saveTextFile(`${c.fn || "contact"}.vcf`, "text/vcard", c.vcard)}
               >
                 {t("modules.eindav.export")}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => del.mutate(c.href)}>
+              <Button size="sm" variant="text" onClick={() => del.mutate(c.href)}>
                 {t("modules.eindav.delete")}
               </Button>
             </div>
@@ -455,7 +455,7 @@ function CalendarPanel() {
           {t("modules.eindav.newEvent")}
         </Button>
         {einDavNative && (
-          <Button size="sm" variant="secondary" onClick={() => void syncNow()}>
+          <Button size="sm" variant="tonal" onClick={() => void syncNow()}>
             {t("modules.eindav.syncEvents")}
           </Button>
         )}
@@ -514,7 +514,7 @@ function CalendarPanel() {
               >
                 {t("modules.eindav.save")}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setForm(null)}>
+              <Button size="sm" variant="text" onClick={() => setForm(null)}>
                 {t("modules.eindav.cancel")}
               </Button>
             </div>
@@ -534,7 +534,7 @@ function CalendarPanel() {
             <div className="row">
               <Button
                 size="sm"
-                variant="ghost"
+                variant="text"
                 onClick={() =>
                   setForm({
                     href: e.href,
@@ -552,12 +552,12 @@ function CalendarPanel() {
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="text"
                 onClick={() => saveTextFile(`${e.summary || "event"}.ics`, "text/calendar", e.ics)}
               >
                 {t("modules.eindav.export")}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => del.mutate(e.href)}>
+              <Button size="sm" variant="text" onClick={() => del.mutate(e.href)}>
                 {t("modules.eindav.delete")}
               </Button>
             </div>
@@ -621,7 +621,7 @@ function FilesPanel() {
         <Button size="sm" onClick={pick} disabled={upload.isPending}>
           {t("modules.eindav.upload")}
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setNewFolder("")}>
+        <Button size="sm" variant="tonal" onClick={() => setNewFolder("")}>
           {t("modules.eindav.newFolder")}
         </Button>
       </div>
@@ -644,7 +644,7 @@ function FilesPanel() {
           >
             {t("modules.eindav.create")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setNewFolder(null)}>
+          <Button size="sm" variant="text" onClick={() => setNewFolder(null)}>
             {t("modules.eindav.cancel")}
           </Button>
         </div>
@@ -667,11 +667,11 @@ function FilesPanel() {
             </div>
             <div className="row">
               {!e.isDir && (
-                <Button size="sm" variant="ghost" onClick={() => dl.mutate(e.path)}>
+                <Button size="sm" variant="text" onClick={() => dl.mutate(e.path)}>
                   {t("modules.eindav.download")}
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={() => del.mutate(e.path)}>
+              <Button size="sm" variant="text" onClick={() => del.mutate(e.path)}>
                 {t("modules.eindav.delete")}
               </Button>
             </div>
