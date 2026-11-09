@@ -343,3 +343,9 @@
 - Columns with internal udts (e.g. pgvector `vector`) are flagged `internal` — never rendered, searched or writable.
 - Mutations (`POST`/`PATCH`/`DELETE .../rows`, addressed by primary-key values) are mounted only when `MODULE_POSTGES_READ_ONLY=false` (default `true`); pk-less tables → 400, unknown/internal columns → 400, unmatched pk → 404.
 - The `/postges` page: connect card → table list with client-side filter → searchable, sortable, paginated grid → row editor (text inputs, checkboxes for booleans; pk read-only on edit, omittable on insert). DE + EN + RU + FR; read-only deployments hide all mutation controls.
+
+### A42 Aufmass module (specialized Tables application)
+
+- `aufmass` (BFF, `requires: ["nextcloud"]`) is a specialized copy of the tables module: identical endpoint set mounted under `/api/aufmass` (`GET /`, `GET /nodes/:type/:id`, `PATCH /rows/:rowId`, `POST/DELETE /nodes/:type/:id/rows`), reading and writing its own Nextcloud Tables application (context) configured via `MODULE_AUFMASS_APPLICATION_ID` — independent of `MODULE_TABLES_APPLICATION_ID` so both modules can run against different contexts. Unset → 424 plus the localized not-configured state.
+- The `/aufmass` page mirrors the tables page behaviour (application node list, interactive grid, add/delete row, per-type cell editors) with its own i18n subtree `modules.aufmass` in DE + EN + RU + FR; nav group `data`.
+- Further specialization modifies this section before implementation.

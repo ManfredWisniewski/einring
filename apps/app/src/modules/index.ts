@@ -1,5 +1,6 @@
 import type { ModuleInfo } from "~/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
+import { aufmassModule } from "./aufmass";
 import { authentikModule } from "./authentik";
 import { csvManagerModule } from "./csv-manager";
 import { einchatModule } from "./einchat";
@@ -33,6 +34,7 @@ export type { AppModule, ModuleRoute } from "./types";
 export const appModules: AppModule[] = [
   einhubModule,
   tablesModule,
+  aufmassModule,
   monitorModule,
   wikiModule,
   csvManagerModule,

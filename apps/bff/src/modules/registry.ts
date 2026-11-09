@@ -1,5 +1,6 @@
 import type { Config } from "../config.js";
 import { audiobookshelfModule } from "./audiobookshelf.js";
+import { aufmassModule } from "./aufmass.js";
 import { authentikModule } from "./authentik.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
@@ -31,6 +32,7 @@ import { yamtrackModule } from "./yamtrack.js";
 export const bffModules: BffModule[] = [
   einhubModule,
   tablesModule,
+  aufmassModule,
   monitorModule,
   wikiModule,
   csvManagerModule,

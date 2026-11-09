@@ -104,6 +104,8 @@ export const keys = {
   connection: ["nextcloud", "connection"] as const,
   tablesApp: ["tables", "app"] as const,
   tableNode: (type: TableNodeType, id: number) => ["tables", "node", type, id] as const,
+  aufmassApp: ["aufmass", "app"] as const,
+  aufmassNode: (type: TableNodeType, id: number) => ["aufmass", "node", type, id] as const,
   modules: ["modules"] as const,
   serverHealth: ["monitor", "server"] as const,
   talkStatus: ["monitor", "talk-status"] as const,
@@ -176,6 +178,7 @@ export function usePollLoginFlow() {
       if (data.status === "connected") {
         qc.setQueryData(keys.connection, data);
         void qc.invalidateQueries({ queryKey: ["tables"] });
+        void qc.invalidateQueries({ queryKey: ["aufmass"] });
       }
     },
   });
@@ -192,6 +195,7 @@ export function useClaimLoginFlow() {
       if (data.status === "connected") {
         qc.setQueryData(keys.connection, data);
         void qc.invalidateQueries({ queryKey: ["tables"] });
+        void qc.invalidateQueries({ queryKey: ["aufmass"] });
       }
     },
   });
@@ -205,6 +209,7 @@ export function useDisconnectNextcloud() {
     onSuccess: () => {
       qc.setQueryData(keys.connection, { status: "disconnected" } satisfies ConnectionStatus);
       qc.removeQueries({ queryKey: ["tables"] });
+      qc.removeQueries({ queryKey: ["aufmass"] });
     },
   });
 }
@@ -264,6 +269,64 @@ export function useTableDeleteRow() {
       api.delete<void>(`/tables/nodes/${input.node.type}/${input.node.id}/rows/${input.rowId}`),
     onSuccess: (_v, input) =>
       void qc.invalidateQueries({ queryKey: keys.tableNode(input.node.type, input.node.id) }),
+  });
+}
+
+/** The configured Aufmass application: name + its nodes (views + tables). */
+export function useAufmassApplication(enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.aufmassApp,
+    queryFn: () => api.get<TablesApplication>("/aufmass"),
+    enabled,
+  });
+}
+
+/** A node's columns + rows, read view-scoped (Nextcloud-side filters apply). */
+export function useAufmassNode(node: TableNode | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.aufmassNode(node?.type ?? "view", node?.id ?? 0),
+    queryFn: () => api.get<TableView>(`/aufmass/nodes/${node?.type}/${node?.id}`),
+    enabled: enabled && node !== null,
+  });
+}
+
+export function useAufmassPatchRow(node: TableNode) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rowId: number; data: Record<string, unknown> }) =>
+      api.patch<TableRow>(`/aufmass/rows/${input.rowId}`, { data: input.data }),
+    // setQueryData keeps checkbox toggles snappy; the response is the canonical row.
+    onSuccess: (row) => {
+      qc.setQueryData<TableView>(keys.aufmassNode(node.type, node.id), (old) =>
+        old ? { ...old, rows: old.rows.map((r) => (r.id === row.id ? row : r)) } : old,
+      );
+    },
+  });
+}
+
+export function useAufmassAddRow() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (node: TableNode) =>
+      api.post<TableRow>(`/aufmass/nodes/${node.type}/${node.id}/rows`, {}),
+    // Invalidate: view filters may keep the new (empty) row out of the result.
+    onSuccess: (_row, node) =>
+      void qc.invalidateQueries({ queryKey: keys.aufmassNode(node.type, node.id) }),
+  });
+}
+
+export function useAufmassDeleteRow() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { node: TableNode; rowId: number }) =>
+      api.delete<void>(`/aufmass/nodes/${input.node.type}/${input.node.id}/rows/${input.rowId}`),
+    onSuccess: (_v, input) =>
+      void qc.invalidateQueries({ queryKey: keys.aufmassNode(input.node.type, input.node.id) }),
   });
 }
 

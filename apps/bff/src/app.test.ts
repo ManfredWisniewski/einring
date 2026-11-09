@@ -4734,6 +4734,7 @@ describe("module framework", () => {
       modules: [
         { id: "einhub", requires: [] },
         { id: "tables", requires: ["nextcloud"] },
+        { id: "aufmass", requires: ["nextcloud"] },
         { id: "monitor", requires: ["nextcloud"] },
         { id: "wiki", requires: ["nextcloud"] },
         { id: "csv-manager", requires: [] },

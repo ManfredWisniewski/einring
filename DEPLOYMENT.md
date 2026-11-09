@@ -65,11 +65,12 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=einhub,tables,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart,postges
+# MODULES=einhub,tables,aufmass,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart,postges
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
 #                                 # rows through them. Requires the Nextcloud Tables app.
+# MODULE_AUFMASS_APPLICATION_ID=4  # same shape — the aufmass module's own Tables application
 # MODULE_WIKI_SYNC_TTL_S=300
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 # MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)

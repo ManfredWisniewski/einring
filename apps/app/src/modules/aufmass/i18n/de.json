@@ -1,0 +1,15 @@
+{
+  "nav": "Aufmaß",
+  "loading": "Aufmaß wird geladen…",
+  "empty": "Diese Ansicht enthält keine Zeilen.",
+  "emptyApp": "Diese Anwendung enthält keine Ansichten oder Tabellen.",
+  "rowCount_one": "{{count}} Zeile",
+  "rowCount_other": "{{count}} Zeilen",
+  "addRow": "Zeile hinzufügen",
+  "deleteRow": "Zeile löschen",
+  "decrease": "Verringern",
+  "increase": "Erhöhen",
+  "selectPlaceholder": "Auswählen…",
+  "error": "Die Daten konnten nicht geladen werden ({{status}}).",
+  "retry": "Erneut versuchen"
+}

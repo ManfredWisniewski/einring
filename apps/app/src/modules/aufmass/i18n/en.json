@@ -1,0 +1,15 @@
+{
+  "nav": "Aufmaß",
+  "loading": "Loading aufmass…",
+  "empty": "This view has no rows.",
+  "emptyApp": "This application has no views or tables.",
+  "rowCount_one": "{{count}} row",
+  "rowCount_other": "{{count}} rows",
+  "addRow": "Add row",
+  "deleteRow": "Delete row",
+  "decrease": "Decrease",
+  "increase": "Increase",
+  "selectPlaceholder": "Select…",
+  "error": "The data could not be loaded ({{status}}).",
+  "retry": "Retry"
+}
