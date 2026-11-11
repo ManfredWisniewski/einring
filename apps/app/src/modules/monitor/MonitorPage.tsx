@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -78,9 +78,9 @@ export function MonitorPage() {
         <div className="stack">
           <p className="muted">{t("modules.nextcloud.emptyHint")}</p>
           <div>
-            <Button variant="outlined" asChild>
-              <Link to="/nextcloud">{t("modules.nextcloud.configure")}</Link>
-            </Button>
+            <Link to="/nextcloud" className={buttonVariants({ variant: "outlined" })}>
+              {t("modules.nextcloud.configure")}
+            </Link>
           </div>
         </div>
       )}
@@ -98,9 +98,9 @@ function AuthentikPanel() {
       <div className="stack">
         <p className="muted">{t("modules.authentik.monitorNotConnected")}</p>
         <div>
-          <Button variant="outlined" asChild>
-            <Link to="/authentik">{t("modules.authentik.monitorConfigure")}</Link>
-          </Button>
+          <Link to="/authentik" className={buttonVariants({ variant: "outlined" })}>
+            {t("modules.authentik.monitorConfigure")}
+          </Link>
         </div>
       </div>
     );

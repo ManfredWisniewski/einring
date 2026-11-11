@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -269,9 +269,9 @@ function NavidromeSection({ onPlay }: { onPlay: (items: PlayItem[], index: numbe
         <div className="stack">
           <p className="muted">{t("modules.einmusic.navidromeNotConnected")}</p>
           <div>
-            <Button variant="outlined" asChild>
-              <Link to="/navidrome">{t("modules.einmusic.navidromeConfigure")}</Link>
-            </Button>
+            <Link to="/navidrome" className={buttonVariants({ variant: "outlined" })}>
+              {t("modules.einmusic.navidromeConfigure")}
+            </Link>
           </div>
         </div>
       )}

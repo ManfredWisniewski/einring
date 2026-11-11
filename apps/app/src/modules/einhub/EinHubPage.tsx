@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "~/api/client";
 import {
@@ -40,9 +40,9 @@ function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boole
       </button>
       {enabled && (
         <div className="einhub-card__action">
-          <Button variant="outlined" size="sm" asChild>
-            <Link to={`/${n.module}`}>{t("modules.einhub.open")}</Link>
-          </Button>
+          <Link to={`/${n.module}`} className={buttonVariants({ variant: "outlined", size: "sm" })}>
+            {t("modules.einhub.open")}
+          </Link>
         </div>
       )}
     </Card>
