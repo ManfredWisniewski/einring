@@ -32,12 +32,19 @@ export interface TableColumn {
   type: string;
   subtype?: string;
   options?: { id: number; label: string }[];
+  /** BFF-computed read-only column (e.g. aufmass restmenge) — never editable. */
+  computed?: boolean;
 }
 
 export interface TableRow {
   id: number;
   /** Raw cell values keyed by columnId — resolve labels via `TableColumn.options`. */
   cells: Record<string, unknown>;
+  /** Tables row meta (createdBy/lastEditBy present on recent Tables releases). */
+  createdAt?: string;
+  createdBy?: string;
+  lastEditAt?: string;
+  lastEditBy?: string;
 }
 
 export type TableNodeType = "view" | "table";

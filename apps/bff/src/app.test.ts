@@ -658,6 +658,125 @@ describe("tables", () => {
   });
 });
 
+describe("aufmass", () => {
+  const V1 = "/index.php/apps/tables/api/1";
+  const CTX = "/ocs/v2.php/apps/tables/api/2/contexts";
+  const ocs = (data: unknown, status = 200) =>
+    json({ ocs: { meta: { status: "ok", statuscode: status }, data } }, status);
+
+  const columns = [
+    { id: 1, title: "Kbez", type: "text", subtype: "line", orderWeight: 0 },
+    { id: 2, title: "Anz", type: "number", orderWeight: 1 },
+    { id: 3, title: "Verbaut", type: "number", orderWeight: 2 },
+    { id: 4, title: "Entfällt", type: "selection", subtype: "check", orderWeight: 3 },
+  ];
+  const row10 = {
+    id: 10,
+    tableId: 7,
+    createdAt: "2026-11-10T08:00:00Z",
+    createdBy: "frodo",
+    lastEditAt: "2026-11-11T09:00:00Z",
+    lastEditBy: "sam",
+    data: [
+      { columnId: 1, value: "KR" },
+      { columnId: 2, value: 10 },
+      { columnId: 3, value: 4 },
+      { columnId: 4, value: false },
+    ],
+  };
+
+  const config9 = () => loadConfig({ ...testEnv(), MODULE_AUFMASS_APPLICATION_ID: "9" });
+
+  /** Context 9 with a single view node carrying Anz+Verbaut columns. */
+  const appFetch = (verbaut = 4) =>
+    fakeFetch((url, init) => {
+      if (url.endsWith(`${CTX}/9`)) {
+        return ocs({ id: 9, name: "Aufmaß", nodes: { 12: { node_id: 5, node_type: 1 } } });
+      }
+      if (url.endsWith(`${V1}/views/5`)) return json({ id: 5, title: "UG.50", tableId: 7 });
+      if (url.endsWith(`${V1}/views/5/columns`)) return json(columns);
+      if (url.endsWith(`${V1}/views/5/rows`)) return json([row10]);
+      if (url.endsWith(`${V1}/tables/7/columns`)) return json(columns);
+      if (url.endsWith(`${V1}/rows/10`) && init?.method === "PUT") {
+        return json({
+          ...row10,
+          data: row10.data.map((d) => (d.columnId === 3 ? { ...d, value: verbaut } : d)),
+        });
+      }
+      return json({ error: `unexpected ${init?.method ?? "GET"} ${url}` }, 500);
+    });
+
+  it("answers 424 when the application id is not configured", async () => {
+    const { app, auth } = await testApp({ config: loadConfig(testEnv()) });
+    const res = await app.inject({ method: "GET", url: "/api/aufmass", headers: auth });
+    expect(res.statusCode).toBe(424);
+    expect(res.json().error).toMatch(/not configured/);
+  });
+
+  it("computes restmenge and exposes row meta (wer/wann)", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: config9(),
+      fetchImpl: appFetch(),
+    });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/aufmass/nodes/view/5",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.columns.at(-1)).toEqual({
+      id: -1,
+      title: "restmenge",
+      type: "computed",
+      computed: true,
+    });
+    expect(body.rows[0].cells["-1"]).toBe(6);
+    expect(body.rows[0]).toMatchObject({
+      createdBy: "frodo",
+      lastEditBy: "sam",
+      lastEditAt: "2026-11-11T09:00:00Z",
+    });
+  });
+
+  it("recomputes restmenge on row update", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: config9(),
+      fetchImpl: appFetch(7),
+    });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/aufmass/rows/10",
+      headers: auth,
+      payload: { data: { "3": 7 } },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().cells["-1"]).toBe(3);
+  });
+
+  it("omits restmenge when planned/verbaut columns are absent", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url.endsWith(`${V1}/views/5`)) return json({ id: 5, title: "Einbauteile" });
+      if (url.endsWith(`${V1}/views/5/columns`)) {
+        return json([{ id: 1, title: "Komponente", type: "text" }]);
+      }
+      if (url.endsWith(`${V1}/views/5/rows`)) return json([{ id: 1, tableId: 7, data: [] }]);
+      return json({ error: `unexpected ${url}` }, 500);
+    });
+    const { app, auth, store, secrets } = await testApp({ config: config9(), fetchImpl });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/aufmass/nodes/view/5",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().columns.some((c: { computed?: boolean }) => c.computed)).toBe(false);
+  });
+});
+
 const connect = (store: Store, secrets: SecretBox) =>
   store.saveCredential({
     sub: TEST_USER.sub,

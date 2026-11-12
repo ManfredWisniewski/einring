@@ -10,6 +10,9 @@
   "decrease": "Decrease",
   "increase": "Increase",
   "selectPlaceholder": "Select…",
+  "restmenge": "Remaining",
+  "totals": "Totals",
+  "lastEdit": "Edited",
   "error": "The data could not be loaded ({{status}}).",
   "retry": "Retry"
 }

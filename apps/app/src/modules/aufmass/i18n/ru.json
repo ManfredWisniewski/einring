@@ -12,6 +12,9 @@
   "decrease": "Уменьшить",
   "increase": "Увеличить",
   "selectPlaceholder": "Выбрать…",
+  "restmenge": "Остаток",
+  "totals": "Суммы",
+  "lastEdit": "Изменено",
   "error": "Не удалось загрузить данные ({{status}}).",
   "retry": "Повторить"
 }

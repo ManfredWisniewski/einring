@@ -11,6 +11,9 @@
   "decrease": "Diminuer",
   "increase": "Augmenter",
   "selectPlaceholder": "Choisir…",
+  "restmenge": "Restant",
+  "totals": "Sommes",
+  "lastEdit": "Modifié",
   "error": "Les données n'ont pas pu être chargées ({{status}}).",
   "retry": "Réessayer"
 }

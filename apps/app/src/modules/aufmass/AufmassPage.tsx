@@ -26,6 +26,11 @@ import { NextcloudGate } from "~/components/NextcloudGate";
 
 const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
 
+const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
+const isSummable = (c: TableColumn) => c.computed === true || c.type === "number";
+const formatSum = (n: number) =>
+  Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+
 export function AufmassPage() {
   return (
     <NextcloudGate>
@@ -120,9 +125,12 @@ function NodeGrid({ node }: { node: TableNode }) {
             <tr>
               {data.columns.map((c) => (
                 <th key={c.id} scope="col">
-                  {c.title}
+                  {c.computed
+                    ? t(`modules.aufmass.${c.title}`, { defaultValue: c.title })
+                    : c.title}
                 </th>
               ))}
+              <th scope="col">{t("modules.aufmass.lastEdit")}</th>
               <th scope="col">
                 <span className="sr-only">{t("modules.aufmass.deleteRow")}</span>
               </th>
@@ -139,6 +147,25 @@ function NodeGrid({ node }: { node: TableNode }) {
               />
             ))}
           </tbody>
+          {data.rows.length > 0 && (
+            <tfoot>
+              <tr>
+                {data.columns.map((c) => {
+                  const nums = isSummable(c)
+                    ? data.rows
+                        .map((r) => r.cells[String(c.id)])
+                        .filter((v) => v !== null && v !== undefined && v !== "")
+                        .map(Number)
+                        .filter(Number.isFinite)
+                    : [];
+                  const sum = nums.reduce((a, b) => a + b, 0);
+                  return <td key={c.id}>{nums.length > 0 ? formatSum(sum) : ""}</td>;
+                })}
+                <td className="muted">{t("modules.aufmass.totals")}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
         {data.rows.length === 0 && (
           <p className="muted" style={{ padding: "var(--space-3)" }}>
@@ -170,9 +197,16 @@ function RowEditor({
   const patchRow = useAufmassPatchRow(node);
   const commit = (columnId: number, value: unknown) =>
     patchRow.mutate({ rowId: row.id, data: { [columnId]: value } });
+  // `entfällt` rows stay visible but struck through (FR-009).
+  const cancelledCol = view.columns.find(
+    (c) => c.type === "selection" && c.subtype === "check" && /entfällt/i.test(c.title),
+  );
+  const cancelled = cancelledCol !== undefined && isChecked(row.cells[String(cancelledCol.id)]);
+  const editedBy = row.lastEditBy ?? row.createdBy;
+  const editedAt = row.lastEditAt ?? row.createdAt;
 
   return (
-    <tr>
+    <tr className={cancelled ? "aufmass-row--cancelled" : undefined}>
       {view.columns.map((c) => (
         <td key={c.id}>
           <CellEditor
@@ -182,6 +216,10 @@ function RowEditor({
           />
         </td>
       ))}
+      <td className="aufmass-row__meta">
+        {editedBy ?? "—"}
+        {editedBy && editedAt ? ` · ${new Date(editedAt).toLocaleString()}` : null}
+      </td>
       <td>
         <Button
           variant="text"
@@ -206,11 +244,15 @@ function CellEditor({
   onCommit: (v: unknown) => void;
 }) {
   const { t } = useTranslation();
+  // Computed columns (restmenge) are read-only — the BFF derives them per row.
+  if (column.computed) {
+    return <span>{formatCell(value, t)}</span>;
+  }
   // Checkbox column (the "done" pattern) — a real Tables value, toggled in place.
   if (column.type === "selection" && column.subtype === "check") {
     return (
       <Checkbox
-        checked={value === true || value === 1 || value === "true"}
+        checked={isChecked(value)}
         onCheckedChange={(v) => onCommit(v === true)}
         aria-label={column.title}
       />

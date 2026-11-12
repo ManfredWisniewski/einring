@@ -26,7 +26,9 @@ export interface TablesRow {
   id: number;
   tableId: number;
   createdAt?: string;
+  createdBy?: string;
   lastEditAt?: string;
+  lastEditBy?: string;
   data: { columnId: number; value: unknown }[];
 }
 

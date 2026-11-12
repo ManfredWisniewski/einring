@@ -10,6 +10,9 @@
   "decrease": "Verringern",
   "increase": "Erhöhen",
   "selectPlaceholder": "Auswählen…",
+  "restmenge": "Restmenge",
+  "totals": "Summen",
+  "lastEdit": "Bearbeitet",
   "error": "Die Daten konnten nicht geladen werden ({{status}}).",
   "retry": "Erneut versuchen"
 }

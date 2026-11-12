@@ -15,9 +15,22 @@ const configSchema = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.coerce.number().int().positive().optional(),
   ),
+  /** Title of the column holding the planned quantity — restmenge is computed only when both exist. */
+  PLANNED_COLUMN: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().default("Anz"),
+  ),
+  /** Title of the column holding the installed quantity (`Verbaut`). */
+  VERBAUT_COLUMN: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().default("Verbaut"),
+  ),
 });
 
 type NodeType = "view" | "table";
+
+/** Synthetic read-only column id — negative ids never collide with Tables column ids. */
+const RESTMENGE_COLUMN_ID = -1;
 
 export interface AufmassApplication {
   name: string;
@@ -35,8 +48,17 @@ export interface AufmassView {
     type: string;
     subtype?: string;
     options?: { id: number; label: string }[];
+    /** BFF-computed read-only column (e.g. restmenge) — never editable. */
+    computed?: boolean;
   }[];
-  rows: { id: number; cells: Record<string, unknown> }[];
+  rows: {
+    id: number;
+    cells: Record<string, unknown>;
+    createdAt?: string;
+    createdBy?: string;
+    lastEditAt?: string;
+    lastEditBy?: string;
+  }[];
 }
 
 /**
@@ -88,6 +110,47 @@ function flattenRow(row: TablesRow) {
   return {
     id: row.id,
     cells: Object.fromEntries((row.data ?? []).map((d) => [d.columnId, d.value])),
+    createdAt: row.createdAt,
+    createdBy: row.createdBy,
+    lastEditAt: row.lastEditAt,
+    lastEditBy: row.lastEditBy,
+  };
+}
+
+const toNum = (v: unknown) => {
+  if (v === "" || v === null || v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/** planned − installed; undefined when the planned quantity isn't numeric. */
+const restOf = (planned: unknown, verbaut: unknown) => {
+  const p = toNum(planned);
+  if (p === undefined) return undefined;
+  return p - (toNum(verbaut) ?? 0);
+};
+
+const colIdByTitle = (columns: { id: number; title: string }[], title: string) =>
+  columns.find((c) => c.title.trim().toLowerCase() === title.trim().toLowerCase())?.id;
+
+/** Restmenge (FR-008): appends a synthetic computed column planned − verbaut when both exist. */
+function withRestmenge(view: AufmassView, config: z.infer<typeof configSchema>): AufmassView {
+  const plannedId = colIdByTitle(view.columns, config.PLANNED_COLUMN);
+  const verbautId = colIdByTitle(view.columns, config.VERBAUT_COLUMN);
+  if (plannedId === undefined || verbautId === undefined) return view;
+  return {
+    ...view,
+    columns: [
+      ...view.columns,
+      { id: RESTMENGE_COLUMN_ID, title: "restmenge", type: "computed", computed: true },
+    ],
+    rows: view.rows.map((r) => ({
+      ...r,
+      cells: {
+        ...r.cells,
+        [RESTMENGE_COLUMN_ID]: restOf(r.cells[String(plannedId)], r.cells[String(verbautId)]),
+      },
+    })),
   };
 }
 
@@ -178,14 +241,14 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
             nc.getViewColumns(id),
             nc.getViewRows(id),
           ]);
-          return toAufmassView("view", view, columns, rows);
+          return withRestmenge(toAufmassView("view", view, columns, rows), config);
         }
         const [table, columns, rows] = await Promise.all([
           nc.getTable(id),
           nc.getColumns(id),
           nc.getRows(id),
         ]);
-        return toAufmassView("table", table, columns, rows);
+        return withRestmenge(toAufmassView("table", table, columns, rows), config);
       } catch (e) {
         if (e instanceof NextcloudError && e.status === 404) {
           return reply.code(404).send({ error: "node not found" });
@@ -209,7 +272,23 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
         return reply.code(400).send({ error: "expected {data: {columnId: value}}" });
       }
       const row = await nc.updateRow(rowId, toData(parsed.data.data ?? {}));
-      return flattenRow(row);
+      const flat = flattenRow(row);
+      // Recompute restmenge so the client can swap the row in without a refetch;
+      // a failing column fetch must not block the update response.
+      try {
+        const cols = await nc.getColumns(row.tableId);
+        const plannedId = colIdByTitle(cols, config.PLANNED_COLUMN);
+        const verbautId = colIdByTitle(cols, config.VERBAUT_COLUMN);
+        if (plannedId !== undefined && verbautId !== undefined) {
+          flat.cells[String(RESTMENGE_COLUMN_ID)] = restOf(
+            flat.cells[String(plannedId)],
+            flat.cells[String(verbautId)],
+          );
+        }
+      } catch (e) {
+        req.log.warn({ err: String(e) }, "aufmass restmenge recompute failed");
+      }
+      return flat;
     });
 
     api.post("/nodes/:type/:id/rows", async (req, reply) => {

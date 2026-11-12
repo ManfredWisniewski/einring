@@ -402,6 +402,24 @@ a {
   border-bottom: 0;
 }
 
+/* --- Aufmass ------------------------------------------------------------ */
+
+.data-table tfoot td {
+  border-top: 1px solid var(--surface-border);
+  border-bottom: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.aufmass-row--cancelled td {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.aufmass-row__meta {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
 /* --- Tabs (react-aria-components) --------------------------------------- */
 
 .tabs__list {
