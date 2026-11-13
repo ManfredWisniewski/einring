@@ -4,11 +4,12 @@ import { resolve } from "node:path";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
-import { requireAuth, type TokenVerifier } from "./auth.js";
+import { createMcpTokenVerifier, requireAuth, type TokenVerifier } from "./auth.js";
 import type { Config } from "./config.js";
 import type { SecretBox } from "./crypto.js";
 import type { Store } from "./db.js";
 import { createLlmService, LlmError, type LlmService } from "./llm/client.js";
+import { registerMcpEndpoint } from "./modules/einchat-mcp.js";
 import type { ImapOpen } from "./modules/email.js";
 import { type ResolvedModule, resolveModules } from "./modules/registry.js";
 import { type Fetch, NextcloudClient, NextcloudError } from "./nextcloud/client.js";
@@ -155,6 +156,25 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     },
     { prefix: "/api" },
   );
+
+  // Dedicated MCP scope (spec einchat-mcp): authenticates via einring MCP tokens
+  // — deliberately not the shared Authentik verifier, so these tokens unlock the
+  // MCP surface only (least privilege). Mounted only when the module is enabled.
+  if (modules.some(({ module }) => module.id === "einchat-mcp")) {
+    await app.register(
+      async (api) => {
+        api.addHook("preHandler", requireAuth(createMcpTokenVerifier(deps.store.getMcpTokenSub)));
+        api.register(
+          (sub, _opts, done) => {
+            registerMcpEndpoint(sub, ctx);
+            done();
+          },
+          { prefix: "/einchat-mcp" },
+        );
+      },
+      { prefix: "/api" },
+    );
+  }
 
   const staticDir = deps.config.STATIC_DIR
     ? resolve(deps.config.STATIC_DIR)

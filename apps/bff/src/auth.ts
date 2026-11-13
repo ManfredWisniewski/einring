@@ -68,6 +68,20 @@ export function createSessionVerifier(
   };
 }
 
+/**
+ * Verifies einring MCP access tokens (einchat-mcp) — opaque tokens whose sha256
+ * hash maps to a `sub` in `mcp_tokens`; the token itself is never stored.
+ */
+export function createMcpTokenVerifier(
+  getMcpTokenSub: (tokenHash: string) => string | undefined,
+): TokenVerifier {
+  return async (token) => {
+    const sub = getMcpTokenSub(hashToken(token));
+    if (!sub) throw new Error("unknown mcp token");
+    return { sub };
+  };
+}
+
 /** Tries each verifier in order; the first success wins. */
 export function createCompositeVerifier(...verifiers: TokenVerifier[]): TokenVerifier {
   return async (token) => {

@@ -219,6 +219,23 @@ export interface EinChatTools {
   tools: EinChatTool[];
 }
 
+/** MCP access token metadata — never the token itself, only its sha256 hash. */
+export interface McpToken {
+  tokenHash: string;
+  label: string;
+  createdAt?: string;
+  revokedAt?: string | null;
+}
+
+export interface McpTokens {
+  tokens: McpToken[];
+}
+
+/** POST /einchat-mcp/tokens response — `token` is shown exactly once at creation. */
+export interface McpTokenCreated extends McpToken {
+  token: string;
+}
+
 /** Connector-module connection state (yamtrack, audiobookshelf, navidrome, trek, email). */
 export interface ConnectorStatus {
   connected: boolean;

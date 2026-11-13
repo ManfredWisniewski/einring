@@ -10,5 +10,14 @@
   "thinking": "Réflexion…",
   "tools": "Outils disponibles : {{tools}}",
   "notConfigured": "EinChat n'est pas configuré sur ce serveur.",
-  "error": "Le message n'a pas pu être envoyé ({{status}})."
+  "error": "Le message n'a pas pu être envoyé ({{status}}).",
+  "mcpTitle": "Accès MCP",
+  "mcpIntro": "Exposez vos outils EinChat aux clients MCP (p. ex. Devin IDE) via un jeton d'accès personnel.",
+  "mcpTokenLabel": "Libellé du jeton (optionnel)",
+  "mcpCreate": "Créer un jeton",
+  "mcpCreated": "Nouveau jeton — copiez-le maintenant, il ne s'affiche qu'une seule fois.",
+  "mcpNone": "Aucun jeton pour l'instant.",
+  "mcpRevoke": "Révoquer",
+  "mcpRevoked": "révoqué",
+  "mcpError": "La requête a échoué ({{status}})."
 }

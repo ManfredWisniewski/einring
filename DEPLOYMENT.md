@@ -65,7 +65,7 @@ PUBLIC_URL=https://einring.example.com
 # INSTANCE_THEME=wuttke              # named biti theme (apps/bff/themes/<name>.json)
 # INSTANCE_CSS_VARS={"--accent-base":"#b91c1c","--accent-subtle":"#fee2e2"}
 # Comma-separated enabled module ids; unset = all registered modules enabled
-# MODULES=einhub,tables,aufmass,monitor,wiki,csv-manager,einchat,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart,postges
+# MODULES=einhub,tables,aufmass,monitor,wiki,csv-manager,einchat,einchat-mcp,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart,postges
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
@@ -247,6 +247,20 @@ Connectors share one pattern (D41): each user links their own account in the app
 | `email` | mail username + password + server: `imaps://host:993` or bare host for IMAP, `https://`/`jmap://` host for JMAP (Basic auth; Stalwart app passwords work). Delete moves to Trash on both protocols (D58) | `email_recent`, `email_read` — plus its own `/email` page listing the last 5 inbox mails with expandable bodies |
 | `gotify` | username + password — a client token is minted upstream (`POST /client`) and stored instead of the password; disconnect deletes the client | `gotify_recent_messages`, `gotify_applications` — plus `/gotify`: live message stream (WS→SSE proxy), priority/app view, delete one/all, application management |
 | `stalwart` | mail account username + password (or app password) → JMAP Basic auth — use an account with management API access | `stalwart_info`, `stalwart_principals` — plus `/stalwart`: read-only server info — capabilities, accounts, groups, lists, roles, mail domains (D62) |
+
+### EinChat MCP server
+
+The `einchat-mcp` module exposes the same per-user tool surface EinChat sees as an MCP server — stateless, tools-only, Streamable HTTP at `POST /api/einchat-mcp/mcp` (JSON-RPC `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`). It works without `LLM_*` config.
+
+- Auth: per-user MCP tokens — created under **Settings → EinChat → MCP access** in the app, shown once, stored hashed, revocable. `GET`/`POST`/`DELETE /api/einchat-mcp/tokens` manage them under normal session auth.
+- Least privilege: MCP tokens authenticate the `/mcp` endpoint only (not `/api/*`); session tokens likewise do not unlock `/mcp`. Calls run as the token's user with that user's sealed credentials and disabled-tool set.
+- Every `tools/call` is audit-logged (user, tool, argument hash, status) and rate-limited.
+
+Devin IDE setup (token in place of `TOKEN`; the URL is the BFF's base URL):
+
+```text
+devin mcp add einchat https://<bff-host>/api/einchat-mcp/mcp --transport http --header "Authorization: Bearer TOKEN"
+```
 
 ## School module (music-school management)
 

@@ -6,11 +6,15 @@ import fr from "./i18n/fr.json";
 import ru from "./i18n/ru.json";
 
 const EinChatPage = lazy(() => import("./EinChatPage").then((m) => ({ default: m.EinChatPage })));
+const EinChatSettings = lazy(() =>
+  import("./EinChatSettings").then((m) => ({ default: m.EinChatSettings })),
+);
 
 export const einchatModule: AppModule = {
   id: "einchat",
   hasBackend: true,
   nav: { i18nKey: "modules.einchat.nav", group: "core" },
   routes: [{ path: "/einchat", Component: EinChatPage }],
+  settings: EinChatSettings,
   i18n: { de, en, fr, ru },
 };

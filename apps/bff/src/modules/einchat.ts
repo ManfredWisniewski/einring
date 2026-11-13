@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { AppContext } from "../app.js";
 import type { ChatMessage } from "../llm/client.js";
 import { makeRateLimiter } from "../rate-limit.js";
-import type { BffModule, ChatTool } from "./types.js";
+import { collectTools, disabledTools } from "./chat-tools.js";
+import type { BffModule } from "./types.js";
 
 /** Safety cap on the tool-call loop — a model that never stops gets cut off. */
 const MAX_TOOL_ITERATIONS = 5;
@@ -24,34 +25,6 @@ const bodySchema = z.object({
 const toolsBodySchema = z.object({
   disabled: z.array(z.string().min(1).max(100)).max(200),
 });
-
-interface CollectedTool {
-  module: string;
-  tool: ChatTool;
-}
-
-/** Collects chatTools from all enabled modules (D41). */
-function collectTools(ctx: AppContext): CollectedTool[] {
-  const tools: CollectedTool[] = [];
-  for (const { module, config } of ctx.modules) {
-    if (module.id === "einchat" || !module.chatTools) continue;
-    for (const tool of module.chatTools(ctx, config)) tools.push({ module: module.id, tool });
-  }
-  return tools;
-}
-
-/** Per-user disabled-tool set, stored as JSON in module_settings (D41). */
-function disabledTools(ctx: AppContext, sub: string): Set<string> {
-  const raw = ctx.store.getModuleSettings(sub, "einchat");
-  if (!raw) return new Set();
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const disabled = (parsed as { disabled?: unknown }).disabled;
-    return new Set(Array.isArray(disabled) ? disabled.filter((d) => typeof d === "string") : []);
-  } catch {
-    return new Set();
-  }
-}
 
 export const einchatModule: BffModule = {
   id: "einchat",

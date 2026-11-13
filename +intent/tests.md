@@ -352,3 +352,14 @@
 - **Wer/wann (FR-005)**: rows expose the Tables row meta `createdBy`/`createdAt`/`lastEditBy`/`lastEditAt`; the grid shows the last editor and timestamp in a trailing meta column ("—" when absent).
 - **Status/entfällt/zusätzlich (FR-009)**: status travels as a `selection` column (options from the schema — dropdown edit); a `selection`+`check` column titled matching `entfällt` renders as a checkbox and strikes/dims the whole row; new (unplanned) positions are appended via add-row. `Raum`/`LV-Nummer` stay text-editable for manual assignment (FR-011); `Verbaut` keeps the number stepper.
 - **Summen (FR-013)**: a footer row sums every `number`/computed column that has at least one numeric cell value.
+
+### A43 EinChat MCP server (spec: `+wit/specs/einring/einchat-mcp/`)
+
+- `devin mcp add einchat <BFF-url>/api/einchat-mcp/mcp` with a valid per-user token: `initialize` + `tools/list` over Streamable HTTP returns exactly the calling user's enabled, non-disabled module `chatTools` (SC-001, US3).
+- `tools/call` with schema-valid arguments executes the module tool with the caller's sealed credentials and returns its result (SC-002); arguments failing the tool's declared JSON schema are refused before dispatch.
+- Disabled or unknown tool names are refused without execution (SC-003).
+- Missing, unknown or revoked MCP tokens get `401` on every MCP request (SC-004); the token authenticates the MCP endpoint only.
+- Every `tools/call` writes an audit log line (user, tool name, argument hash, result status) (SC-005); tokens and plaintext arguments never appear in logs.
+- MCP calls are rate-limited (SC-006).
+- The endpoint lives in the `einchat-mcp` module (own `MODULES` entry) and works without LLM configuration; v1 is stateless tools-only (`initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`) — no resources/prompts/sampling, `GET` → 405.
+- Token management in the einchat module's settings view (`/einchat/settings`): create (shown once, stored hashed, optional label), list, revoke.

@@ -10,5 +10,14 @@
   "thinking": "Thinking…",
   "tools": "Available tools: {{tools}}",
   "notConfigured": "EinChat is not configured on this server.",
-  "error": "The message could not be sent ({{status}})."
+  "error": "The message could not be sent ({{status}}).",
+  "mcpTitle": "MCP access",
+  "mcpIntro": "Expose your EinChat tools to MCP clients (e.g. Devin IDE) via a personal access token.",
+  "mcpTokenLabel": "Token label (optional)",
+  "mcpCreate": "Create token",
+  "mcpCreated": "New token — copy it now, it is shown only once.",
+  "mcpNone": "No tokens yet.",
+  "mcpRevoke": "Revoke",
+  "mcpRevoked": "revoked",
+  "mcpError": "The request failed ({{status}})."
 }

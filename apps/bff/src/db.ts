@@ -106,6 +106,14 @@ export interface MusicPlaylistRow {
   createdAt: string;
 }
 
+export interface McpTokenRow {
+  sub: string;
+  tokenHash: string;
+  label: string;
+  createdAt: string;
+  revokedAt?: string | null;
+}
+
 export interface Store {
   getCredential(sub: string): NextcloudCredential | undefined;
   saveCredential(cred: NextcloudCredential): void;
@@ -136,6 +144,13 @@ export interface Store {
   getSessionSub(tokenHash: string): string | undefined;
   /** Drops all sessions of a user (called on Nextcloud disconnect). */
   deleteSessionsForSub(sub: string): void;
+  /** Per-user MCP access tokens — stored as sha256 hash only, like sessions. */
+  createMcpToken(sub: string, tokenHash: string, label: string): void;
+  /** The token's owning sub, or undefined for unknown/revoked tokens. */
+  getMcpTokenSub(tokenHash: string): string | undefined;
+  listMcpTokens(sub: string): Omit<McpTokenRow, "sub">[];
+  /** True when a live token was revoked; false for unknown/already-revoked. */
+  revokeMcpToken(sub: string, tokenHash: string): boolean;
   listWikiPages(sub: string): Omit<WikiPageRow, "content" | "sub">[];
   getWikiPage(sub: string, path: string): WikiPageRow | undefined;
   /** path→etag map, for change detection during sync. */
@@ -286,6 +301,13 @@ CREATE TABLE IF NOT EXISTS module_settings (
   data TEXT NOT NULL,
   PRIMARY KEY (sub, module)
 );
+CREATE TABLE IF NOT EXISTS mcp_tokens (
+  sub TEXT NOT NULL,
+  token_hash TEXT PRIMARY KEY,
+  label TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT
+);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sub TEXT NOT NULL,
@@ -382,6 +404,19 @@ export function openStore(path: string): Store {
   const putModSettings = db.prepare(
     `INSERT INTO module_settings (sub, module, data) VALUES (?, ?, ?)
      ON CONFLICT(sub, module) DO UPDATE SET data = excluded.data`,
+  );
+  const putMcpToken = db.prepare(
+    "INSERT INTO mcp_tokens (sub, token_hash, label) VALUES (?, ?, ?)",
+  );
+  const getMcpToken = db.prepare(
+    "SELECT sub FROM mcp_tokens WHERE token_hash = ? AND revoked_at IS NULL",
+  );
+  const listMcpTok = db.prepare(
+    `SELECT token_hash AS tokenHash, label, created_at AS createdAt, revoked_at AS revokedAt
+     FROM mcp_tokens WHERE sub = ? ORDER BY created_at DESC`,
+  );
+  const revokeMcpTok = db.prepare(
+    "UPDATE mcp_tokens SET revoked_at = datetime('now') WHERE sub = ? AND token_hash = ? AND revoked_at IS NULL",
   );
   const getFlow = db.prepare(
     `SELECT sub, poll_token AS pollToken, poll_endpoint AS pollEndpoint,
@@ -566,6 +601,10 @@ export function openStore(path: string): Store {
       return (getSession.get(tokenHash) as { sub: string } | undefined)?.sub;
     },
     deleteSessionsForSub: (sub) => void delSessionsForSub.run(sub),
+    createMcpToken: (sub, tokenHash, label) => void putMcpToken.run(sub, tokenHash, label),
+    getMcpTokenSub: (h) => (getMcpToken.get(h) as { sub: string } | undefined)?.sub,
+    listMcpTokens: (sub) => listMcpTok.all(sub) as unknown as Omit<McpTokenRow, "sub">[],
+    revokeMcpToken: (sub, tokenHash) => revokeMcpTok.run(sub, tokenHash).changes > 0,
     listWikiPages: (sub) => listPages.all(sub) as Omit<WikiPageRow, "content" | "sub">[],
     getWikiPage: (sub, path) => getPage.get(sub, path) as WikiPageRow | undefined,
     wikiEtags: (sub) =>

@@ -10,5 +10,14 @@
   "thinking": "Denke nach…",
   "tools": "Verfügbare Werkzeuge: {{tools}}",
   "notConfigured": "EinChat ist auf diesem Server nicht konfiguriert.",
-  "error": "Die Nachricht konnte nicht gesendet werden ({{status}})."
+  "error": "Die Nachricht konnte nicht gesendet werden ({{status}}).",
+  "mcpTitle": "MCP-Zugriff",
+  "mcpIntro": "Stelle deine EinChat-Werkzeuge MCP-Clients (z. B. Devin IDE) über ein persönliches Zugangstoken bereit.",
+  "mcpTokenLabel": "Token-Bezeichnung (optional)",
+  "mcpCreate": "Token erstellen",
+  "mcpCreated": "Neues Token — jetzt kopieren, es wird nur einmal angezeigt.",
+  "mcpNone": "Noch keine Tokens.",
+  "mcpRevoke": "Widerrufen",
+  "mcpRevoked": "widerrufen",
+  "mcpError": "Die Anfrage ist fehlgeschlagen ({{status}})."
 }

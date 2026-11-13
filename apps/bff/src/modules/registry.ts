@@ -4,6 +4,7 @@ import { aufmassModule } from "./aufmass.js";
 import { authentikModule } from "./authentik.js";
 import { csvManagerModule } from "./csv-manager.js";
 import { einchatModule } from "./einchat.js";
+import { einchatMcpModule } from "./einchat-mcp.js";
 import { eindavModule } from "./eindav.js";
 import { einhubModule } from "./einhub.js";
 import { einmusicModule } from "./einmusic.js";
@@ -37,6 +38,7 @@ export const bffModules: BffModule[] = [
   wikiModule,
   csvManagerModule,
   einchatModule,
+  einchatMcpModule,
   yamtrackModule,
   audiobookshelfModule,
   navidromeModule,

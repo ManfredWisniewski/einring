@@ -4858,6 +4858,7 @@ describe("module framework", () => {
         { id: "wiki", requires: ["nextcloud"] },
         { id: "csv-manager", requires: [] },
         { id: "einchat", requires: [] },
+        { id: "einchat-mcp", requires: [] },
         { id: "yamtrack", requires: [] },
         { id: "audiobookshelf", requires: [] },
         { id: "navidrome", requires: [] },

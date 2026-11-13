@@ -39,6 +39,8 @@ import type {
   MatrixMessages,
   MatrixRooms,
   MatrixSelf,
+  McpTokenCreated,
+  McpTokens,
   Me,
   ModulePrefs,
   ModuleRegistry,
@@ -116,6 +118,7 @@ export const keys = {
   csvFile: (id: number) => ["csv-manager", "file", id] as const,
   einchatStatus: ["einchat", "status"] as const,
   einchatTools: ["einchat", "tools"] as const,
+  einchatMcpTokens: ["einchat-mcp", "tokens"] as const,
   emailList: ["email", "list"] as const,
   emailMessage: (id: string) => ["email", "message", id] as const,
   emailAccounts: ["email", "accounts"] as const,
@@ -529,6 +532,35 @@ export function useEinChatTools(enabled = true) {
     queryKey: keys.einchatTools,
     queryFn: () => api.get<EinChatTools>("/einchat/tools"),
     enabled,
+  });
+}
+
+/** The user's MCP access tokens — hash metadata only, never the token. */
+export function useMcpTokens(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einchatMcpTokens,
+    queryFn: () => api.get<McpTokens>("/einchat-mcp/tokens"),
+    enabled,
+  });
+}
+
+export function useCreateMcpToken() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (label?: string) => api.post<McpTokenCreated>("/einchat-mcp/tokens", { label }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.einchatMcpTokens }),
+  });
+}
+
+export function useRevokeMcpToken() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tokenHash: string) =>
+      api.delete<{ revoked: boolean }>(`/einchat-mcp/tokens/${tokenHash}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.einchatMcpTokens }),
   });
 }
 
