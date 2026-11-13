@@ -1,6 +1,6 @@
 # Agent instructions for einring
 
-Before making changes, read the shared WIT development guidance in `+wit/development/` — start with `+wit/development/README.md` and `+wit/development/AGENTS.md` (they list the mandatory convention files), plus the shared rules in `+wit/AGENTS.md`. Then read `+intent/intent.md`, `+intent/decisions.md` and `+intent/tests.md`. Decisions are binding; change them by adding a dated entry, not by silently deviating.
+Before making changes, read the shared WIT development guidance in `+wit/development/` — start with `+wit/development/README.md` and `+wit/development/AGENTS.md` (they list the mandatory convention files), plus the shared rules in `+wit/AGENTS.md`. Then read `+intent/intent.md`, `knowledge/decisions.md` and `+intent/tests.md`. Decisions are binding; change them by adding a dated entry, not by silently deviating.
 
 ## Commands
 
@@ -15,6 +15,8 @@ Before making changes, read the shared WIT development guidance in `+wit/develop
 
 ## Rules
 
+- Never use `>nul`, `2>nul` or other `nul` redirects in shell commands — under Git Bash they create a literal `nul` file in the working directory. Use `>/dev/null` / `2>/dev/null` instead.
+- `.agents/skills/` is generated from `+wit/agents/skills/` — do not edit it by hand; run `scripts/sync-agent-skills.sh sync` and commit the result with `skills-lock.json`.
 - Interactive IDE assistant sessions (Devin, Windsurf, Cursor, etc.) work as the human's tool in the main checkout on the currently checked-out branch — they MUST NOT create persona branches or worktrees, MUST NOT push to `wip`, MUST NOT commit or push at all unless the human explicitly asks or a skill prescribes it, and MUST NOT give git command advice unless specifically asked; the persona branch pipeline applies to autonomous personas only. When a commit is requested, it carries the human author plus an AI co-author trailer.
 - UI styling uses only token variables from `@einring/tokens/css`; no hard-coded colours, spacing or font sizes. New tokens go into `packages/tokens/src` (DTCG format, primitive -> semantic).
 - UI components come from the `biti` submodule (`biti/src/components/ui`, M3 variants — Tailwind + Radix + cva), imported as `@/components/ui/<x>`; `@/*` resolves to `biti/src/*`, app code uses `~/*`. `biti/` is read-only here — component changes belong to the biti repository; only the pin is bumped. The root `package.json` dependency block is the biti component dep set (submodule sources resolve via node_modules walk-up); keep it aligned with `biti/src/components/ui` imports. `ui/wit/wit-space.tsx` imports `next/font` — do not import it. biti's semantic vars map onto einring tokens via the `@theme inline` block in `src/styles/global.css`. `react-aria-components` is still used for the elements biti lacks (Tabs, Popover/Dialog).

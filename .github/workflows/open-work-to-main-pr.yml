@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -17,6 +17,17 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Ensure wip and work exist
+        run: |
+          base=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha 2>/dev/null || true)
+          [ -z "$base" ] && { echo "no main - cannot bootstrap"; exit 0; }
+          for b in wip work; do
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$b" --jq .ref >/dev/null 2>&1; then
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/heads/$b" -f "sha=$base" >/dev/null
+              echo "bootstrapped $b from main"
+            fi
+          done
+
       - uses: actions/checkout@v4
 
       - name: Create PR if work is ahead of main

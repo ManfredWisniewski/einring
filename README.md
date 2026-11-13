@@ -38,7 +38,7 @@ git submodule update --init
 - Android: Android Studio (bundled JDK 21) and its SDK; set `JAVA_HOME` and `ANDROID_HOME`
 - Authentik: a public OAuth2/OIDC provider + application "einring" (PKCE, no client secret), redirect URIs
   `http://localhost:5173/auth/callback`, `einring://auth/callback` and the production URL; scopes `openid profile email`
-- Nextcloud with the Tables app; Login Flow v2 and API endpoints reachable without forward-auth interception (see `+intent/decisions.md` D25)
+- Nextcloud with the Tables app; Login Flow v2 and API endpoints reachable without forward-auth interception (see `knowledge/decisions.md` D25)
 
 ## Authentik setup
 
@@ -197,5 +197,5 @@ Full guide — TLS proxy, env reference, updates, backup, troubleshooting: `DEPL
 ## Documentation
 
 - `+intent/intent.md` - what and why
-- `+intent/decisions.md` - architecture decisions with alternatives and reasons
+- `knowledge/decisions.md` - architecture decisions with alternatives and reasons
 - `+intent/tests.md` - test strategy and acceptance criteria

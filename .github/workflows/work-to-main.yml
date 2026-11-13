@@ -1,8 +1,11 @@
 # Fast-forwards main to work on every work push - but only when the pending
 # diff is content: markup files (*.md, *.markdown, *.txt) and submodule
-# gitlinks. Any other file (code, config, workflows) blocks the merge; the
-# open-work-to-main-pr workflow then leaves the PR for a human.
-# Content repos (wit-common, planning repos) thus release
+# gitlinks whose new SHA is reachable on the submodule's protected branch.
+# Instruction-channel files (AGENTS.md, .agents/, +intent/, +team/, .devin/),
+# non-blob entries (symlinks, undeclared gitlinks), and any other file (code,
+# config, workflows) block the merge; the open-work-to-main-pr workflow then
+# leaves the PR for a human.
+# Content repos (wit-common, wit-agents, planning repos) thus release
 # automatically; development projects keep the human gate.
 name: work-to-main
 
@@ -18,9 +21,23 @@ jobs:
   integrate:
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure wip and work exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          base=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha 2>/dev/null || true)
+          [ -z "$base" ] && { echo "no main - cannot bootstrap"; exit 0; }
+          for b in wip work; do
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$b" --jq .ref >/dev/null 2>&1; then
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/heads/$b" -f "sha=$base" >/dev/null
+              echo "bootstrapped $b from main"
+            fi
+          done
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: true
 
       - name: Fast-forward main to work if diff is content-only
         run: |
@@ -28,15 +45,34 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rev-parse --verify -q origin/main || { echo "no main - skip"; exit 0; }
           git merge-base --is-ancestor origin/main origin/work || { echo "work does not contain main - human merge needed"; exit 0; }
-          subs=$(git config --file .gitmodules --get-regexp 'path$' 2>/dev/null | awk '{print $2}' || true)
           blocked=0
-          while IFS= read -r f; do
+          while IFS= read -r line; do
+            mode_new=$(echo "$line" | awk '{print $2}')
+            sha_new=$(echo "$line" | awk '{print $4}')
+            f=$(echo "$line" | awk -F'\t' '{print $NF}')
             case "$f" in
-              *.md|*.markdown|*.txt) ;;
-              *)
-                if echo "$subs" | grep -qx "$f"; then :; else echo "non-content change: $f"; blocked=1; fi ;;
+              AGENTS.md|CLAUDE.md|.agents/*|+intent/*|+team/*|.devin/*)
+                echo "instruction-channel change: $f"; blocked=1; continue ;;
             esac
-          done < <(git diff --name-only origin/main...origin/work)
+            if [ "$mode_new" = "160000" ]; then
+              url=$(git config --file .gitmodules --get "submodule.$f.url" || true)
+              br=$(git config --file .gitmodules --get "submodule.$f.branch" || true); br=${br:-main}
+              if [ -z "$url" ]; then echo "undeclared gitlink: $f"; blocked=1; continue; fi
+              git -C "$f" fetch -q "$url" "$br" 2>/dev/null || { echo "cannot verify $f"; blocked=1; continue; }
+              if git -C "$f" merge-base --is-ancestor "$sha_new" FETCH_HEAD 2>/dev/null; then
+                echo "gitlink $f -> $sha_new verified on $br"
+              else
+                echo "gitlink $f -> $sha_new not on protected branch $br"; blocked=1
+              fi
+            elif [ "$mode_new" = "100644" ] || [ "$mode_new" = "100755" ] || [ "$mode_new" = "000000" ]; then
+              case "$f" in
+                *.md|*.markdown|*.txt) ;;
+                *) echo "non-content change: $f"; blocked=1 ;;
+              esac
+            else
+              echo "non-blob change (mode $mode_new): $f"; blocked=1
+            fi
+          done < <(git diff --raw origin/main...origin/work)
           if [ "$blocked" -eq 0 ]; then
             git checkout main
             git merge --ff-only origin/work

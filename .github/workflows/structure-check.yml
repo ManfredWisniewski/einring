@@ -1,0 +1,24 @@
+# Repository structure compliance check (wit-common inventory). Runs on push
+# to protected branches and on demand; fails on missing required structure.
+name: structure-check
+
+on:
+  push:
+    branches: [main, work, wip]
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Check repository structure
+        run: python3 scripts/check-repo-structure.py . --remote --skills-check

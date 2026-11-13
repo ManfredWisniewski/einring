@@ -1,0 +1,321 @@
+# WIT branch integration — GitLab CI port of the GitHub Actions workflows
+# (.github/workflows/*.yml). Convention: +wit/common/conventions/repo-setup.md.
+# Chain: <persona> --push--> wip --(wip-to-work)--> work --human--> main
+#
+# Required project setup (once, in GitLab):
+#   1. CI/CD variable WIT_TOKEN (Settings → CI/CD → Variables; masked,
+#      protection OFF — persona branches are unprotected): a project access
+#      token, role Maintainer, scopes api + write_repository. It pushes to
+#      wip/work/main and creates merge requests; CI_JOB_TOKEN cannot.
+#   2. Pipeline schedules (Build → Pipeline schedules), each with the
+#      variable SCHEDULE_TASK set as below (target branch: wip or main —
+#      jobs check out the ref they need). Automatic: the ensure-schedules
+#      job creates/updates all of them on every push to main (or run
+#      scripts/ensure-gitlab-schedules.ps1 once by hand):
+#        main-to-wip           5 4 * * *            daily safety net
+#        tasks-archive         0 2 * * *            daily archive
+#        weekly-dailies        0 3 * * 0            Sunday, next week's dailies
+#        open-work-to-main-pr  0 5,7,9,11,13,15 * * *  work→main MR opener
+#        persona-janitor         30 4 * * *            stale persona sync
+#        structure-check         0 5 * * *             repo structure audit
+#
+# A push made with WIT_TOKEN triggers the next pipeline in the chain — same
+# behaviour as the GitHub workflows. Loops converge: once branches are equal,
+# the merge-base checks no-op and nothing is pushed.
+
+default:
+  image: alpine
+  before_script:
+    - apk add --no-cache git curl bash >/dev/null
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - git config --global user.name "gitlab-ci[bot]"
+    - git config --global user.email "gitlab-ci[bot]@${CI_SERVER_HOST}"
+    - git remote set-url origin "https://oauth2:${WIT_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+
+variables:
+  GIT_DEPTH: "0"
+  GIT_SUBMODULE_FORCE_HTTPS: "true"
+
+# Opens a GitLab merge request; args: source target title description
+.open_mr: &open_mr |
+  open_mr() {
+    curl -sf -X POST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests" \
+      -H "PRIVATE-TOKEN: $WIT_TOKEN" \
+      --data-urlencode "source_branch=$1" \
+      --data-urlencode "target_branch=$2" \
+      --data-urlencode "title=$3" \
+      --data-urlencode "description=$4" || true
+  }
+
+ensure-schedules:
+  # On every push to main: creates the pipeline schedules from the header
+  # and fixes drifted cron/ref/SCHEDULE_TASK (matched by description; other
+  # schedules untouched). Owned by the WIT_TOKEN bot - a schedule created
+  # by someone else only gets a warning until its ownership is taken.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - apk add --no-cache jq >/dev/null
+    - |
+      api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipeline_schedules"
+      auth="PRIVATE-TOKEN: $WIT_TOKEN"
+      existing=$(curl -sf -H "$auth" "$api?per_page=100")
+      printf '%s\n' \
+        'main-to-wip|5 4 * * *' \
+        'tasks-archive|0 2 * * *' \
+        'weekly-dailies|0 3 * * 0' \
+        'open-work-to-main-pr|0 5,7,9,11,13,15 * * *' \
+        'persona-janitor|30 4 * * *' \
+        'structure-check|0 5 * * *' |
+      while IFS='|' read -r task cron; do
+        current=$(echo "$existing" | jq -r --arg d "$task" \
+          'map(select(.description == $d))[0] // empty | "\(.id)|\(.cron)|\(.ref)|\(.cron_timezone)"')
+        id=${current%%|*}
+        if [ -z "$id" ]; then
+          id=$(curl -sf -X POST -H "$auth" "$api" \
+            --data-urlencode "description=$task" --data-urlencode "cron=$cron" \
+            -d ref=main -d cron_timezone=UTC -d active=true | jq -r .id)
+          echo "created $task ($cron)"
+        elif [ "$current" != "$id|$cron|main|UTC" ]; then
+          curl -sf -X PUT -H "$auth" "$api/$id" --data-urlencode "cron=$cron" \
+            -d ref=main -d cron_timezone=UTC >/dev/null \
+            && echo "updated $task ($cron)" \
+            || echo "warning: cannot update $task - take ownership of schedule $id"
+        fi
+        value=$(curl -sf -H "$auth" "$api/$id" \
+          | jq -r '.variables[]? | select(.key == "SCHEDULE_TASK") | .value')
+        if [ -z "$value" ]; then
+          curl -sf -X POST -H "$auth" "$api/$id/variables" \
+            -d key=SCHEDULE_TASK --data-urlencode "value=$task" >/dev/null \
+            || echo "warning: cannot set SCHEDULE_TASK on $task - take ownership of schedule $id"
+        elif [ "$value" != "$task" ]; then
+          curl -sf -X PUT -H "$auth" "$api/$id/variables/SCHEDULE_TASK" \
+            --data-urlencode "value=$task" >/dev/null \
+            || echo "warning: cannot fix SCHEDULE_TASK on $task - take ownership of schedule $id"
+        fi
+        echo "ok $task"
+      done
+
+persona-janitor:
+  # Scheduled/manual: merge origin/main then origin/wip into stale persona
+  # branches and push clean results. Conflicts abort and fail the job; the
+  # branch stays unchanged for human resolution. Never touches main/work/wip.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "persona-janitor"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - bash scripts/persona-branch-janitor.sh
+
+structure-check:
+  # Scheduled/manual repository structure audit against +wit inventory.
+  image: python:3.12-alpine
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "structure-check"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - python3 scripts/check-repo-structure.py . --remote --skills-check
+
+persona-to-wip:
+  # Fast-forwards wip to a persona branch on every persona push (ff-only:
+  # a branch that does not contain wip skips — local integrate stays the
+  # fallback). Bootstraps wip/work from main on first run.
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "work" && $CI_COMMIT_BRANCH != "wip" && $CI_PIPELINE_SOURCE != "schedule"
+  script:
+    - *open_mr
+    - |
+      git show-ref --verify -q refs/remotes/origin/main || { echo "no main - cannot bootstrap"; exit 0; }
+      for b in work wip; do
+        if ! git show-ref --verify -q "refs/remotes/origin/$b"; then
+          git push origin "refs/remotes/origin/main:refs/heads/$b"
+          echo "bootstrapped $b from main"
+        fi
+      done
+    - git checkout -B wip origin/wip
+    - |
+      if git merge-base --is-ancestor wip "origin/$CI_COMMIT_BRANCH"; then
+        git merge --ff-only "origin/$CI_COMMIT_BRANCH"
+        git push origin wip
+      else
+        echo "warning: $CI_COMMIT_BRANCH does not contain wip - sync locally (sync-persona-branch) then push again"
+      fi
+
+wip-to-work:
+  # Merges wip into work on every push to wip. On conflict the job fails,
+  # work stays unchanged, and a merge request is opened for a human.
+  # Submodules are checked out so git can fast-forward diverging +wit pins.
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "wip"
+    - if: $CI_COMMIT_BRANCH == "wip" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger")
+      when: manual
+  script:
+    - *open_mr
+    - git checkout -B work origin/work
+    - |
+      if git merge --no-edit origin/wip; then
+        git push origin work
+      else
+        git merge --abort || true
+        open_mr wip work \
+          "wip → work (merge conflict)" \
+          "Automatic merge of wip into work failed. Resolve the conflicts in this MR, then merge it — work is unchanged until then."
+        exit 1
+      fi
+
+main-to-wip:
+  # Keeps wip on the current main baseline: on push to main and as a daily
+  # safety net, merge main into wip and push. On conflict the job fails,
+  # wip stays unchanged, and a merge request is opened for a human.
+  # Submodules are checked out so git can fast-forward diverging +wit pins.
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger")
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "main-to-wip"
+  script:
+    - *open_mr
+    - git checkout -B wip origin/wip
+    - |
+      if git merge-base --is-ancestor origin/main HEAD; then
+        echo "wip already contains main — nothing to do."
+        exit 0
+      fi
+      if git merge --no-edit origin/main; then
+        git push origin wip
+      else
+        git merge --abort || true
+        open_mr main wip \
+          "main → wip (merge conflict)" \
+          "Automatic merge of main into wip failed. Resolve the conflicts in this MR, then merge it — wip is unchanged until then."
+        exit 1
+      fi
+
+work-to-main:
+  # Fast-forwards main to work on every work push — but only when the
+  # pending diff is content: markup files (*.md, *.markdown, *.txt) and
+  # submodule gitlinks. Any other file keeps the human gate; the
+  # open-work-to-main-pr job leaves the MR for a human.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "work"
+    - if: $CI_COMMIT_BRANCH == "work" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger")
+      when: manual
+  script:
+    - |
+      git rev-parse --verify -q origin/main >/dev/null || { echo "no main - skip"; exit 0; }
+      git merge-base --is-ancestor origin/main origin/work || { echo "work does not contain main - human merge needed"; exit 0; }
+      subs=$(git config --file .gitmodules --get-regexp 'path$' 2>/dev/null | awk '{print $2}' || true)
+      blocked=0
+      git diff --name-only origin/main...origin/work > /tmp/changed-files
+      while IFS= read -r f; do
+        case "$f" in
+          *.md|*.markdown|*.txt) ;;
+          *)
+            if echo "$subs" | grep -qx "$f"; then :; else echo "non-content change: $f"; blocked=1; fi ;;
+        esac
+      done < /tmp/changed-files
+      if [ "$blocked" -eq 0 ]; then
+        git checkout -B main origin/main
+        git merge --ff-only origin/work
+        git push origin main
+        echo "main fast-forwarded to work"
+      else
+        echo "merge deferred - non-content files pending; MR stays for human review"
+      fi
+
+open-work-to-main-pr:
+  # Scheduled: opens the work → main merge request when work is ahead and
+  # no such MR is open yet.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "open-work-to-main-pr"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - |
+      ahead=$(git rev-list --count origin/main..origin/work)
+      if [ "$ahead" -eq 0 ]; then
+        echo "work is not ahead of main — nothing to do."
+        exit 0
+      fi
+      open=$(curl -sf -H "PRIVATE-TOKEN: $WIT_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests?state=opened&source_branch=work&target_branch=main&per_page=1" \
+        | grep -c '"iid"' || true)
+      if [ "$open" -gt 0 ]; then
+        echo "An open work → main MR already exists."
+        exit 0
+      fi
+      curl -sf -X POST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests" \
+        -H "PRIVATE-TOKEN: $WIT_TOKEN" \
+        -d "source_branch=work" \
+        -d "target_branch=main" \
+        --data-urlencode "title=Merge work into main ($(date -u +'%Y-%m-%d %H:%M UTC'))" \
+        --data-urlencode "description=Scheduled merge of \`work\` ($ahead commits ahead) into \`main\`."
+
+tasks-archive:
+  # Archives finished tasks from +team/+tasks/<persona>.md into
+  # <persona>.history.md; runs on wip and commits back to wip, which then
+  # triggers wip-to-work. Convention: +wit/common/conventions/tasks.md
+  image: python:3.12-alpine
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "tasks-archive"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - git checkout -B wip origin/wip
+    - |
+      if [ -d "+wit/agents/skills" ]; then
+        bash scripts/sync-agent-skills.sh sync
+      fi
+    - python scripts/archive-done-tasks.py
+    - |
+      git add '+team/+tasks/' 2>/dev/null || true
+      git add '.agents/skills/' 2>/dev/null || true
+      git add 'skills-lock.json' 2>/dev/null || true
+      git diff --cached --quiet && exit 0
+      git commit -m "chore: archive done tasks and sync agent skills"
+      git push origin HEAD:wip
+
+weekly-dailies:
+  # Creates the coming week's daily logs in +team/+coordination/ on Sunday —
+  # one file per day, Mon–Sun, from the +wit template. Existing files are
+  # never overwritten. Commits to main (human-facing artifacts).
+  # Convention: +wit/common/conventions/coordination.md
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TASK == "weekly-dailies"
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "trigger"
+      when: manual
+  script:
+    - git checkout -B main origin/main
+    - |
+      set -e
+      COORD="+wit/+team/+coordination"
+      SLUG=$(basename "$(git rev-parse --show-toplevel)")
+      TPL="+wit/common/templates/coordination/YYYY-MM-DD-REPO-Daily.md"
+      if [ ! -d "$COORD" ]; then echo "no $COORD — nothing to do"; exit 0; fi
+      if [ ! -f "$TPL" ]; then echo "template $TPL missing — nothing to do"; exit 0; fi
+      now=$(date -u +%s); dow=$(date -u +%u)
+      for i in 1 2 3 4 5 6 7; do
+        d=$(date -u -d "@$((now + (8 - dow + i - 1) * 86400))" +%F)
+        f="$COORD/$d-$SLUG-Daily.md"
+        if [ -f "$f" ]; then echo "exists: $f"; else
+          sed "s/{{YYYY-MM-DD}}/$d/g" "$TPL" > "$f"
+          echo "created: $f"
+        fi
+      done
+    - |
+      git add '+wit/+team/' 2>/dev/null || true
+      git diff --cached --quiet && exit 0
+      git commit -m "chore: create daily logs for next week"
+      git push origin HEAD:main

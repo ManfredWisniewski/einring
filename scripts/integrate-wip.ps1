@@ -72,7 +72,7 @@ try {
         git push origin "HEAD:wip"
         if ($LASTEXITCODE -eq 0) { break }
         if ($i -eq $Retries) {
-            throw "wip push rejected $Retries times in a row - escalate (impediments-log)"
+            throw "wip push rejected $Retries times in a row - escalate (impediment ticket or fallback log)"
         }
         Write-Host "wip     non-fast-forward - another agent integrated; re-syncing ($i/$Retries)"
         try { & "$PSScriptRoot\sync-persona-branch.ps1" -Upstream origin/wip }

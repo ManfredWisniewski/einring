@@ -1,11 +1,37 @@
 {
   "version": 1,
+  "source": "+wit/agents/skills",
   "skills": {
-    "grilling": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "skillPath": "skills/productivity/grilling/SKILL.md",
-      "computedHash": "4fa026e5979770347b3357ff5139e1e41d21c3a9f7335e9cd2811cb5b8d32f2f"
-    }
+    "product-definition": "d25c5bae69d8b291dada4643aa0b4ac694b93e9e43f5fc2c37779c1c4b501f0e",
+    "research-item": "e5fd9055065603305048cf514aa50557cf8327cbc6fe79c2e42e199966efac83",
+    "handoff": "12eb25b73e96d679f3ab1e9b6f061e35b70b8866dfbd971e80d473470521f365",
+    "implementation": "b67a44b5bd972ad8c7f03df1140b59b26923e14c7ff2be7ca83378355242931e",
+    "intent": "5372e71c7b2a2b748c7f14745268c287f352d561148d0c5a16f8a4bfa050b06f",
+    "migrate-gitlab": "23e79069e43d6e57c463f6c541a4d5b6e0169ffdef4a798d2f933c7db6c010e4",
+    "plan": "563b721e331a905260cb145a098d879b8ce492bcc6e57ade149b050da2de7d79",
+    "research": "20449474f2a9d81af0b6cf58c1afe135f4d945253ede565bff0de3015d674fa6",
+    "review-standards": "60d820f2ab6663ad3bbe1c4d682d4c2c7ae688365dbb80c8a6180b907b04c195",
+    "template-refinement": "51732c0b0b8e6398322a5736a1879e4c7fbb712f4d32d943c305c03c4947145c",
+    "wit-structure-check": "94324ed40a460640f3aed424abcdd87acbcfc56c9d0b3e33493f5962219318f3",
+    "tasks-prioritize": "a24710bd04828743179f570b82a8d431dfd947b4221ef64c8b9a1457fdb80687",
+    "w1t-update-team": "9c04467cfa2f5b840738557548622762465a5a9ee6cf9f20dc1ea21f1ff785b4",
+    "security-audit": "dd83c8fa0101635276f37d3e8f19409c8578abdc56b9498dc1a97401594d6767",
+    "blogpost-ai": "2dc475971bdef7d5919ea4031e1d39b1ec941d7590ef6ad701a5e2a233f344a8",
+    "keyword-research": "2340b529ef71f104785ae03ba9445f0d41233772f263d87178c3ff8dcad10114",
+    "menschlich-mittel": "64be7f67dabadbe8389a08adeb0fcc7d82f926994394d29dd1d782373011a513",
+    "product-category": "da4e0780d3e3f4625f0ee0f020c6e27cebcbd98da1b239c29f49e3f148ce5685",
+    "product-product": "197f5e522358073e196f8a97a18d4cc88e092347c619dc20835fbd76515912ff",
+    "product-topic": "b58935f4f4cecebfd530517ec5b816a7701879a4819c6d0dc0f54ac5ed535ce2",
+    "seo-manfred-daily": "2bb0db6ea01fc378d755ab23cb16f4d7e51bdadcd34d3dad58b9bfec59fe45e4",
+    "seo-webtext": "0d29dea5187a1b77069daaee2142b5a6464ce5f5be2ddb78d18b4a8d0e866b2d",
+    "webtext-datenschutz": "883fb6db84368b9136cb195af66c751203ec9fe1df792705adac23d77c09ba4e",
+    "webtext-impressum": "e06d83617aef8cde94e62e82984eb15c2e292356e7afeaf5a6d0c73b301efa72",
+    "ok-atoms-refine": "7faa21da308ae63cd80bf0cdb2ad8f5a98d3aa3a69b3982808564139bcbe5ef1",
+    "ok-domain-review": "ffc28fbb79a0891be702c937b41ad08e0da26804fd30e3b2d25df3eb3f603f2d",
+    "ok-orchestration-run": "b615dbd810c11aafebb604acb1afb809f2b167c34a5d4ed3b63cbaf2d77d68ca",
+    "ok-orchestration-setup": "6ad50083c753413df9650ffdc460353ec1072a6d8335cbd9199070e5cfea32e7",
+    "ok-orchestration-test": "a5b45489bac08f010284aee432fa361a83153e73e8417b36036d1baf26470ef3",
+    "ok-workflow-create": "2ea07ddaac659d773d30c277d6ad3cb09ca95c8822ae8f9bbbaf55eee7d7b1d4",
+    "ok-workflow-review": "abe9b42eb95cd9af2954c454407b3c78a71065f03cfb18b3048cbcd7d9c02bb6"
   }
 }

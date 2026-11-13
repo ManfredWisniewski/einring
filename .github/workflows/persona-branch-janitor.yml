@@ -1,0 +1,39 @@
+# Scheduled janitor for stale persona branches (WIT branch model, see
+# +wit/common/conventions/repo-setup.md). Merges origin/main then origin/wip
+# into every non-protected branch that is behind, pushes clean results, and
+# fails loudly on conflicts — humans resolve, the janitor never does.
+name: persona-branch-janitor
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  janitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync stale persona branches
+        id: janitor
+        run: |
+          set +e
+          bash scripts/persona-branch-janitor.sh 2>&1 | tee janitor.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Escalate conflicts
+        if: steps.janitor.outputs.exit != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          open=$(gh issue list --search 'persona-branch-janitor in:title' --state open --json number --jq 'length')
+          if [ "$open" -eq 0 ]; then
+            gh issue create --title 'persona-branch-janitor: merge conflicts' \
+              --body-file janitor.log || true
+          fi
+          exit 1

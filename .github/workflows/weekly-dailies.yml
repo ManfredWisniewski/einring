@@ -1,6 +1,6 @@
 # Creates the coming week's daily logs in +team/+coordination/, Sunday at
 # 03:00 UTC — one file per day, Monday through Sunday, named
-# `YYYY-MM-DD Daily.md` from +wit/common/templates/coordination/YYYY-MM-DD Daily.md.
+# `<YYYY-MM-DD>-<repo>-Daily.md` from +wit/common/templates/coordination/YYYY-MM-DD-REPO-Daily.md.
 # Existing files are never overwritten; {{placeholders}} stay untouched except
 # the date. Repos without +team/+coordination/ skip silently. Runs on `main`
 # and commits back to `main` — these are human-facing artifacts, not agent
@@ -19,28 +19,29 @@ jobs:
   prepare-dailies:
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure wip and work exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          base=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha 2>/dev/null || true)
+          [ -z "$base" ] && { echo "no main - cannot bootstrap"; exit 0; }
+          for b in wip work; do
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$b" --jq .ref >/dev/null 2>&1; then
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/heads/$b" -f "sha=$base" >/dev/null
+              echo "bootstrapped $b from main"
+            fi
+          done
+
       - uses: actions/checkout@v4
         with:
           ref: main
-          submodules: false
-      - name: Fetch +wit submodule (optional)
-        env:
-          # Full clone URL with embedded credentials, e.g.
-          # https://user:token@git.w1t.org/wit/wit-common.git — unset skips +wit.
-          WIT_GIT_URL: ${{ secrets.WIT_GIT_URL }}
-        run: |
-          if [ -z "$WIT_GIT_URL" ]; then
-            echo "::warning::WIT_GIT_URL secret not set — +wit content unavailable, dependent steps will skip"
-            exit 0
-          fi
-          git config --global "url.$WIT_GIT_URL.insteadOf" "ssh://git@git.w1t.org:2222/wit/wit-common.git"
-          git submodule sync +wit
-          git submodule update --init +wit
+          submodules: true
       - name: Create daily files for next week
         run: |
           set -e
-          COORD="+team/+coordination"
-          TPL="+wit/common/templates/coordination/YYYY-MM-DD Daily.md"
+          COORD="+wit/+team/+coordination"
+          SLUG=$(basename "$(git rev-parse --show-toplevel)")
+          TPL="+wit/common/templates/coordination/YYYY-MM-DD-REPO-Daily.md"
           if [ ! -d "$COORD" ]; then
             echo "no $COORD — nothing to do"
             exit 0
@@ -52,7 +53,7 @@ jobs:
           # Monday after the Sunday run through the following Sunday
           for i in 1 2 3 4 5 6 7; do
             d=$(date -d "next monday + $((i - 1)) days" +%F)
-            f="$COORD/$d Daily.md"
+            f="$COORD/$d-$SLUG-Daily.md"
             if [ -f "$f" ]; then
               echo "exists: $f"
             else
@@ -64,7 +65,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add '+team/+coordination/' 2>/dev/null || true
+          git add '+wit/+team/' 2>/dev/null || true
           git diff --cached --quiet && exit 0
           git commit -m "chore: create daily logs for next week"
           git push origin HEAD:main

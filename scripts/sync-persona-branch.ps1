@@ -16,8 +16,8 @@
     the .gitattributes union driver.
 
   Any other conflict aborts the merge, realigns the submodule checkouts
-  and throws — escalate to a human (row in
-  +team/+coordination/impediments-log.md) instead of resolving by hand.
+  and throws — escalate to a human (impediment ticket or fallback log)
+  instead of resolving by hand.
 
   Refuses to run: detached HEAD, on main/work/wip, dirty working tree, or
   while a merge/rebase/cherry-pick is in progress.
@@ -160,7 +160,7 @@ try {
             foreach ($f in $files) { Write-Host "  file    $f : content conflict - escalate" }
             git merge --abort
             git submodule update --init --recursive
-            throw "merge of $up left unresolved conflicts - escalate to a human (impediments-log), do not resolve by hand"
+            throw "merge of $up left unresolved conflicts - escalate to a human (impediment ticket or fallback log), do not resolve by hand"
         }
 
         git commit --no-edit --quiet
@@ -177,6 +177,23 @@ try {
     foreach ($p in $subPaths) {
         $sdir = Join-Path $repo ($p -replace '/', '\')
         if (-not (Test-Path (Join-Path $sdir '.git'))) { continue }
+
+        # submodule checkouts are detached at the pin by design; a commit
+        # there lands on no branch and strands silently. Install the
+        # versioned pre-commit hook into the submodule's gitdir - it lives
+        # in the checkout, which may be pinned to a commit without it, so
+        # core.hooksPath is not enough; copy the file instead (idempotent)
+        $src = Join-Path $sdir 'scripts\hooks\pre-commit'
+        if (Test-Path $src) {
+            $gdir = git -C $sdir rev-parse --git-dir
+            $dstDir = Join-Path $gdir 'hooks'
+            $dst = Join-Path $dstDir 'pre-commit'
+            if (-not (Test-Path $dst) -or (Get-FileHash $src).Hash -ne (Get-FileHash $dst).Hash) {
+                New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
+                Copy-Item $src $dst -Force
+            }
+        }
+
         git -C $sdir symbolic-ref -q --short HEAD | Out-Null
         if ($LASTEXITCODE -ne 0) {
             $remote = git -C $sdir branch -r --contains HEAD
