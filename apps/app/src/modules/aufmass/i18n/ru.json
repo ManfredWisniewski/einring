@@ -16,5 +16,11 @@
   "filterEmpty": "(пусто)",
   "clearFilters": "Сбросить фильтры",
   "error": "Не удалось загрузить данные ({{status}}).",
-  "retry": "Повторить"
+  "retry": "Повторить",
+  "viewAs": "Вид",
+  "group_gf": "Руководство",
+  "group_plan": "Планирование",
+  "group_monteur": "Монтажник",
+  "group_abrechnung": "Биллинг",
+  "einbauteileliste": "Ведомость встраиваемых изделий"
 }

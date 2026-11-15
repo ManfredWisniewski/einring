@@ -1713,6 +1713,8 @@ describe("einchat", () => {
       configured: true,
       tools: [
         "einhub_notifications",
+        "aufmass_list_nodes",
+        "aufmass_get_rows",
         "wiki_search",
         "yamtrack_search_media",
         "yamtrack_list_media",
@@ -1854,7 +1856,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(25);
+    expect(all.json().tools.length).toBe(27);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",

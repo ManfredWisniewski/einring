@@ -66,7 +66,8 @@ export const einchatMcpModule: BffModule = {
  * endpoint only. No session lifecycle, no resources/prompts/sampling.
  */
 export function registerMcpEndpoint(api: FastifyInstance, ctx: AppContext): void {
-  const collected = collectTools(ctx);
+  // Tools scoped "einchat" stay inside the app chat and are never served over MCP.
+  const collected = collectTools(ctx).filter((c) => c.tool.scope !== "einchat");
   const ajv = new Ajv({ allErrors: false, strict: false });
   const validators = new Map<string, ValidateFunction>();
   for (const c of collected) {

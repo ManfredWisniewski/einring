@@ -419,15 +419,31 @@ a {
   cursor: pointer;
 }
 
+/* Long node titles truncate instead of wrapping the header row. */
+.aufmass-node-btn {
+  max-width: 16rem;
+}
+
+.aufmass-node-btn__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Push the add-row button to the right end of its flex row. */
 .aufmass-add-btn {
   margin-inline-start: auto;
 }
 
-/* Filter row sticks below the title row (title th height ≈ padding + line). */
-.aufmass-table thead tr:nth-child(2) th {
-  top: calc(var(--space-2) * 2 + 1.4em);
-  font-weight: var(--font-weight-regular);
+/* When the "Ansicht" group selector sits next to it, the selector takes the
+ * auto margin and the button gets a normal gap. */
+.aufmass-view-select {
+  max-width: max-content;
+  margin-inline-start: auto;
+}
+
+.aufmass-view-select + .aufmass-add-btn {
+  margin-inline-start: var(--space-2);
 }
 
 .aufmass-filter__trigger {
@@ -464,10 +480,25 @@ a {
   table-layout: fixed;
 }
 
+/* Truncated header/cell text — the span carries the ellipsis so its
+ * scrollWidth vs clientWidth tells TruncatedText whether to show a tooltip. */
+.aufmass-truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .aufmass-table th,
 .aufmass-table td {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Filter row sticks below the title row (title th height ≈ padding + line). */
+.aufmass-table thead tr:nth-child(2) th {
+  top: calc(var(--space-2) * 2 + 1.4em);
+  font-weight: var(--font-weight-regular);
 }
 
 .aufmass-row--cancelled td {

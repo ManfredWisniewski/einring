@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
+import type { AppContext } from "../app.js";
 import type {
   AuthenticatedNextcloud,
   TablesColumn,
@@ -8,7 +9,7 @@ import type {
   TablesRow,
 } from "../nextcloud/client.js";
 import { NextcloudError } from "../nextcloud/client.js";
-import type { BffModule } from "./types.js";
+import type { BffModule, ChatTool } from "./types.js";
 
 const configSchema = z.object({
   /** Context (application) id from the Nextcloud Tables `/app/<id>` URL. Empty/missing = not configured. */
@@ -40,6 +41,14 @@ type NodeType = "view" | "table";
 
 /** Synthetic read-only column id — negative ids never collide with Tables column ids. */
 const RESTMENGE_COLUMN_ID = -1;
+
+/** Authenticated client for a user, or null when their Nextcloud is disconnected. */
+const ncFor = (ctx: AppContext, sub: string): AuthenticatedNextcloud | null => {
+  const cred = ctx.store.getCredential(sub);
+  return cred
+    ? ctx.nextcloud.withCredentials(cred.loginName, ctx.secrets.open(cred.appPasswordSealed))
+    : null;
+};
 
 export interface AufmassApplication {
   name: string;
@@ -174,7 +183,7 @@ function withOriginal(view: AufmassView, markerId: number | undefined): AufmassV
 async function resolveUserNames(
   nc: AuthenticatedNextcloud,
   rows: { createdBy?: string; lastEditBy?: string }[],
-  log: FastifyBaseLogger,
+  log?: FastifyBaseLogger,
 ): Promise<Map<string, string>> {
   const uids = [
     ...new Set(rows.flatMap((r) => [r.createdBy, r.lastEditBy]).filter((u): u is string => !!u)),
@@ -192,7 +201,7 @@ async function resolveUserNames(
         const hit = (await nc.autocompleteUser(uid)).ocs.data.find((u) => u.id === uid);
         if (hit?.label) names.set(uid, hit.label);
       } catch (e) {
-        log.warn({ err: String(e), uid }, "aufmass user display-name lookup failed");
+        log?.warn({ err: String(e), uid }, "aufmass user display-name lookup failed");
       }
     }),
   );
@@ -266,23 +275,123 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
   requires: ["nextcloud"],
   configSchema,
+  chatTools(ctx, config): ChatTool[] {
+    return [
+      {
+        name: "aufmass_list_nodes",
+        scope: "einchat",
+        description:
+          "List the tables and views in the configured Aufmaß application (Nextcloud Tables context). Returns node type, id and title — pass a node to aufmass_get_rows.",
+        parameters: { type: "object", properties: {} },
+        async call(_args, sub) {
+          if (config.APPLICATION_ID === undefined) {
+            return { error: "aufmass application id not configured" };
+          }
+          const nc = ncFor(ctx, sub);
+          if (!nc) return { error: "nextcloud is not connected" };
+          const ctxRes = await nc.getContext(config.APPLICATION_ID);
+          const data = ctxRes.ocs?.data ?? {};
+          const settled = await Promise.allSettled(
+            contextNodes(data).map(async (node) => {
+              const meta =
+                node.type === "view" ? await nc.getView(node.id) : await nc.getTable(node.id);
+              return { ...node, title: meta.title || node.title };
+            }),
+          );
+          const nodes = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+          return {
+            name: (data.name ?? data.title ?? "").trim() || `Application ${config.APPLICATION_ID}`,
+            nodes,
+          };
+        },
+      },
+      {
+        name: "aufmass_get_rows",
+        scope: "einchat",
+        description:
+          "Fetch the rows of an Aufmaß table or view (site measurement data). Cells are keyed by column title with selection values resolved to labels; 'restmenge' is planned (Anz) minus installed (Verbaut); 'original' flags imported rows. Returns at most 200 rows.",
+        parameters: {
+          type: "object",
+          properties: {
+            type: {
+              type: "string",
+              enum: ["view", "table"],
+              description: "node type from aufmass_list_nodes",
+            },
+            id: { type: "integer", description: "node id from aufmass_list_nodes" },
+          },
+          required: ["type", "id"],
+        },
+        async call(args, sub) {
+          const nc = ncFor(ctx, sub);
+          if (!nc) return { error: "nextcloud is not connected" };
+          const type = args.type === "view" ? "view" : args.type === "table" ? "table" : null;
+          const id = Number(args.id);
+          if (!type || !Number.isInteger(id) || id <= 0) {
+            return { error: "expected {type: view|table, id}" };
+          }
+          const [meta, columns, rows] =
+            type === "view"
+              ? await Promise.all([nc.getView(id), nc.getViewColumns(id), nc.getViewRows(id)])
+              : await Promise.all([nc.getTable(id), nc.getColumns(id), nc.getRows(id)]);
+          // Marker col may be hidden in the view — fall back to table columns.
+          const markerId =
+            colIdByTitle(columns, config.ORIGINAL_COLUMN) ??
+            (type === "view" && (meta as { tableId?: number }).tableId !== undefined
+              ? colIdByTitle(
+                  await nc.getColumns((meta as { tableId: number }).tableId).catch(() => []),
+                  config.ORIGINAL_COLUMN,
+                )
+              : undefined);
+          const plannedId = colIdByTitle(columns, config.PLANNED_COLUMN);
+          const verbautId = colIdByTitle(columns, config.VERBAUT_COLUMN);
+          const cellOf = (row: TablesRow, colId: number) =>
+            row.data?.find((d) => d.columnId === colId)?.value;
+          const resolveCell = (c: TablesColumn, v: unknown) => {
+            if (c.type === "selection" && c.selectionOptions?.length) {
+              const options = c.selectionOptions;
+              const label = (o: unknown) => options.find((x) => x.id === o)?.label ?? String(o);
+              if (Array.isArray(v)) return v.map(label);
+              if (v !== null && v !== undefined && v !== "") return label(v);
+            }
+            return v;
+          };
+          const LIMIT = 200;
+          const names = await resolveUserNames(nc, rows);
+          const out = rows.slice(0, LIMIT).map((row) => {
+            const titled: Record<string, unknown> = { _rowId: row.id };
+            for (const c of columns) {
+              if (c.id === markerId) continue;
+              titled[c.title] = resolveCell(c, cellOf(row, c.id));
+            }
+            if (plannedId !== undefined && verbautId !== undefined) {
+              titled.rest = restOf(cellOf(row, plannedId), cellOf(row, verbautId));
+            }
+            if (markerId !== undefined) titled._original = isChecked(cellOf(row, markerId));
+            titled._lastEditBy = row.lastEditBy ? names.get(row.lastEditBy) : undefined;
+            titled._lastEditAt = row.lastEditAt;
+            return titled;
+          });
+          return {
+            title: meta.title,
+            rowCount: rows.length,
+            truncated: rows.length > LIMIT,
+            rows: out,
+          };
+        },
+      },
+    ];
+  },
+
   register(api: FastifyInstance, ctx, config) {
-    const { store, secrets, nextcloud } = ctx;
     const nodeType = (s: string): NodeType | null =>
       s === "view" ? "view" : s === "table" ? "table" : null;
-    /** Authenticated client for the caller, or null when Nextcloud is disconnected. */
-    const ncFor = (sub: string) => {
-      const cred = store.getCredential(sub);
-      return cred
-        ? nextcloud.withCredentials(cred.loginName, secrets.open(cred.appPasswordSealed))
-        : null;
-    };
 
     api.get("/", async (req, reply) => {
       if (config.APPLICATION_ID === undefined) {
         return reply.code(424).send({ error: "aufmass application id not configured" });
       }
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(ctx, req.user!.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -310,7 +419,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.get("/nodes/:type/:id", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(ctx, req.user!.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -372,7 +481,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       Object.entries(cells).map(([k, v]) => ({ columnId: Number(k), value: v }));
 
     api.patch("/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(ctx, req.user!.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -411,7 +520,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.post("/nodes/:type/:id/rows", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(ctx, req.user!.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -429,7 +538,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.delete("/nodes/:type/:id/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(ctx, req.user!.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }

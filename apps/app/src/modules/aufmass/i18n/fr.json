@@ -15,5 +15,11 @@
   "filterEmpty": "(vide)",
   "clearFilters": "Réinitialiser les filtres",
   "error": "Les données n'ont pas pu être chargées ({{status}}).",
-  "retry": "Réessayer"
+  "retry": "Réessayer",
+  "viewAs": "Vue",
+  "group_gf": "Direction",
+  "group_plan": "Planification",
+  "group_monteur": "Monteur",
+  "group_abrechnung": "Facturation",
+  "einbauteileliste": "Liste des pièces installées"
 }

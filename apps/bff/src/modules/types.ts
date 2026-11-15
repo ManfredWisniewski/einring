@@ -11,6 +11,11 @@ import type { AuthUser } from "../auth.js";
 export interface ChatTool {
   name: string;
   description: string;
+  /**
+   * `"einchat"` exposes the tool only inside the app chat; tools default to
+   * being shared with the einchat-mcp surface as well (`"all"`).
+   */
+  scope?: "einchat" | "all";
   /** JSON Schema object for `call`'s argument. */
   parameters: Record<string, unknown>;
   call(args: Record<string, unknown>, sub: string, user?: AuthUser): Promise<unknown>;

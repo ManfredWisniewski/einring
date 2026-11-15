@@ -78,7 +78,9 @@ function patchIndexHtml(html: string, config: Config): string {
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Enabled modules resolve + validate their MODULE_<ID>_* env here, so bad config fails at startup.
-  const modules = resolveModules(deps.config);
+  const modules = resolveModules(deps.config).filter(
+    ({ module }) => deps.config.MCP_ENABLED || module.id !== "einchat-mcp",
+  );
   const app = Fastify({ logger: deps.logger ?? { level: deps.config.LOG_LEVEL } });
   const ctx: AppContext = {
     ...deps,

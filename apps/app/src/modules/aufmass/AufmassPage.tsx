@@ -1,5 +1,5 @@
 import { FilterX, HardHat, ListFilter, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +31,13 @@ const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
 const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
 /** Synthetic filter id for the meta ("edited") column — real column ids are positive. */
 const META_FILTER_ID = -2;
+/** Group-view suffixes (FR-016): `&lt;table&gt;_gf|_plan|_monteur|_abrechnung` (`-` separator seen for `_gf`). */
+const GROUPS = ["gf", "plan", "monteur", "abrechnung"] as const;
+type Group = (typeof GROUPS)[number];
+const GROUP_SUFFIX = /[-_](gf|plan|monteur|abrechnung)$/i;
+const groupOf = (title: string): Group | undefined =>
+  GROUPS.find((g) => g === GROUP_SUFFIX.exec(title)?.[1]?.toLowerCase());
+const baseOf = (title: string) => title.replace(GROUP_SUFFIX, "");
 const editorOf = (r: TableRow) =>
   r.lastEditByDisplayName ?? r.lastEditBy ?? r.createdByDisplayName ?? r.createdBy ?? "";
 /** `YYYY-MM-DD HH:mm` — 24h, local time. */
@@ -79,19 +86,59 @@ function AufmassContent() {
     return <p className="muted">{t("modules.aufmass.emptyApp")}</p>;
   }
 
+  const bases = [...new Set(data.nodes.map((n) => baseOf(n.title)))];
+  const currentBase = node ? baseOf(node.title) : null;
+  const group = node ? groupOf(node.title) : undefined;
+  const viewFor = (base: string, g: Group) =>
+    data.nodes.find((n) => n.type === "view" && groupOf(n.title) === g && baseOf(n.title) === base);
+  const primaryOf = (base: string) =>
+    data.nodes.find((n) => n.title === base) ?? data.nodes.find((n) => baseOf(n.title) === base);
+  const pick = (base: string) => {
+    const preferred = group
+      ? (viewFor(base, group) ?? primaryOf(base))
+      : (viewFor(base, "gf") ?? primaryOf(base));
+    if (preferred) setNode(preferred);
+  };
+  const hasGroupViews = currentBase !== null && GROUPS.some((g) => viewFor(currentBase, g));
+
   return (
     <section className="stack">
       <div className="row">
         <h2>{data.name}</h2>
-        {data.nodes.map((n) => (
+        {bases.map((b) => (
           <Button
-            key={`${n.type}:${n.id}`}
-            variant={node?.type === n.type && node.id === n.id ? "outlined" : "text"}
-            onClick={() => setNode(n)}
+            key={b}
+            variant={b === currentBase ? "outlined" : "text"}
+            className="aufmass-node-btn"
+            onClick={() => pick(b)}
           >
-            {n.title}
+            <span className="aufmass-node-btn__label">{b}</span>
           </Button>
         ))}
+        <Button variant="text">{t("modules.aufmass.einbauteileliste")}</Button>
+        {node && currentBase && hasGroupViews && (
+          <Select
+            value={group ?? ""}
+            onValueChange={(g) => {
+              const sib = viewFor(currentBase, g as Group);
+              if (sib) setNode(sib);
+            }}
+          >
+            <SelectTrigger
+              className="aufmass-view-select h-8"
+              aria-label={t("modules.aufmass.viewAs")}
+            >
+              <SelectValue placeholder={t("modules.aufmass.viewAs")} />
+            </SelectTrigger>
+            <SelectContent>
+              {GROUPS.map((g) => (
+                <SelectItem key={g} value={g} disabled={!viewFor(currentBase, g)}>
+                  {t(`modules.aufmass.group_${g}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {node && (
           <Button
             variant="outlined"
@@ -105,6 +152,34 @@ function AufmassContent() {
       </div>
       {node && <NodeGrid key={`${node.type}:${node.id}`} node={node} addRow={addRow} />}
     </section>
+  );
+}
+
+/** Title text that only shows its hover tooltip when actually ellipsized. */
+function TruncatedText({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+  const check = () => {
+    const el = ref.current;
+    if (el) setTruncated(el.scrollWidth > el.clientWidth);
+  };
+  useEffect(() => {
+    check();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text]);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span ref={ref} className="aufmass-truncate" onPointerEnter={check}>
+          {text}
+        </span>
+      </TooltipTrigger>
+      {truncated && <TooltipContent>{text}</TooltipContent>}
+    </Tooltip>
   );
 }
 
@@ -169,12 +244,18 @@ function NodeGrid({
             <tr>
               {data.columns.map((c) => (
                 <th key={c.id} scope="col" style={c.width ? { width: `${c.width}px` } : undefined}>
-                  {c.computed
-                    ? t(`modules.aufmass.${c.title}`, { defaultValue: c.title })
-                    : c.title}
+                  <TruncatedText
+                    text={
+                      c.computed
+                        ? t(`modules.aufmass.${c.title}`, { defaultValue: c.title })
+                        : c.title
+                    }
+                  />
                 </th>
               ))}
-              <th scope="col">{t("modules.aufmass.lastEdit")}</th>
+              <th scope="col">
+                <TruncatedText text={t("modules.aufmass.lastEdit")} />
+              </th>
               <th scope="col">
                 <span className="sr-only">{t("modules.aufmass.deleteRow")}</span>
               </th>

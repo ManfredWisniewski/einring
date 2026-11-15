@@ -9,7 +9,7 @@ import { NextcloudConnect } from "./NextcloudConnect";
 
 /**
  * Service gate for modules that require Nextcloud: renders the connect card until
- * credentials exist, then the connected-as row and the module content.
+ * credentials exist, then the module content with the connected-as row at the bottom.
  */
 export function NextcloudGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -30,6 +30,7 @@ export function NextcloudGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="stack">
+      {children}
       <div className="row muted">
         <span>
           {t("nextcloud.connectedAs", {
@@ -41,7 +42,6 @@ export function NextcloudGate({ children }: { children: ReactNode }) {
           {t("nextcloud.disconnect")}
         </Button>
       </div>
-      {children}
     </div>
   );
 }

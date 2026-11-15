@@ -252,6 +252,8 @@ Connectors share one pattern (D41): each user links their own account in the app
 
 The `einchat-mcp` module exposes the same per-user tool surface EinChat sees as an MCP server — stateless, tools-only, Streamable HTTP at `POST /api/einchat-mcp/mcp` (JSON-RPC `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`). It works without `LLM_*` config.
 
+Instance switch: `MCP_ENABLED=false` disables the MCP surface entirely — the `/mcp` endpoint and the `einchat-mcp` module's `/tokens` routes are not mounted. Unset or `true` = enabled (tools marked `scope: "einchat"` are never served over MCP, regardless).
+
 - Auth: per-user MCP tokens — created under **Settings → EinChat → MCP access** in the app, shown once, stored hashed, revocable. `GET`/`POST`/`DELETE /api/einchat-mcp/tokens` manage them under normal session auth.
 - Least privilege: MCP tokens authenticate the `/mcp` endpoint only (not `/api/*`); session tokens likewise do not unlock `/mcp`. Calls run as the token's user with that user's sealed credentials and disabled-tool set.
 - Every `tools/call` is audit-logged (user, tool, argument hash, status) and rate-limited.

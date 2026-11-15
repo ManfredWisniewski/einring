@@ -8,6 +8,15 @@ const schema = z.object({
   NEXTCLOUD_URL: z.url().transform((u) => u.replace(/\/+$/, "")),
   /** Comma-separated enabled module ids; absent = all registered modules enabled. */
   MODULES: z.string().optional(),
+  /**
+   * Master switch for the EinChat MCP surface (einchat-mcp module + `/mcp`
+   * endpoint). Unset = enabled; `"false"`/`"0"`/`"off"` disables it entirely —
+   * the module's `/tokens` routes are unmounted as well.
+   */
+  MCP_ENABLED: z.preprocess(
+    (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
+    z.boolean().default(true),
+  ),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default("0.0.0.0"),
   DATA_DIR: z.string().default("./data"),

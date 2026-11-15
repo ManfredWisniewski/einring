@@ -14,5 +14,11 @@
   "filterEmpty": "(leer)",
   "clearFilters": "Alle Filter zurücksetzen",
   "error": "Die Daten konnten nicht geladen werden ({{status}}).",
-  "retry": "Erneut versuchen"
+  "retry": "Erneut versuchen",
+  "viewAs": "Ansicht",
+  "group_gf": "Geschäftsführung",
+  "group_plan": "Planung",
+  "group_monteur": "Monteur",
+  "group_abrechnung": "Buchhaltung",
+  "einbauteileliste": "Einbauteileliste"
 }

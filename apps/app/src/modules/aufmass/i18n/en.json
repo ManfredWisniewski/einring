@@ -14,5 +14,11 @@
   "filterEmpty": "(empty)",
   "clearFilters": "Clear all filters",
   "error": "The data could not be loaded ({{status}}).",
-  "retry": "Retry"
+  "retry": "Retry",
+  "viewAs": "View",
+  "group_gf": "Management",
+  "group_plan": "Planning",
+  "group_monteur": "Installer",
+  "group_abrechnung": "Billing",
+  "einbauteileliste": "Installed parts list"
 }
