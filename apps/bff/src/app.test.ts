@@ -670,6 +670,12 @@ describe("aufmass", () => {
     { id: 3, title: "Verbaut", type: "number", orderWeight: 2 },
     { id: 4, title: "Entfällt", type: "selection", subtype: "check", orderWeight: 3 },
   ];
+  // `original` is hidden in the view (absent from view columns) but present on
+  // the table — the BFF resolves it via the table column list.
+  const tableColumns = [
+    ...columns,
+    { id: 5, title: "original", type: "selection", subtype: "check", orderWeight: 4 },
+  ];
   const row10 = {
     id: 10,
     tableId: 7,
@@ -682,6 +688,15 @@ describe("aufmass", () => {
       { columnId: 2, value: 10 },
       { columnId: 3, value: 4 },
       { columnId: 4, value: false },
+      { columnId: 5, value: true },
+    ],
+  };
+  const row11 = {
+    id: 11,
+    tableId: 7,
+    data: [
+      { columnId: 1, value: "extra" },
+      { columnId: 5, value: false },
     ],
   };
 
@@ -695,8 +710,9 @@ describe("aufmass", () => {
       }
       if (url.endsWith(`${V1}/views/5`)) return json({ id: 5, title: "UG.50", tableId: 7 });
       if (url.endsWith(`${V1}/views/5/columns`)) return json(columns);
-      if (url.endsWith(`${V1}/views/5/rows`)) return json([row10]);
-      if (url.endsWith(`${V1}/tables/7/columns`)) return json(columns);
+      if (url.endsWith(`${V1}/views/5/rows`)) return json([row10, row11]);
+      if (url.endsWith(`${V1}/tables/7/columns`)) return json(tableColumns);
+      if (url.includes("/ocs/v2.php/cloud/users/")) return ocs({ displayname: "Sam Gamgee" });
       if (url.endsWith(`${V1}/rows/10`) && init?.method === "PUT") {
         return json({
           ...row10,
@@ -737,7 +753,27 @@ describe("aufmass", () => {
       createdBy: "frodo",
       lastEditBy: "sam",
       lastEditAt: "2026-11-11T09:00:00Z",
+      lastEditByDisplayName: "Sam Gamgee",
     });
+  });
+
+  it("flags `original` rows via the hidden marker column and strips it", async () => {
+    const { app, auth, store, secrets } = await testApp({
+      config: config9(),
+      fetchImpl: appFetch(),
+    });
+    connect(store, secrets);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/aufmass/nodes/view/5",
+      headers: auth,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // marker column hidden from the grid; flag resolved via the table columns
+    expect(body.columns.some((c: { id: number }) => c.id === 5)).toBe(false);
+    expect(body.rows[0].original).toBe(true);
+    expect(body.rows[1].original).toBe(false);
   });
 
   it("recomputes restmenge on row update", async () => {
@@ -754,6 +790,7 @@ describe("aufmass", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().cells["-1"]).toBe(3);
+    expect(res.json().original).toBe(true);
   });
 
   it("omits restmenge when planned/verbaut columns are absent", async () => {

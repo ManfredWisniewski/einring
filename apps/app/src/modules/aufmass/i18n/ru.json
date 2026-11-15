@@ -9,11 +9,8 @@
   "rowCount_other": "{{count}} строк",
   "addRow": "Добавить строку",
   "deleteRow": "Удалить строку",
-  "decrease": "Уменьшить",
-  "increase": "Увеличить",
   "selectPlaceholder": "Выбрать…",
   "restmenge": "Остаток",
-  "totals": "Суммы",
   "lastEdit": "Изменено",
   "error": "Не удалось загрузить данные ({{status}}).",
   "retry": "Повторить"

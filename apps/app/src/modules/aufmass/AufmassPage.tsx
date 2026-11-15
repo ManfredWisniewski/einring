@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { HardHat, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ApiError } from "~/api/client";
 import {
   useAufmassAddRow,
@@ -27,15 +28,21 @@ import { NextcloudGate } from "~/components/NextcloudGate";
 const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
 
 const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
-const isSummable = (c: TableColumn) => c.computed === true || c.type === "number";
-const formatSum = (n: number) =>
-  Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+/** `YYYY-MM-DD HH:mm` — 24h, local time. */
+const formatDateTime = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 export function AufmassPage() {
   return (
-    <NextcloudGate>
-      <AufmassContent />
-    </NextcloudGate>
+    <TooltipProvider delayDuration={0}>
+      <NextcloudGate>
+        <AufmassContent />
+      </NextcloudGate>
+    </TooltipProvider>
   );
 }
 
@@ -43,6 +50,7 @@ function AufmassContent() {
   const { t } = useTranslation();
   const connected = useNextcloudConnection().data?.status === "connected";
   const app = useAufmassApplication(connected);
+  const addRow = useAufmassAddRow();
   const [node, setNode] = useState<TableNode | null>(null);
 
   // Auto-open the first node once the application loads.
@@ -79,16 +87,31 @@ function AufmassContent() {
             {n.title}
           </Button>
         ))}
+        {node && (
+          <Button
+            variant="outlined"
+            className="aufmass-add-btn"
+            onClick={() => addRow.mutate(node)}
+            disabled={addRow.isPending}
+          >
+            <Plus /> {t("modules.aufmass.addRow")}
+          </Button>
+        )}
       </div>
-      {node && <NodeGrid key={`${node.type}:${node.id}`} node={node} />}
+      {node && <NodeGrid key={`${node.type}:${node.id}`} node={node} addRow={addRow} />}
     </section>
   );
 }
 
-function NodeGrid({ node }: { node: TableNode }) {
+function NodeGrid({
+  node,
+  addRow,
+}: {
+  node: TableNode;
+  addRow: ReturnType<typeof useAufmassAddRow>;
+}) {
   const { t } = useTranslation();
   const view = useAufmassNode(node);
-  const addRow = useAufmassAddRow();
   const deleteRow = useAufmassDeleteRow();
 
   if (view.isPending) return <p className="muted">{t("modules.aufmass.loading")}</p>;
@@ -107,24 +130,12 @@ function NodeGrid({ node }: { node: TableNode }) {
 
   return (
     <>
-      <div className="row">
-        <h3>
-          {data.emoji ? `${data.emoji} ` : ""}
-          {data.title}{" "}
-          <span className="muted" style={{ fontSize: "var(--font-size-sm)" }}>
-            {t("modules.aufmass.rowCount", { count: data.rows.length })}
-          </span>
-        </h3>
-        <Button variant="outlined" onClick={() => addRow.mutate(node)} disabled={addRow.isPending}>
-          <Plus /> {t("modules.aufmass.addRow")}
-        </Button>
-      </div>
-      <div className="table-wrap">
-        <table className="data-table">
+      <div className="table-wrap aufmass-table-wrap">
+        <table className="data-table aufmass-table">
           <thead>
             <tr>
               {data.columns.map((c) => (
-                <th key={c.id} scope="col">
+                <th key={c.id} scope="col" style={c.width ? { width: `${c.width}px` } : undefined}>
                   {c.computed
                     ? t(`modules.aufmass.${c.title}`, { defaultValue: c.title })
                     : c.title}
@@ -147,31 +158,28 @@ function NodeGrid({ node }: { node: TableNode }) {
               />
             ))}
           </tbody>
-          {data.rows.length > 0 && (
-            <tfoot>
-              <tr>
-                {data.columns.map((c) => {
-                  const nums = isSummable(c)
-                    ? data.rows
-                        .map((r) => r.cells[String(c.id)])
-                        .filter((v) => v !== null && v !== undefined && v !== "")
-                        .map(Number)
-                        .filter(Number.isFinite)
-                    : [];
-                  const sum = nums.reduce((a, b) => a + b, 0);
-                  return <td key={c.id}>{nums.length > 0 ? formatSum(sum) : ""}</td>;
-                })}
-                <td className="muted">{t("modules.aufmass.totals")}</td>
-                <td />
-              </tr>
-            </tfoot>
-          )}
         </table>
         {data.rows.length === 0 && (
           <p className="muted" style={{ padding: "var(--space-3)" }}>
             {t("modules.aufmass.empty")}
           </p>
         )}
+      </div>
+      <div className="row">
+        <h3>
+          {data.title}{" "}
+          <span className="muted" style={{ fontSize: "var(--font-size-sm)" }}>
+            {t("modules.aufmass.rowCount", { count: data.rows.length })}
+          </span>
+        </h3>
+        <Button
+          variant="outlined"
+          className="aufmass-add-btn"
+          onClick={() => addRow.mutate(node)}
+          disabled={addRow.isPending}
+        >
+          <Plus /> {t("modules.aufmass.addRow")}
+        </Button>
       </div>
       {(addRow.isError || deleteRow.isError) && (
         <div className="alert alert--danger">
@@ -202,13 +210,14 @@ function RowEditor({
     (c) => c.type === "selection" && c.subtype === "check" && /entfällt/i.test(c.title),
   );
   const cancelled = cancelledCol !== undefined && isChecked(row.cells[String(cancelledCol.id)]);
-  const editedBy = row.lastEditBy ?? row.createdBy;
+  const editedBy =
+    row.lastEditByDisplayName ?? row.lastEditBy ?? row.createdByDisplayName ?? row.createdBy;
   const editedAt = row.lastEditAt ?? row.createdAt;
 
   return (
     <tr className={cancelled ? "aufmass-row--cancelled" : undefined}>
       {view.columns.map((c) => (
-        <td key={c.id}>
+        <td key={c.id} style={c.width ? { width: `${c.width}px` } : undefined}>
           <CellEditor
             column={c}
             value={row.cells[String(c.id)]}
@@ -217,18 +226,37 @@ function RowEditor({
         </td>
       ))}
       <td className="aufmass-row__meta">
-        {editedBy ?? "—"}
-        {editedBy && editedAt ? ` · ${new Date(editedAt).toLocaleString()}` : null}
+        {editedBy ? (
+          <Tooltip>
+            <TooltipTrigger className="aufmass-row__meta-trigger" aria-label={editedBy}>
+              <HardHat className="size-4" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>
+              {editedBy}
+              {editedAt ? (
+                <>
+                  <br />
+                  {formatDateTime(editedAt)}
+                </>
+              ) : null}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          "—"
+        )}
       </td>
       <td>
-        <Button
-          variant="text"
-          size="clear"
-          onClick={onDelete}
-          aria-label={t("modules.aufmass.deleteRow")}
-        >
-          <Trash2 />
-        </Button>
+        {!row.original && (
+          <Button
+            variant="text"
+            size="clear"
+            className="aufmass-row__delete"
+            onClick={onDelete}
+            aria-label={t("modules.aufmass.deleteRow")}
+          >
+            <Trash2 />
+          </Button>
+        )}
       </td>
     </tr>
   );
@@ -244,9 +272,9 @@ function CellEditor({
   onCommit: (v: unknown) => void;
 }) {
   const { t } = useTranslation();
-  // Computed columns (restmenge) are read-only — the BFF derives them per row.
-  if (column.computed) {
-    return <span>{formatCell(value, t)}</span>;
+  // Computed (restmenge) and view-readonly columns render as plain text.
+  if (column.computed || column.readonly) {
+    return <span>{cellText(column, value, t)}</span>;
   }
   // Checkbox column (the "done" pattern) — a real Tables value, toggled in place.
   if (column.type === "selection" && column.subtype === "check") {
@@ -280,7 +308,6 @@ function NumberCell({
   label: string;
   onCommit: (v: number) => void;
 }) {
-  const { t } = useTranslation();
   const num = typeof value === "number" ? value : Number(value);
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
@@ -289,14 +316,6 @@ function NumberCell({
   };
   return (
     <span className="csv-cell">
-      <Button
-        variant="text"
-        size="clear"
-        onClick={() => onCommit(num - 1)}
-        aria-label={t("modules.aufmass.decrease")}
-      >
-        <Minus />
-      </Button>
       <Input
         type="number"
         className="csv-cell__input h-8 w-24"
@@ -313,14 +332,6 @@ function NumberCell({
           }
         }}
       />
-      <Button
-        variant="text"
-        size="clear"
-        onClick={() => onCommit(num + 1)}
-        aria-label={t("modules.aufmass.increase")}
-      >
-        <Plus />
-      </Button>
     </span>
   );
 }

@@ -398,16 +398,50 @@ a {
   font-weight: var(--font-weight-medium);
 }
 
-.data-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
 /* --- Aufmass ------------------------------------------------------------ */
 
-.data-table tfoot td {
-  border-top: 1px solid var(--surface-border);
-  border-bottom: 0;
-  font-weight: var(--font-weight-medium);
+.aufmass-row__meta {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.aufmass-row__meta-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: help;
+}
+
+.aufmass-row__delete {
+  cursor: pointer;
+}
+
+/* Push the add-row button to the right end of its flex row. */
+.aufmass-add-btn {
+  margin-inline-start: auto;
+}
+
+/* Break out of .app-main's 72rem cap — the grid spans the full viewport. */
+.aufmass-table-wrap {
+  width: auto;
+  margin-inline: calc(50% - 50vw + var(--space-4));
+  border-radius: 0;
+  border-inline: 0;
+}
+
+/* Fixed layout: customSettings.width defines exact column widths, uncapped
+ * columns share the rest — the table always fills .table-wrap. */
+.aufmass-table {
+  table-layout: fixed;
+}
+
+.aufmass-table th,
+.aufmass-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .aufmass-row--cancelled td {
@@ -415,9 +449,8 @@ a {
   text-decoration: line-through;
 }
 
-.aufmass-row__meta {
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 /* --- Tabs (react-aria-components) --------------------------------------- */

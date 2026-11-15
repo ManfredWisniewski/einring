@@ -20,6 +20,8 @@ export interface TablesColumn {
   subtype?: string;
   orderWeight?: number;
   selectionOptions?: { id: number; label: string }[] | null;
+  /** UI settings from the Tables app — `width` is the column's pixel width. */
+  customSettings?: { width?: number } | null;
 }
 
 export interface TablesRow {
@@ -38,6 +40,13 @@ export interface TablesViewMeta {
   title: string;
   emoji?: string;
   tableId?: number;
+  /** Per-column view settings — `readonly` marks columns non-editable in this view. */
+  columnSettings?: {
+    columnId: number;
+    order?: number;
+    readonly?: boolean;
+    mandatory?: boolean;
+  }[];
 }
 
 /**
@@ -414,6 +423,17 @@ export class AuthenticatedNextcloud {
   /** Own account info incl. storage quota — any authenticated user. */
   getOwnUser() {
     return this.get<OcsResponse<OwnUser>>("/ocs/v2.php/cloud/user");
+  }
+
+  /** `GET /ocs/v2.php/cloud/users/<uid>` — another user's profile; admin/subadmin only. */
+  getUser(uid: string) {
+    return this.get<OcsResponse<OwnUser>>(`/ocs/v2.php/cloud/users/${encodeURIComponent(uid)}`);
+  }
+
+  /** `GET /ocs/v2.php/core/autocomplete/get` — sharee search usable by regular users; match `id` exactly for uid→name. */
+  autocompleteUser(uid: string) {
+    const q = new URLSearchParams({ search: uid, itemType: "users", limit: "10" });
+    return this.get<OcsResponse<AutocompleteResult[]>>(`/ocs/v2.php/core/autocomplete/get?${q}`);
   }
 
   /** Revokes this app password upstream (`DELETE /ocs/v2.php/core/apppassword`). */

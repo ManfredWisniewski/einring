@@ -1,6 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
 import type {
+  AuthenticatedNextcloud,
   TablesColumn,
   TablesContext,
   TablesContextNode,
@@ -24,6 +25,14 @@ const configSchema = z.object({
   VERBAUT_COLUMN: z.preprocess(
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().default("Verbaut"),
+  ),
+  /**
+   * Title of the hidden marker column that flags imported rows. Checked rows are
+   * `original` — only Tables admins may delete them; user-added rows stay deletable.
+   */
+  ORIGINAL_COLUMN: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().default("original"),
   ),
 });
 
@@ -50,14 +59,23 @@ export interface AufmassView {
     options?: { id: number; label: string }[];
     /** BFF-computed read-only column (e.g. restmenge) — never editable. */
     computed?: boolean;
+    /** View `columnSettings.readonly` — display value as text, no editor. */
+    readonly?: boolean;
+    /** Column width in px from Tables `customSettings.width` — absent on older releases. */
+    width?: number;
   }[];
   rows: {
     id: number;
     cells: Record<string, unknown>;
     createdAt?: string;
     createdBy?: string;
+    /** Display name resolved from `createdBy` (row meta carries user ids only). */
+    createdByDisplayName?: string;
     lastEditAt?: string;
     lastEditBy?: string;
+    lastEditByDisplayName?: string;
+    /** True when the hidden `original` marker column is checked (imported row — no delete). */
+    original?: boolean;
   }[];
 }
 
@@ -133,6 +151,67 @@ const restOf = (planned: unknown, verbaut: unknown) => {
 const colIdByTitle = (columns: { id: number; title: string }[], title: string) =>
   columns.find((c) => c.title.trim().toLowerCase() === title.trim().toLowerCase())?.id;
 
+const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
+
+/**
+ * Hidden `original` marker column (checked = imported row, admin-only delete).
+ * The column is stripped from the view and each row flagged — the grid never
+ * renders it; `undefined` marker means "no gate" (all rows deletable).
+ */
+function withOriginal(view: AufmassView, markerId: number | undefined): AufmassView {
+  if (markerId === undefined) return view;
+  return {
+    ...view,
+    columns: view.columns.filter((c) => c.id !== markerId),
+    rows: view.rows.map((r) => ({ ...r, original: isChecked(r.cells[String(markerId)]) })),
+  };
+}
+
+/**
+ * Maps Tables user ids (row meta carries uids, not names) to display names —
+ * admin users-API first, sharee autocomplete as fallback for regular accounts.
+ */
+async function resolveUserNames(
+  nc: AuthenticatedNextcloud,
+  rows: { createdBy?: string; lastEditBy?: string }[],
+  log: FastifyBaseLogger,
+): Promise<Map<string, string>> {
+  const uids = [
+    ...new Set(rows.flatMap((r) => [r.createdBy, r.lastEditBy]).filter((u): u is string => !!u)),
+  ];
+  const names = new Map<string, string>();
+  await Promise.all(
+    uids.map(async (uid) => {
+      try {
+        const name = (await nc.getUser(uid)).ocs.data.displayname;
+        if (name) return void names.set(uid, name);
+      } catch {
+        // not admin — try the sharee autocomplete instead
+      }
+      try {
+        const hit = (await nc.autocompleteUser(uid)).ocs.data.find((u) => u.id === uid);
+        if (hit?.label) names.set(uid, hit.label);
+      } catch (e) {
+        log.warn({ err: String(e), uid }, "aufmass user display-name lookup failed");
+      }
+    }),
+  );
+  return names;
+}
+
+/** Attaches resolved display names to a view's rows (no-op when lookup finds nothing). */
+function withUserNames(view: AufmassView, names: Map<string, string>): AufmassView {
+  if (names.size === 0) return view;
+  return {
+    ...view,
+    rows: view.rows.map((r) => ({
+      ...r,
+      createdByDisplayName: r.createdBy ? names.get(r.createdBy) : undefined,
+      lastEditByDisplayName: r.lastEditBy ? names.get(r.lastEditBy) : undefined,
+    })),
+  };
+}
+
 /** Restmenge (FR-008): appends a synthetic computed column planned − verbaut when both exist. */
 function withRestmenge(view: AufmassView, config: z.infer<typeof configSchema>): AufmassView {
   const plannedId = colIdByTitle(view.columns, config.PLANNED_COLUMN);
@@ -159,6 +238,7 @@ function toAufmassView(
   meta: { id: number; title: string; emoji?: string },
   columns: TablesColumn[],
   rows: TablesRow[],
+  readonlyIds?: Set<number>,
 ): AufmassView {
   return {
     kind,
@@ -171,10 +251,16 @@ function toAufmassView(
       type: c.type,
       subtype: c.subtype,
       options: c.selectionOptions ?? undefined,
+      width: c.customSettings?.width ?? undefined,
+      readonly: readonlyIds?.has(c.id) || undefined,
     })),
     rows: rows.map(flattenRow),
   };
 }
+
+/** columnIds flagged `readonly` in the view's `columnSettings`. */
+const readonlyColumnIds = (view: { columnSettings?: { columnId: number; readonly?: boolean }[] }) =>
+  new Set((view.columnSettings ?? []).filter((s) => s.readonly === true).map((s) => s.columnId));
 
 export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
@@ -241,14 +327,38 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
             nc.getViewColumns(id),
             nc.getViewRows(id),
           ]);
-          return withRestmenge(toAufmassView("view", view, columns, rows), config);
+          // The marker may be hidden in the view — fall back to the table's
+          // column list; row.data still carries its cell value.
+          const markerId =
+            colIdByTitle(columns, config.ORIGINAL_COLUMN) ??
+            (view.tableId !== undefined
+              ? colIdByTitle(
+                  await nc.getColumns(view.tableId).catch(() => []),
+                  config.ORIGINAL_COLUMN,
+                )
+              : undefined);
+          const out = withRestmenge(
+            withOriginal(
+              toAufmassView("view", view, columns, rows, readonlyColumnIds(view)),
+              markerId,
+            ),
+            config,
+          );
+          return withUserNames(out, await resolveUserNames(nc, out.rows, req.log));
         }
         const [table, columns, rows] = await Promise.all([
           nc.getTable(id),
           nc.getColumns(id),
           nc.getRows(id),
         ]);
-        return withRestmenge(toAufmassView("table", table, columns, rows), config);
+        const out = withRestmenge(
+          withOriginal(
+            toAufmassView("table", table, columns, rows),
+            colIdByTitle(columns, config.ORIGINAL_COLUMN),
+          ),
+          config,
+        );
+        return withUserNames(out, await resolveUserNames(nc, out.rows, req.log));
       } catch (e) {
         if (e instanceof NextcloudError && e.status === 404) {
           return reply.code(404).send({ error: "node not found" });
@@ -273,6 +383,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       }
       const row = await nc.updateRow(rowId, toData(parsed.data.data ?? {}));
       const flat = flattenRow(row);
+      let original: boolean | undefined;
       // Recompute restmenge so the client can swap the row in without a refetch;
       // a failing column fetch must not block the update response.
       try {
@@ -285,10 +396,18 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
             flat.cells[String(verbautId)],
           );
         }
+        const markerId = colIdByTitle(cols, config.ORIGINAL_COLUMN);
+        if (markerId !== undefined) original = isChecked(flat.cells[String(markerId)]);
       } catch (e) {
         req.log.warn({ err: String(e) }, "aufmass restmenge recompute failed");
       }
-      return flat;
+      const names = await resolveUserNames(nc, [flat], req.log);
+      return {
+        ...flat,
+        original,
+        createdByDisplayName: flat.createdBy ? names.get(flat.createdBy) : undefined,
+        lastEditByDisplayName: flat.lastEditBy ? names.get(flat.lastEditBy) : undefined,
+      };
     });
 
     api.post("/nodes/:type/:id/rows", async (req, reply) => {

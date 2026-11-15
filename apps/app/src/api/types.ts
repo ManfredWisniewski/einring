@@ -34,17 +34,25 @@ export interface TableColumn {
   options?: { id: number; label: string }[];
   /** BFF-computed read-only column (e.g. aufmass restmenge) — never editable. */
   computed?: boolean;
+  /** Aufmaß: view `columnSettings.readonly` — display as text, no editor. */
+  readonly?: boolean;
+  /** Column width in px from Tables `customSettings.width` — absent on older releases. */
+  width?: number;
 }
 
 export interface TableRow {
   id: number;
   /** Raw cell values keyed by columnId — resolve labels via `TableColumn.options`. */
   cells: Record<string, unknown>;
-  /** Tables row meta (createdBy/lastEditBy present on recent Tables releases). */
+  /** Tables row meta (createdBy/lastEditBy carry user ids; the BFF resolves *DisplayName). */
   createdAt?: string;
   createdBy?: string;
+  createdByDisplayName?: string;
   lastEditAt?: string;
   lastEditBy?: string;
+  lastEditByDisplayName?: string;
+  /** Aufmaß only: hidden `original` marker column checked — imported row, no user delete. */
+  original?: boolean;
 }
 
 export type TableNodeType = "view" | "table";

@@ -192,7 +192,9 @@ describe("einchat-mcp", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    const list = (await rpc(app, token, { jsonrpc: "2.0", id: 1, method: "tools/list" })).json() as {
+    const list = (
+      await rpc(app, token, { jsonrpc: "2.0", id: 1, method: "tools/list" })
+    ).json() as {
       result: { tools: { name: string }[] };
     };
     expect(list.result.tools.map((t) => t.name)).not.toContain("einhub_notifications");
