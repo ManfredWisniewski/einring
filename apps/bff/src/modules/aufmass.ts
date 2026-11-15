@@ -17,12 +17,13 @@ const configSchema = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.coerce.number().int().positive().optional(),
   ),
-  /** Title of the column holding the planned quantity — restmenge is computed only when both exist. */
+  /** Title candidates (comma-separated) for the planned-quantity column —
+   * restmenge is computed only when both quantities resolve. */
   PLANNED_COLUMN: z.preprocess(
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-    z.string().default("Anz"),
+    z.string().default("Anz,Wert"),
   ),
-  /** Title of the column holding the installed quantity (`Verbaut`). */
+  /** Title candidates (comma-separated) for the installed-quantity column (`Verbaut`). */
   VERBAUT_COLUMN: z.preprocess(
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().default("Verbaut"),
@@ -55,24 +56,33 @@ export interface AufmassApplication {
   nodes: { type: NodeType; id: number; title: string }[];
 }
 
-export interface AufmassView {
+export interface AufmassColumn {
+  id: number;
+  title: string;
+  type: string;
+  subtype?: string;
+  options?: { id: number; label: string }[];
+  /** BFF-computed read-only column (e.g. restmenge) — never editable. */
+  computed?: boolean;
+  /** View `columnSettings.readonly` — display value as text, no editor. */
+  readonly?: boolean;
+  /** Tables/view `mandatory` flag — required input in the add-row form. */
+  mandatory?: boolean;
+  /** Column width in px from Tables `customSettings.width` — absent on older releases. */
+  width?: number;
+}
+
+interface AufmassView {
   kind: NodeType;
   id: number;
   title: string;
   emoji?: string;
-  columns: {
-    id: number;
-    title: string;
-    type: string;
-    subtype?: string;
-    options?: { id: number; label: string }[];
-    /** BFF-computed read-only column (e.g. restmenge) — never editable. */
-    computed?: boolean;
-    /** View `columnSettings.readonly` — display value as text, no editor. */
-    readonly?: boolean;
-    /** Column width in px from Tables `customSettings.width` — absent on older releases. */
-    width?: number;
-  }[];
+  /** Column ids for the planned/installed quantities — monteur per-unit UX needs them. */
+  plannedColumnId?: number;
+  verbautColumnId?: number;
+  columns: AufmassColumn[];
+  /** Full table columns for view nodes — the add-row form offers every field. */
+  allColumns?: AufmassColumn[];
   rows: {
     id: number;
     cells: Record<string, unknown>;
@@ -157,8 +167,23 @@ const restOf = (planned: unknown, verbaut: unknown) => {
   return p - (toNum(verbaut) ?? 0);
 };
 
-const colIdByTitle = (columns: { id: number; title: string }[], title: string) =>
-  columns.find((c) => c.title.trim().toLowerCase() === title.trim().toLowerCase())?.id;
+const colIdByTitle = (columns: { id: number; title: string }[], title: string) => {
+  const want = title.trim().toLowerCase();
+  return (
+    columns.find((c) => c.title.trim().toLowerCase() === want)?.id ??
+    // Item tables name quantity columns e.g. "Verbaut m²" / "Anzahl".
+    columns.find((c) => c.title.trim().toLowerCase().startsWith(want))?.id
+  );
+};
+
+/** First title in the comma-separated list that resolves to a column. */
+const colIdByTitles = (columns: { id: number; title: string }[], titles: string) => {
+  for (const t of titles.split(",")) {
+    const id = colIdByTitle(columns, t);
+    if (id !== undefined) return id;
+  }
+  return undefined;
+};
 
 const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
 
@@ -167,12 +192,19 @@ const isChecked = (v: unknown) => v === true || v === 1 || v === "true";
  * The column is stripped from the view and each row flagged — the grid never
  * renders it; `undefined` marker means "no gate" (all rows deletable).
  */
-function withOriginal(view: AufmassView, markerId: number | undefined): AufmassView {
+function withOriginal(
+  view: AufmassView,
+  markerId: number | undefined,
+  markerByRowId?: Map<number, unknown>,
+): AufmassView {
   if (markerId === undefined) return view;
   return {
     ...view,
     columns: view.columns.filter((c) => c.id !== markerId),
-    rows: view.rows.map((r) => ({ ...r, original: isChecked(r.cells[String(markerId)]) })),
+    rows: view.rows.map((r) => ({
+      ...r,
+      original: isChecked(markerByRowId?.get(r.id) ?? r.cells[String(markerId)]),
+    })),
   };
 }
 
@@ -223,11 +255,13 @@ function withUserNames(view: AufmassView, names: Map<string, string>): AufmassVi
 
 /** Restmenge (FR-008): appends a synthetic computed column planned − verbaut when both exist. */
 function withRestmenge(view: AufmassView, config: z.infer<typeof configSchema>): AufmassView {
-  const plannedId = colIdByTitle(view.columns, config.PLANNED_COLUMN);
-  const verbautId = colIdByTitle(view.columns, config.VERBAUT_COLUMN);
+  const plannedId = colIdByTitles(view.columns, config.PLANNED_COLUMN);
+  const verbautId = colIdByTitles(view.columns, config.VERBAUT_COLUMN);
   if (plannedId === undefined || verbautId === undefined) return view;
   return {
     ...view,
+    plannedColumnId: plannedId,
+    verbautColumnId: verbautId,
     columns: [
       ...view.columns,
       { id: RESTMENGE_COLUMN_ID, title: "restmenge", type: "computed", computed: true },
@@ -242,27 +276,35 @@ function withRestmenge(view: AufmassView, config: z.infer<typeof configSchema>):
   };
 }
 
+const mapColumn = (
+  c: TablesColumn,
+  readonlyIds?: Set<number>,
+  mandatoryIds?: Set<number>,
+): AufmassColumn => ({
+  id: c.id,
+  title: c.title,
+  type: c.type,
+  subtype: c.subtype,
+  options: c.selectionOptions ?? undefined,
+  width: c.customSettings?.width ?? undefined,
+  readonly: readonlyIds?.has(c.id) || undefined,
+  mandatory: mandatoryIds?.has(c.id) || c.mandatory === true || c.mandatory === 1 || undefined,
+});
+
 function toAufmassView(
   kind: NodeType,
   meta: { id: number; title: string; emoji?: string },
   columns: TablesColumn[],
   rows: TablesRow[],
   readonlyIds?: Set<number>,
+  mandatoryIds?: Set<number>,
 ): AufmassView {
   return {
     kind,
     id: meta.id,
     title: meta.title,
     emoji: meta.emoji,
-    columns: columns.map((c) => ({
-      id: c.id,
-      title: c.title,
-      type: c.type,
-      subtype: c.subtype,
-      options: c.selectionOptions ?? undefined,
-      width: c.customSettings?.width ?? undefined,
-      readonly: readonlyIds?.has(c.id) || undefined,
-    })),
+    columns: columns.map((c) => mapColumn(c, readonlyIds, mandatoryIds)),
     rows: rows.map(flattenRow),
   };
 }
@@ -270,6 +312,12 @@ function toAufmassView(
 /** columnIds flagged `readonly` in the view's `columnSettings`. */
 const readonlyColumnIds = (view: { columnSettings?: { columnId: number; readonly?: boolean }[] }) =>
   new Set((view.columnSettings ?? []).filter((s) => s.readonly === true).map((s) => s.columnId));
+
+/** columnIds flagged `mandatory` in the view's `columnSettings`. */
+const mandatoryColumnIds = (view: {
+  columnSettings?: { columnId: number; mandatory?: boolean }[];
+}) =>
+  new Set((view.columnSettings ?? []).filter((s) => s.mandatory === true).map((s) => s.columnId));
 
 export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
@@ -343,8 +391,8 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
                   config.ORIGINAL_COLUMN,
                 )
               : undefined);
-          const plannedId = colIdByTitle(columns, config.PLANNED_COLUMN);
-          const verbautId = colIdByTitle(columns, config.VERBAUT_COLUMN);
+          const plannedId = colIdByTitles(columns, config.PLANNED_COLUMN);
+          const verbautId = colIdByTitles(columns, config.VERBAUT_COLUMN);
           const cellOf = (row: TablesRow, colId: number) =>
             row.data?.find((d) => d.columnId === colId)?.value;
           const resolveCell = (c: TablesColumn, v: unknown) => {
@@ -436,23 +484,51 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
             nc.getViewColumns(id),
             nc.getViewRows(id),
           ]);
-          // The marker may be hidden in the view — fall back to the table's
-          // column list; row.data still carries its cell value.
+          // The table's columns serve two purposes: the marker may be hidden
+          // in the view, and the add-row form needs every column the view hides.
+          const tableColumns =
+            view.tableId !== undefined
+              ? await nc.getColumns(view.tableId).catch(() => [] as TablesColumn[])
+              : [];
           const markerId =
             colIdByTitle(columns, config.ORIGINAL_COLUMN) ??
-            (view.tableId !== undefined
-              ? colIdByTitle(
-                  await nc.getColumns(view.tableId).catch(() => []),
-                  config.ORIGINAL_COLUMN,
-                )
-              : undefined);
+            colIdByTitle(tableColumns, config.ORIGINAL_COLUMN);
+          // Hidden columns are absent from view row data — read the marker's
+          // value from the table's rows when the view rows don't carry it.
+          let markerByRowId: Map<number, unknown> | undefined;
+          if (
+            markerId !== undefined &&
+            view.tableId !== undefined &&
+            rows.some((r) => !(r.data ?? []).some((d) => d.columnId === markerId))
+          ) {
+            const tableRows = await nc.getRows(view.tableId).catch(() => [] as TablesRow[]);
+            markerByRowId = new Map(
+              tableRows.map((r) => [r.id, r.data?.find((d) => d.columnId === markerId)?.value]),
+            );
+          }
           const out = withRestmenge(
             withOriginal(
-              toAufmassView("view", view, columns, rows, readonlyColumnIds(view)),
+              toAufmassView(
+                "view",
+                view,
+                columns,
+                rows,
+                readonlyColumnIds(view),
+                mandatoryColumnIds(view),
+              ),
               markerId,
+              markerByRowId,
             ),
             config,
           );
+          // Marker column stays out of the form just like the grid.
+          out.allColumns = tableColumns.filter((c) => c.id !== markerId).map((c) => mapColumn(c));
+          if (out.plannedColumnId === undefined || out.verbautColumnId === undefined) {
+            req.log.info(
+              { titles: columns.map((c) => c.title), viewId: id },
+              "aufmass: planned/verbaut columns not resolved",
+            );
+          }
           return withUserNames(out, await resolveUserNames(nc, out.rows, req.log));
         }
         const [table, columns, rows] = await Promise.all([
@@ -477,8 +553,6 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     const dataSchema = z.object({ data: z.record(z.string(), z.unknown()).optional() }).strict();
-    const toData = (cells: Record<string, unknown>) =>
-      Object.entries(cells).map(([k, v]) => ({ columnId: Number(k), value: v }));
 
     api.patch("/rows/:rowId", async (req, reply) => {
       const nc = ncFor(ctx, req.user!.sub);
@@ -490,15 +564,15 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (!Number.isInteger(rowId) || rowId <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "expected {data: {columnId: value}}" });
       }
-      const row = await nc.updateRow(rowId, toData(parsed.data.data ?? {}));
+      const row = await nc.updateRow(rowId, parsed.data.data ?? {});
       const flat = flattenRow(row);
       let original: boolean | undefined;
       // Recompute restmenge so the client can swap the row in without a refetch;
       // a failing column fetch must not block the update response.
       try {
         const cols = await nc.getColumns(row.tableId);
-        const plannedId = colIdByTitle(cols, config.PLANNED_COLUMN);
-        const verbautId = colIdByTitle(cols, config.VERBAUT_COLUMN);
+        const plannedId = colIdByTitles(cols, config.PLANNED_COLUMN);
+        const verbautId = colIdByTitles(cols, config.VERBAUT_COLUMN);
         if (plannedId !== undefined && verbautId !== undefined) {
           flat.cells[String(RESTMENGE_COLUMN_ID)] = restOf(
             flat.cells[String(plannedId)],
@@ -531,7 +605,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (!type || !Number.isInteger(id) || id <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "node must be view|table and a positive id" });
       }
-      const data = toData(parsed.data.data ?? {});
+      const data = parsed.data.data ?? {};
       const row =
         type === "view" ? await nc.createRowInView(id, data) : await nc.createRowInTable(id, data);
       return reply.code(201).send(flattenRow(row));

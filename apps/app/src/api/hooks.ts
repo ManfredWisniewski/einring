@@ -314,11 +314,15 @@ export function useAufmassAddRow() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (node: TableNode) =>
-      api.post<TableRow>(`/aufmass/nodes/${node.type}/${node.id}/rows`, {}),
-    // Invalidate: view filters may keep the new (empty) row out of the result.
-    onSuccess: (_row, node) =>
-      void qc.invalidateQueries({ queryKey: keys.aufmassNode(node.type, node.id) }),
+    mutationFn: (input: { node: TableNode; data: Record<string, unknown> }) =>
+      api.post<TableRow>(`/aufmass/nodes/${input.node.type}/${input.node.id}/rows`, {
+        data: input.data,
+      }),
+    // Invalidate: view filters may keep the new row out of the result.
+    onSuccess: (_row, input) =>
+      void qc.invalidateQueries({
+        queryKey: keys.aufmassNode(input.node.type, input.node.id),
+      }),
   });
 }
 

@@ -36,6 +36,8 @@ export interface TableColumn {
   computed?: boolean;
   /** Aufmaß: view `columnSettings.readonly` — display as text, no editor. */
   readonly?: boolean;
+  /** Tables/view `mandatory` flag — required input in the add-row form. */
+  mandatory?: boolean;
   /** Column width in px from Tables `customSettings.width` — absent on older releases. */
   width?: number;
 }
@@ -74,7 +76,12 @@ export interface TableView {
   id: number;
   title: string;
   emoji?: string;
+  /** Aufmaß only: column ids of the planned/installed quantity columns. */
+  plannedColumnId?: number;
+  verbautColumnId?: number;
   columns: TableColumn[];
+  /** Aufmaß views only: full table column list for the add-row form. */
+  allColumns?: TableColumn[];
   rows: TableRow[];
 }
 

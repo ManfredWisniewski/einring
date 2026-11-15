@@ -609,7 +609,7 @@ describe("tables", () => {
     expect(patch.statusCode).toBe(200);
     expect(seen.puts).toHaveLength(1);
     expect(seen.puts[0]!.url).toContain("/api/1/rows/10");
-    expect(seen.puts[0]!.body).toEqual({ data: [{ columnId: 2, value: false }] });
+    expect(seen.puts[0]!.body).toEqual({ data: { "2": false } });
     expect(patch.json().cells["2"]).toBe(false);
 
     const created = await app.inject({

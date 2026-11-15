@@ -8,7 +8,7 @@
   "addRow": "Zeile hinzufügen",
   "deleteRow": "Zeile löschen",
   "selectPlaceholder": "Auswählen…",
-  "restmenge": "Restmenge",
+  "restmenge": "Rest",
   "lastEdit": "Bearbeitet",
   "filterColumn": "Spalte {{column}} filtern",
   "filterEmpty": "(leer)",
@@ -20,5 +20,28 @@
   "group_plan": "Planung",
   "group_monteur": "Monteur",
   "group_abrechnung": "Buchhaltung",
-  "einbauteileliste": "Einbauteileliste"
+  "einbauteileliste": "Einbauteile",
+  "deleteConfirmTitle": "Zeile löschen?",
+  "deleteConfirm": "Die Zeile wird unwiderruflich gelöscht.",
+  "cancel": "Abbrechen",
+  "addItem": "{{item}} hinzufügen",
+  "item": {
+    "bauelement": "Bauelement",
+    "kanal": "Kanal",
+    "rohr": "Rohr"
+  },
+  "hideColumns": "Spalten ein-/ausblenden",
+  "loadingList": "Liste {{list}} aus dem Aufmaß {{app}} wird geladen…",
+  "readingList": "Liste {{list}} aus dem Aufmaß {{app}} wird eingelesen…",
+  "addAmountTitle": "Menge hinzufügen",
+  "unit_kanal": "m²",
+  "unit_rohr": "m",
+  "unit_default": "m",
+  "restUnit_kanal": "m²",
+  "restUnit_rohr": "mm",
+  "restUnit_default": "",
+  "available": "Verfügbar",
+  "add": "Hinzufügen",
+  "addAmountLabel": "{{item}} {{unit}} verbaut:",
+  "exceeded": "überschritten"
 }

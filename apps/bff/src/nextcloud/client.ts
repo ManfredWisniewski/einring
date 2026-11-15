@@ -22,6 +22,8 @@ export interface TablesColumn {
   selectionOptions?: { id: number; label: string }[] | null;
   /** UI settings from the Tables app — `width` is the column's pixel width. */
   customSettings?: { width?: number } | null;
+  /** Tables `mandatory` flag (0|1 or boolean depending on the Tables version). */
+  mandatory?: boolean | number;
 }
 
 export interface TablesRow {
@@ -327,7 +329,13 @@ export class AuthenticatedNextcloud {
       init.body = JSON.stringify(body);
     }
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, init);
-    if (!res.ok) throw new NextcloudError(res.status, `${method} ${path} -> ${res.status}`);
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new NextcloudError(
+        res.status,
+        `${method} ${path} -> ${res.status}${detail ? ` — ${detail}` : ""}`,
+      );
+    }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   }
@@ -382,17 +390,19 @@ export class AuthenticatedNextcloud {
     return this.get<TablesRow[]>(`/index.php/apps/tables/api/1/views/${viewId}/rows`);
   }
 
-  // -- Row writes — v1 REST; `data` is [{columnId, value}] like the read shape.
+  // -- Row writes — v1 REST; `data` is a {"<columnId>": value} object map
+  // (NOT the [{columnId, value}] list the read shape uses — the controller
+  // iterates key => value).
 
-  createRowInTable(tableId: number, data: { columnId: number; value: unknown }[]) {
+  createRowInTable(tableId: number, data: Record<string, unknown>) {
     return this.post<TablesRow>(`/index.php/apps/tables/api/1/tables/${tableId}/rows`, { data });
   }
 
-  createRowInView(viewId: number, data: { columnId: number; value: unknown }[]) {
+  createRowInView(viewId: number, data: Record<string, unknown>) {
     return this.post<TablesRow>(`/index.php/apps/tables/api/1/views/${viewId}/rows`, { data });
   }
 
-  updateRow(rowId: number, data: { columnId: number; value: unknown }[]) {
+  updateRow(rowId: number, data: Record<string, unknown>) {
     return this.put<TablesRow>(`/index.php/apps/tables/api/1/rows/${rowId}`, { data });
   }
 

@@ -22,10 +22,12 @@ void i18n
       fr: { translation: { ...fr, modules: { ...moduleTranslations("fr"), ...fr.modules } } },
     },
     supportedLngs: supportedLanguages,
-    fallbackLng: "en",
+    fallbackLng: "de",
     interpolation: { escapeValue: false },
     detection: {
-      order: ["localStorage", "navigator"],
+      // Only the stored choice is honored — without it the fallback (de) wins,
+      // regardless of the browser's navigator language.
+      order: ["localStorage"],
       lookupLocalStorage: "einring.language",
       caches: ["localStorage"],
     },

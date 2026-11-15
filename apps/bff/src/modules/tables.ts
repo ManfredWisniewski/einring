@@ -195,8 +195,6 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     const dataSchema = z.object({ data: z.record(z.string(), z.unknown()).optional() }).strict();
-    const toData = (cells: Record<string, unknown>) =>
-      Object.entries(cells).map(([k, v]) => ({ columnId: Number(k), value: v }));
 
     api.patch("/rows/:rowId", async (req, reply) => {
       const nc = ncFor(req.user!.sub);
@@ -208,7 +206,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
       if (!Number.isInteger(rowId) || rowId <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "expected {data: {columnId: value}}" });
       }
-      const row = await nc.updateRow(rowId, toData(parsed.data.data ?? {}));
+      const row = await nc.updateRow(rowId, parsed.data.data ?? {});
       return flattenRow(row);
     });
 
@@ -224,7 +222,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
       if (!type || !Number.isInteger(id) || id <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "node must be view|table and a positive id" });
       }
-      const data = toData(parsed.data.data ?? {});
+      const data = parsed.data.data ?? {};
       const row =
         type === "view" ? await nc.createRowInView(id, data) : await nc.createRowInTable(id, data);
       return reply.code(201).send(flattenRow(row));

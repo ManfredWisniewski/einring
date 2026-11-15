@@ -8,7 +8,7 @@
   "addRow": "Add row",
   "deleteRow": "Delete row",
   "selectPlaceholder": "Select…",
-  "restmenge": "Remaining",
+  "restmenge": "Rest",
   "lastEdit": "Edited",
   "filterColumn": "Filter {{column}}",
   "filterEmpty": "(empty)",
@@ -20,5 +20,28 @@
   "group_plan": "Planning",
   "group_monteur": "Installer",
   "group_abrechnung": "Billing",
-  "einbauteileliste": "Installed parts list"
+  "einbauteileliste": "Installed parts",
+  "deleteConfirmTitle": "Delete row?",
+  "deleteConfirm": "The row will be permanently deleted.",
+  "cancel": "Cancel",
+  "addItem": "Add {{item}}",
+  "item": {
+    "bauelement": "element",
+    "kanal": "duct",
+    "rohr": "pipe"
+  },
+  "hideColumns": "Show/hide columns",
+  "loadingList": "Loading list {{list}} from the aufmass {{app}}…",
+  "readingList": "Reading list {{list}} from the aufmass {{app}}…",
+  "addAmountTitle": "Add amount",
+  "unit_kanal": "m²",
+  "unit_rohr": "m",
+  "unit_default": "m",
+  "restUnit_kanal": "m²",
+  "restUnit_rohr": "mm",
+  "restUnit_default": "",
+  "available": "Available",
+  "add": "Add",
+  "addAmountLabel": "{{item}} {{unit}} installed:",
+  "exceeded": "exceeded"
 }

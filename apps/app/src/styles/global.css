@@ -393,6 +393,7 @@ a {
 .data-table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--surface-sunken);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
@@ -417,6 +418,12 @@ a {
 
 .aufmass-row__delete {
   cursor: pointer;
+}
+
+.aufmass-row__delete:disabled {
+  color: inherit;
+  opacity: 0.125;
+  cursor: not-allowed;
 }
 
 /* Long node titles truncate instead of wrapping the header row. */
@@ -466,18 +473,52 @@ a {
   font-size: var(--font-size-xs);
 }
 
+/* Add-row entry form (one labelled control per editable column). */
+.aufmass-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.aufmass-add-form__field {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.aufmass-add-form__required {
+  color: var(--text-secondary);
+}
+
+.aufmass-add-form__error {
+  color: var(--text-danger);
+}
+
+.aufmass-add-form__mindblown {
+  font-size: 125%;
+}
+
 /* Break out of .app-main's 72rem cap — the grid spans the full viewport. */
 .aufmass-table-wrap {
   width: auto;
   margin-inline: calc(50% - 50vw + var(--space-4));
   border-radius: 0;
   border-inline: 0;
+  background: var(--surface-sunken);
+  /* No scroll container here — the page scrolls so the sticky header pins to
+   * the viewport top. Horizontal overflow scrolls the page instead. */
+  overflow: visible;
 }
 
-/* Fixed layout: customSettings.width defines exact column widths, uncapped
- * columns share the rest — the table always fills .table-wrap. */
+/* Auto layout: columns size to their content; the table only takes the
+ * wrap's full width when the content actually needs it. */
 .aufmass-table {
-  table-layout: fixed;
+  width: max-content;
+  margin-inline: auto;
+  border-inline: 1px solid var(--surface-border);
 }
 
 /* Truncated header/cell text — the span carries the ellipsis so its
@@ -493,6 +534,86 @@ a {
 .aufmass-table td {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Column cap only kicks in when the natural table width overflows the wrap
+ * (class toggled by NodeGrid's ResizeObserver measurement). */
+.aufmass-table--capped th,
+.aufmass-table--capped td {
+  max-width: 200px;
+}
+
+.aufmass-table input,
+.aufmass-table button {
+  max-width: 100%;
+}
+
+.aufmass-table tbody tr {
+  background: var(--surface-raised);
+}
+
+.aufmass-cell--right {
+  text-align: right;
+}
+
+/* Monteur unit checkboxes — text-colored border, hover ring for interactivity. */
+.aufmass-table [data-slot="checkbox"] {
+  cursor: pointer;
+  border-color: var(--text-primary);
+}
+
+/* Verbaut "+" button (Kanal/Rohr monteur) — same square style as the checkbox. */
+.aufmass-verbaut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* Row PATCH spinner — sits at the right edge of its cell/flex row. */
+.aufmass-cell__loader {
+  display: block;
+  margin-inline-start: auto;
+}
+
+.aufmass-verbaut__add {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 2px solid var(--text-primary);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.aufmass-verbaut__add:not(:disabled):hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.aufmass-verbaut__add:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.aufmass-table [data-slot="checkbox"]:not(:disabled):hover {
+  border-color: var(--color-primary);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Cell/filter inputs size to their value so editable columns stay
+ * max-content narrow (`size` attr is the no-field-sizing fallback). */
+.aufmass-cell-input {
+  field-sizing: content;
+  min-width: var(--space-12);
 }
 
 /* Filter row sticks below the title row (title th height ≈ padding + line). */

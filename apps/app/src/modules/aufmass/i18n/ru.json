@@ -22,5 +22,28 @@
   "group_plan": "Планирование",
   "group_monteur": "Монтажник",
   "group_abrechnung": "Биллинг",
-  "einbauteileliste": "Ведомость встраиваемых изделий"
+  "einbauteileliste": "Установленные детали",
+  "deleteConfirmTitle": "Удалить строку?",
+  "deleteConfirm": "Строка будет удалена безвозвратно.",
+  "cancel": "Отмена",
+  "addItem": "Добавить {{item}}",
+  "item": {
+    "bauelement": "элемент",
+    "kanal": "канал",
+    "rohr": "трубу"
+  },
+  "hideColumns": "Показать/скрыть столбцы",
+  "loadingList": "Загрузка списка {{list}} из замера {{app}}…",
+  "readingList": "Чтение списка {{list}} из замера {{app}}…",
+  "addAmountTitle": "Добавить количество",
+  "unit_kanal": "м²",
+  "unit_rohr": "м",
+  "unit_default": "м",
+  "restUnit_kanal": "м²",
+  "restUnit_rohr": "мм",
+  "restUnit_default": "",
+  "available": "Доступно",
+  "add": "Добавить",
+  "addAmountLabel": "{{item}} {{unit}} установлено:",
+  "exceeded": "превышено"
 }
