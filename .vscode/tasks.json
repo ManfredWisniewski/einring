@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "problemMatcher": [],
+            "label": "pull-on-open",
+            "command": "bash",
+            "args": [
+                "-c",
+                "git pull --ff-only --autostash; git submodule update --init --recursive; if [ -d +wit ]; then b=$(git config -f .gitmodules --get submodule.+wit.branch); [ -n \"$b\" ] && git -C +wit checkout -q \"$b\"; git -C +wit pull --ff-only --autostash; fi; [ -f scripts/sync-agent-skills.sh ] && bash scripts/sync-agent-skills.sh sync; true"
+            ],
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared",
+                "close": true
+            }
+        }
+    ]
+}
