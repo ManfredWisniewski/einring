@@ -12,6 +12,9 @@
   "selectPlaceholder": "Выбрать…",
   "restmenge": "Остаток",
   "lastEdit": "Изменено",
+  "filterColumn": "Фильтр {{column}}",
+  "filterEmpty": "(пусто)",
+  "clearFilters": "Сбросить фильтры",
   "error": "Не удалось загрузить данные ({{status}}).",
   "retry": "Повторить"
 }

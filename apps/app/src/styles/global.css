@@ -424,6 +424,32 @@ a {
   margin-inline-start: auto;
 }
 
+/* Filter row sticks below the title row (title th height ≈ padding + line). */
+.aufmass-table thead tr:nth-child(2) th {
+  top: calc(var(--space-2) * 2 + 1.4em);
+  font-weight: var(--font-weight-regular);
+}
+
+.aufmass-filter__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.aufmass-filter__trigger:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.aufmass-filter__count {
+  font-size: var(--font-size-xs);
+}
+
 /* Break out of .app-main's 72rem cap — the grid spans the full viewport. */
 .aufmass-table-wrap {
   width: auto;

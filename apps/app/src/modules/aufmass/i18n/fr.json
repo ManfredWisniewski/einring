@@ -11,6 +11,9 @@
   "selectPlaceholder": "Choisir…",
   "restmenge": "Restant",
   "lastEdit": "Modifié",
+  "filterColumn": "Filtrer {{column}}",
+  "filterEmpty": "(vide)",
+  "clearFilters": "Réinitialiser les filtres",
   "error": "Les données n'ont pas pu être chargées ({{status}}).",
   "retry": "Réessayer"
 }

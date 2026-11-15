@@ -10,6 +10,9 @@
   "selectPlaceholder": "Select…",
   "restmenge": "Remaining",
   "lastEdit": "Edited",
+  "filterColumn": "Filter {{column}}",
+  "filterEmpty": "(empty)",
+  "clearFilters": "Clear all filters",
   "error": "The data could not be loaded ({{status}}).",
   "retry": "Retry"
 }

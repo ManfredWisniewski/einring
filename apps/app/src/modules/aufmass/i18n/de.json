@@ -10,6 +10,9 @@
   "selectPlaceholder": "Auswählen…",
   "restmenge": "Restmenge",
   "lastEdit": "Bearbeitet",
+  "filterColumn": "Spalte {{column}} filtern",
+  "filterEmpty": "(leer)",
+  "clearFilters": "Alle Filter zurücksetzen",
   "error": "Die Daten konnten nicht geladen werden ({{status}}).",
   "retry": "Erneut versuchen"
 }
