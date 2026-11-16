@@ -82,7 +82,7 @@
 
 - Entering the app via `?embedded=nextcloud` marks the tab embedded (sessionStorage — survives SPA navigation); Authentik login is skipped and the "Connect Nextcloud" card is the sign-in.
 - `POST /api/nextcloud/login-flow` without a bearer token returns `{login, flow}`; poll takes `{flow}` and pending flows expire after 10 minutes.
-- Completing the poll anonymously stores the credential under `nc:<loginName>` and returns a `sessionToken`; the app stores it and sends it as `Authorization: Bearer` — it authenticates all `/api/*` routes like an Authentik JWT (`/api/me` answers the session's `sub`).
+- Completing the poll anonymously stores the credential under `nc:<loginName>` and returns a `sessionToken`; the app stores it and sends it as `Authorization: Bearer` — it authenticates all `/api/*` routes like an Authentik JWT (`/api/me` answers the session's `sub`). With `EMBEDDED_CLAIM_REQUIRED=true` the poll instead answers `awaiting_claim` and only `POST /login-flow/claim {flow, code}` releases the session (A34).
 - The app password never appears in any response, including the session-minting poll response.
 - A poll without `flow` gets 400; an unknown/expired `flow` gets 409.
 - `DELETE /api/nextcloud/connection` removes the credential AND the user's sessions — the dead token gets 401.
@@ -276,6 +276,7 @@
 - `POST /api/nextcloud/login-flow` returns `{login, flow}` for every caller; upstream `login`/`poll.endpoint` outside the configured `NEXTCLOUD_URL` origin are rejected.
 - `POST /login-flow/poll` requires the flow id and returns `pending` → `awaiting_claim` — never a credential or session. The completed app password stays parked on the flow.
 - On upstream completion the BFF writes `einring-sign-in-<6-digit-code>.txt` into the completer's own Nextcloud files; `POST /login-flow/claim {flow, code}` is the only path that stores the credential (Authentik callers → own `sub`; anonymous → `nc:<login>` + einring session token).
+- Exception: anonymous-initiated (embedded) flows skip the claim step by default — the completing poll stores the credential on `nc:<login>` and returns the session token directly, and no claim file is written. `EMBEDDED_CLAIM_REQUIRED=true` restores the claim step; Authentik-initiated flows are always claim-bound.
 - Wrong codes → 401 (attempts capped per flow); rate limits bound flow start/poll/claim per IP; abandoned `login_flows` rows are pruned.
 - `DELETE /nextcloud/connection` and credential replacement revoke the superseded app password upstream (`DELETE /ocs/v2.php/core/apppassword`) — failures are logged/surfaced.
 - The app shows a code-entry step between polling and "connected".

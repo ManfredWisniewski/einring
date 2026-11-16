@@ -162,6 +162,35 @@ export function registerNextcloudPublicRoutes(api: FastifyInstance, ctx: AppCont
     if (pending.appPasswordSealed) return { status: "awaiting_claim" };
     const result = await nextcloud.pollLoginFlow(pending.pollEndpoint, pending.pollToken);
     if (!result) return { status: "pending", login: pending.upstreamLogin ?? "" };
+    // Embedded deployments default to one-step completion: the finished upstream
+    // login is itself the proof, so the credential lands on nc:<login> and the
+    // session goes straight to the poller. EMBEDDED_CLAIM_REQUIRED restores the
+    // completer-bound claim step; authed-initiated flows always keep it.
+    if (!pending.initiatorSub && !user && !ctx.config.EMBEDDED_CLAIM_REQUIRED) {
+      const cred: NextcloudCredential = {
+        sub: `${EMBEDDED_SUB_PREFIX}${result.loginName}`,
+        server: result.server,
+        loginName: result.loginName,
+        appPasswordSealed: secrets.seal(result.appPassword),
+      };
+      const old = store.getCredential(cred.sub);
+      store.saveCredential(cred);
+      store.deletePendingFlow(pending.sub);
+      if (old) void revokeCredential(ctx, old, request.log);
+      const sessionToken = randomBytes(32).toString("base64url");
+      store.saveSession(
+        hashToken(sessionToken),
+        cred.sub,
+        new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+      );
+      return {
+        status: "connected",
+        loginName: cred.loginName,
+        displayName: await resolveDisplayName(ctx, cred),
+        server: cred.server,
+        sessionToken,
+      };
+    }
     // Upstream login finished: park the credential on the flow and drop the
     // claim code where only the completing user can read it — their own files.
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");

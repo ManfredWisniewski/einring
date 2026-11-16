@@ -1,11 +1,12 @@
 import { Browser } from "@capacitor/browser";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useClaimLoginFlow, usePollLoginFlow, useStartLoginFlow } from "~/api/hooks";
 import { useAuth } from "~/auth/AuthProvider";
 import { isNative } from "~/config";
+import { isEmbedded } from "~/embedded";
 import { useInstanceName } from "~/instance";
 
 const POLL_INTERVAL_MS = 2000;
@@ -41,7 +42,7 @@ export function NextcloudConnect() {
   }, [loginUrl, poll, flowId, awaitingClaim]);
 
   useEffect(() => {
-    const data = poll.data ?? claim.data;
+    const data = claim.data ?? poll.data;
     if (poll.data?.status === "awaiting_claim") {
       setAwaitingClaim(true);
       if (timer.current) clearInterval(timer.current);
@@ -55,12 +56,22 @@ export function NextcloudConnect() {
     }
   }, [poll.data, claim.data, setSession]);
 
-  const begin = async () => {
+  const begin = useCallback(async () => {
     const { login, flow } = await start.mutateAsync();
     setFlowId(flow);
     setLoginUrl(login);
     await openLogin(login);
-  };
+  }, [start]);
+
+  // Embedded sign-in: this card is the login, so start the flow on mount instead
+  // of waiting for a click. If the gesture-less window.open gets popup-blocked,
+  // the "open again" button below remains the one manual step.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!isEmbedded() || autoStarted.current) return;
+    autoStarted.current = true;
+    void begin();
+  }, [begin]);
 
   const submitCode = () => {
     if (flowId && code.trim()) claim.mutate({ flow: flowId, code: code.trim() });

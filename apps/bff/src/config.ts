@@ -17,6 +17,16 @@ const schema = z.object({
     (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
     z.boolean().default(true),
   ),
+  /**
+   * Require the claim-code step for anonymous (embedded) login flows — the BFF
+   * writes `einring-sign-in-<code>.txt` into the completer's files and only a
+   * matching `POST /login-flow/claim` releases the session. Unset = off: the
+   * completed upstream login itself mints the session on poll.
+   */
+  EMBEDDED_CLAIM_REQUIRED: z.preprocess(
+    (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
+    z.boolean().default(false),
+  ),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default("0.0.0.0"),
   DATA_DIR: z.string().default("./data"),

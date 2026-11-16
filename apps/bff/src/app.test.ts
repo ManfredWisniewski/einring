@@ -280,9 +280,14 @@ describe("nextcloud login flow", () => {
 
 describe("embedded login flow (anonymous)", () => {
   /** App whose verifier accepts the test JWT and real session tokens. */
-  async function embeddedApp(state: { finished: boolean }, capture: { code?: string } = {}) {
+  async function embeddedApp(
+    state: { finished: boolean },
+    capture: { code?: string } = {},
+    env: Record<string, string> = {},
+  ) {
     const store = openStore(":memory:");
     const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), ...env }),
       store,
       fetchImpl: nextcloudFlowFake(state, capture),
       verifyToken: createCompositeVerifier(async (token) => {
@@ -293,10 +298,46 @@ describe("embedded login flow (anonymous)", () => {
     return { app, store, auth };
   }
 
-  it("mints a session only on claim — a flow-id holder gains nothing", async () => {
+  it("completes an anonymous flow on poll — session minted without a claim code", async () => {
     const state = { finished: false };
     const capture: { code?: string } = {};
     const { app, store } = await embeddedApp(state, capture);
+
+    let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" });
+    const { flow } = res.json() as { flow: string };
+
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow },
+    });
+    expect(res.json()).toEqual({ status: "pending", login: LOGIN_URL });
+
+    state.finished = true;
+    res = await app.inject({
+      method: "POST",
+      url: "/api/nextcloud/login-flow/poll",
+      payload: { flow },
+    });
+    const body = res.json() as { status: string; sessionToken?: string };
+    expect(body.status).toBe("connected");
+    expect(body.sessionToken).toBeTruthy();
+    // No claim file was written; the credential landed on the flow poll directly.
+    expect(capture.code).toBeUndefined();
+    expect(store.getCredential("nc:frodo")?.appPasswordSealed).toBeDefined();
+    expect(JSON.stringify(body)).not.toContain("app-pw-secret");
+
+    const sessionAuth = { authorization: `Bearer ${body.sessionToken}` };
+    res = await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth });
+    expect(res.json()).toEqual({ sub: "nc:frodo" });
+  });
+
+  it("with EMBEDDED_CLAIM_REQUIRED, mints a session only on claim — a flow-id holder gains nothing", async () => {
+    const state = { finished: false };
+    const capture: { code?: string } = {};
+    const { app, store } = await embeddedApp(state, capture, {
+      EMBEDDED_CLAIM_REQUIRED: "true",
+    });
 
     let res = await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" });
     expect(res.statusCode).toBe(200);
@@ -382,17 +423,15 @@ describe("embedded login flow (anonymous)", () => {
 
   it("disconnecting deletes the session — a dead token gets 401", async () => {
     const state = { finished: true };
-    const capture: { code?: string } = {};
-    const { app } = await embeddedApp(state, capture);
+    const { app } = await embeddedApp(state);
     const { flow } = (
       await app.inject({ method: "POST", url: "/api/nextcloud/login-flow" })
     ).json() as { flow: string };
-    await app.inject({
+    const res = await app.inject({
       method: "POST",
       url: "/api/nextcloud/login-flow/poll",
       payload: { flow },
     });
-    const res = await claimFlow(app, flow, capture);
     const sessionAuth = { authorization: `Bearer ${res.json().sessionToken}` };
     expect(
       (await app.inject({ method: "GET", url: "/api/me", headers: sessionAuth })).statusCode,

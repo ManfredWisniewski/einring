@@ -287,6 +287,8 @@ The app can run inside a Nextcloud **External sites** iframe — Authentik login
 
 How it works: the anonymous login flow is keyed by a random `flow` id; when it completes, the BFF mints an opaque session token (`nc:<loginName>` identity, 30-day expiry, stored hashed) that the app sends as `Bearer` for all API calls. The Nextcloud app password still never leaves the BFF. The `?embedded` flag lives in sessionStorage, so it can't leak into a standalone tab of the same deployment.
 
+Optional hardening: `EMBEDDED_CLAIM_REQUIRED=true` adds a claim step — after the Nextcloud login completes, the BFF writes `einring-sign-in-<6-digit-code>.txt` into the user's own files and only releases the session to a caller presenting that code. This binds the session to the party that actually logged in (an unclaimed `flow` id is a bearer capability otherwise). Standalone Authentik flows always require the code, regardless of this setting.
+
 ## Updating
 
 Push to `main` (or tag `v*`) — CI publishes a new image. Then on the host:
