@@ -121,6 +121,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     tagline: deps.config.INSTANCE_TAGLINE,
     cssVars: deps.config.INSTANCE_CSS_VARS,
     theme: deps.config.INSTANCE_THEME,
+    // D68: false hides module-discovery surfaces (nav search/tags, Modules menu entry).
+    nav: deps.config.EINRING_NAV,
     // Public OIDC client settings — the SPA prefers these over its baked VITE_* values
     // so one image serves deployments with different Authentik providers.
     authentik: {

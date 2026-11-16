@@ -201,6 +201,7 @@ MODULES=wiki                                       # restrict the module set per
 - `INSTANCE_TAGLINE` — login-page tagline; unset keeps the Einring default, empty string hides it
 - `INSTANCE_THEME` — named biti theme shipped with the image (`apps/bff/themes/<name>.json`, today: `wuttke`); injected per color scheme into `index.html`. Unknown names or malformed files refuse startup
 - `INSTANCE_CSS_VARS` — JSON map of `--var:value` injected as `:root{…}` into `index.html` before first paint; emitted after the theme, so explicit overrides win. Set the full accent set (`--accent-base`, `--accent-hover`, `--accent-subtle`, `--accent-subtle-fg`, `--accent-fg`) or subtler shades will stay neutral
+- `EINRING_NAV` — `false` hides module-discovery UI: the nav sidebar's search/tag filter and the Menu's Modules entry (D68). Display gate only — `GET /api/modules` and module routes keep answering; default `true`
 - `MODULES` — limits which modules the instance exposes (BFF registry is the source of truth)
 
 The SPA gets its Authentik issuer/client-id from `GET /api/config` at runtime, so each container uses its own `AUTHENTIK_ISSUER`/`AUTHENTIK_CLIENT_ID` env — the `VITE_AUTHENTIK_*` build args are only a fallback. A whitelabel instance can therefore sign in via its own Authentik provider on the same image. The Android app's identity (`de.wit.einring`, icon) is **not** whitelabeled — branded mobile builds would need a separate Capacitor package.

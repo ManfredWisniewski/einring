@@ -9,6 +9,8 @@ interface InstanceConfig {
   cssVars?: Record<string, string>;
   /** Named biti theme (INSTANCE_THEME): einring CSS var maps per color scheme. */
   theme?: { light?: Record<string, string>; dark?: Record<string, string> };
+  /** EINRING_NAV (D68): false hides module-discovery surfaces. */
+  nav?: boolean;
   /** Runtime OIDC client settings — preferred over the baked VITE_* values. */
   authentik?: { issuer?: string; clientId?: string };
 }
@@ -37,6 +39,11 @@ export function useInstanceTagline(): string | undefined {
   return useSyncExternalStore(subscribe, () => current.tagline);
 }
 
+/** EINRING_NAV (D68): false = hide module-discovery surfaces. Absent field = shown. */
+export function useNav(): boolean {
+  return useSyncExternalStore(subscribe, () => current.nav !== false);
+}
+
 let inflight: Promise<void> | undefined;
 
 /** Memoized: main.tsx kicks this off at startup; auth code awaits the same promise so the
@@ -57,6 +64,7 @@ async function doLoad(): Promise<void> {
         name: body.name?.trim() || DEFAULT_NAME,
         tagline: body.tagline,
         cssVars: body.cssVars,
+        nav: body.nav,
       };
       // Dev mode serves index.html unpatched — apply brand overrides here too.
       if (body.theme) {

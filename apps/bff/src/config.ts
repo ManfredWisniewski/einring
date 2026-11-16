@@ -27,6 +27,15 @@ const schema = z.object({
     (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
     z.boolean().default(false),
   ),
+  /**
+   * Hide the module-discovery UI surfaces (nav search/tags controls, the
+   * Menu's Modules entry) for whitelabel deployments (D68). Unset = shown;
+   * display gate only — `/api/modules` and module routes keep answering.
+   */
+  EINRING_NAV: z.preprocess(
+    (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
+    z.boolean().default(true),
+  ),
   PORT: z.coerce.number().int().default(3000),
   HOST: z.string().default("0.0.0.0"),
   DATA_DIR: z.string().default("./data"),

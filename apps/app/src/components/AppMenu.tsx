@@ -16,7 +16,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "~/api/hooks";
-import { useInstanceName } from "~/instance";
+import { useInstanceName, useNav } from "~/instance";
 
 type DialogId = "modules" | "info";
 
@@ -94,6 +94,8 @@ function InfoDialog({ close }: { close: () => void }) {
 /** Header hamburger: Modules (per-user activation) + Info (was the standalone info button). */
 export function AppMenu() {
   const { t } = useTranslation();
+  // D68: EINRING_NAV=false removes the Modules entry (and with it the Modules dialog).
+  const nav = useNav();
   const [open, setOpen] = useState<DialogId | null>(null);
   return (
     <>
@@ -106,9 +108,11 @@ export function AppMenu() {
         </Button>
         <Popover placement="bottom end">
           <Menu className="app-menu" onAction={(key) => setOpen(key as DialogId)}>
-            <MenuItem id="modules" className="app-menu__item">
-              {t("menu.modules")}
-            </MenuItem>
+            {nav && (
+              <MenuItem id="modules" className="app-menu__item">
+                {t("menu.modules")}
+              </MenuItem>
+            )}
             <MenuItem id="info" className="app-menu__item">
               {t("menu.info")}
             </MenuItem>

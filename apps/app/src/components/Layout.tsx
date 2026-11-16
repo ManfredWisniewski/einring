@@ -14,7 +14,7 @@ import {
   useNextcloudSettings,
 } from "~/api/hooks";
 import { useAuth } from "~/auth/AuthProvider";
-import { useInstanceName } from "~/instance";
+import { useInstanceName, useNav } from "~/instance";
 import { moduleTitle, resolveAppModules } from "~/modules";
 import { AppMenu } from "./AppMenu";
 import { LanguageSelect, ThemeSelect } from "./Settings";
@@ -22,6 +22,8 @@ import { LanguageSelect, ThemeSelect } from "./Settings";
 export function Layout() {
   const { t, i18n } = useTranslation();
   const name = useInstanceName();
+  // D68: EINRING_NAV=false hides the module finder (search + tag filter).
+  const nav = useNav();
   const { user, logout } = useAuth();
   const registry = useModuleRegistry(!!user);
   // Per-user Nextcloud feature toggles (D46) hide whole modules from the nav.
@@ -90,6 +92,7 @@ export function Layout() {
       </header>
       {user && navModules.length > 0 && (
         <nav className="app-nav" aria-label={t("nav.label")}>
+          {nav && (
           <div className="app-nav__controls">
             <Input
               type="search"
@@ -130,6 +133,7 @@ export function Layout() {
               </Popover>
             </MenuTrigger>
           </div>
+          )}
           {sorted.length === 0 && <p className="muted app-nav__empty">{t("nav.noMatches")}</p>}
           <div className="app-nav__links">
             {sorted.map((m) => (

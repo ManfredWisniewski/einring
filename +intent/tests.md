@@ -370,3 +370,8 @@
 - `MODULE_TALK_ROOMS=<token,token>` scopes the talk module's surface to the listed Talk conversation tokens: `GET /api/talk/rooms` returns only allowed rooms plus `{member:false}` stubs for allowed tokens the user hasn't joined; the EinHub unread poll filters to the same set. Unset = all rooms (unchanged). Message/image/file routes keep answering any token — filter semantics (preference), not authorization.
 - A single resolved room auto-opens its conversation without the room list; multiple rooms keep the list. Rooms the user hasn't joined show a localized "not a member" hint; opening one surfaces the upstream error.
 - `MODULE_<ID>_TITLE=<literal>` overrides any module's display name for the deployment: `GET /api/modules` carries it as `title`, and nav links, nav sort/search, the settings gear aria-label and the Modules dialog use it instead of the i18n key. Unset = i18n title; single literal across locales.
+
+### A45 Module-finder nav gate (D68)
+
+- `EINRING_NAV=false` hides the two module-discovery surfaces: the nav sidebar's search/tags controls and the Menu's Modules entry. Unset or any truthy value = current behavior (bool parsing: only `0`/`false`/`no`/`off`, case-insensitive, mean false). Display gate only — `GET /api/modules` and all module routes keep answering.
+- The flag ships on the public `GET /api/config` response as `nav`; older images ignore the unknown env var.

@@ -49,6 +49,7 @@ describe("instance config", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       name: "Einring",
+      nav: true,
       authentik: {
         issuer: "https://auth.test/application/o/einring/",
         clientId: "einring-client",
@@ -70,6 +71,7 @@ describe("instance config", () => {
       name: "Portal",
       tagline: "",
       cssVars: { "--accent-base": "#b91c1c", "--accent-subtle": "#fee2e2" },
+      nav: true,
       authentik: {
         issuer: "https://auth.test/application/o/einring/",
         clientId: "einring-client",
@@ -84,6 +86,7 @@ describe("instance config", () => {
     const res = await app.inject({ method: "GET", url: "/api/config" });
     expect(res.json()).toEqual({
       name: "Einring",
+      nav: true,
       authentik: {
         issuer: "https://auth.test/application/o/einring/",
         clientId: "einring-client",
@@ -93,6 +96,17 @@ describe("instance config", () => {
         dark: expect.objectContaining({ "--surface-base": "#000000" }),
       }),
     });
+  });
+
+  it("exposes nav:false when EINRING_NAV disables module discovery (D68)", async () => {
+    const { app } = await testApp({
+      config: loadConfig({ ...testEnv(), EINRING_NAV: "false" }),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/config" });
+    expect(res.json().nav).toBe(false);
+    // Modules and routes stay reachable — display gate only.
+    const modules = await app.inject({ method: "GET", url: "/api/modules" });
+    expect([200, 401]).toContain(modules.statusCode);
   });
 
   it("fails config on an unknown or malformed INSTANCE_THEME", () => {
