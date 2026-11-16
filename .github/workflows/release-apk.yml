@@ -16,6 +16,7 @@ jobs:
         with:
           # +wit is not needed for the build; its ssh remote is unreachable from CI.
           submodules: false
+      - run: git submodule update --init biti # @/ alias target for the web build
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

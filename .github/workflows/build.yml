@@ -21,6 +21,7 @@ jobs:
         with:
           # +wit is in .dockerignore; its ssh:// remote is unreachable from CI anyway.
           submodules: false
+      - run: git submodule update --init biti # Docker context needs biti/ for the in-image web build
 
       - uses: docker/setup-qemu-action@v3
 

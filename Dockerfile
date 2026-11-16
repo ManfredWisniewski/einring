@@ -13,6 +13,8 @@ COPY tsconfig.base.json ./
 COPY packages/tokens packages/tokens
 COPY apps/bff apps/bff
 COPY apps/app apps/app
+# UI component sources live in the biti submodule (vite/tsconfig `@/` alias).
+COPY biti biti
 
 # Public OIDC settings are baked into the web bundle at build time (no secrets).
 ARG VITE_AUTHENTIK_ISSUER
