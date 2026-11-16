@@ -85,6 +85,7 @@ const options = (config: NavidromeConfig): ConnectorOptions => ({
 
 export const navidromeModule: BffModule<NavidromeConfig> = {
   id: "navidrome",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

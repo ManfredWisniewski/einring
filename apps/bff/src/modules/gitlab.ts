@@ -84,6 +84,7 @@ async function listTodos(ctx: AppContext, sub: string, limit: number) {
 
 export const gitlabModule: BffModule<GitLabConfig> = {
   id: "gitlab",
+  version: "0.1.0",
   configSchema,
 
   notifications(ctx) {

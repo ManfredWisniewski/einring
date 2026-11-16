@@ -53,6 +53,7 @@ const options = (config: AudiobookshelfConfig): ConnectorOptions => ({
 
 export const audiobookshelfModule: BffModule<AudiobookshelfConfig> = {
   id: "audiobookshelf",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

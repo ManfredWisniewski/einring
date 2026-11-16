@@ -14,6 +14,12 @@ export interface ModuleRoute {
 export interface AppModule {
   /** Stable id; must match the BFF module id when `hasBackend` is set. */
   id: string;
+  /**
+   * Semver feature level (D69). Backend modules carry it on `BffModule` and get
+   * it attached by `resolveAppModules` from the registry; frontend-only modules
+   * (no `/api/modules` entry) set it here directly.
+   */
+  version?: string;
   /** Module consumes `/api/<id>/*` and is gated by the BFF registry. */
   hasBackend?: boolean;
   /**

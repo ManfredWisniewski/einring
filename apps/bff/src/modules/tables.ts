@@ -115,6 +115,7 @@ function toTableView(
 
 export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
   id: "tables",
+  version: "0.1.0",
   requires: ["nextcloud"],
   configSchema,
   register(api: FastifyInstance, ctx, config) {

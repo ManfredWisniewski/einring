@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "~/api/hooks";
 import { useInstanceName, useNav } from "~/instance";
+import { moduleTitle, resolveAppModules } from "~/modules";
 
 type DialogId = "modules" | "info";
 
@@ -82,11 +83,23 @@ function ModulesDialog({ close }: { close: () => void }) {
 function InfoDialog({ close }: { close: () => void }) {
   const { t } = useTranslation();
   const name = useInstanceName();
+  const registry = useModuleRegistry();
+  const modules = resolveAppModules(registry.data);
   return (
     <div className="stack">
       <DialogHeader title={t("info.title", { name })} close={close} />
       <p>{t("info.description", { name })}</p>
       <p className="muted">{t("info.version", { version: "0.1.0" })}</p>
+      <div>
+        <span className="muted">{t("info.modules")}</span>
+        <ul className="info-modules">
+          {modules.map((m) => (
+            <li key={m.id}>
+              {moduleTitle(m, t)} <span className="muted">{m.version ?? "—"}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ function ncFor(ctx: AppContext, sub: string): AuthenticatedNextcloud | null {
  */
 export const passmanModule: BffModule = {
   id: "passman",
+  version: "0.1.0",
   requires: ["nextcloud"],
   register(api, ctx) {
     api.get("/vaults", async (req, reply) => {

@@ -115,6 +115,7 @@ async function readRecipe(
  */
 export const recipesModule: BffModule<z.infer<typeof configSchema>> = {
   id: "recipes",
+  version: "0.1.0",
   requires: ["nextcloud"],
   configSchema,
 

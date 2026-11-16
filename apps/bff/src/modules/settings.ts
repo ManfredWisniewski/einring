@@ -27,6 +27,7 @@ export function disabledModules(ctx: AppContext, sub: string): Set<string> {
 /** Per-user module activation preferences (D47) — the header "Modules" dialog. */
 export const settingsModule: BffModule = {
   id: "settings",
+  version: "0.1.0",
   register(api, ctx) {
     api.get("/modules", async (req) => ({
       disabled: [...disabledModules(ctx, req.user.sub)],

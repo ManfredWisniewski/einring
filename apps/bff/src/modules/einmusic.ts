@@ -58,6 +58,7 @@ const configSchema = z.object({
 
 export const einmusicModule: BffModule<z.infer<typeof configSchema>> = {
   id: "einmusic",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

@@ -147,6 +147,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       api.get("/modules", async () => ({
         modules: modules.map(({ module, title }) => ({
           id: module.id,
+          version: module.version,
           requires: module.requires ?? [],
           title,
         })),

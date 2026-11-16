@@ -256,6 +256,7 @@ async function listContacts(nc: AuthenticatedNextcloud, book: string) {
  */
 export const eindavModule: BffModule = {
   id: "eindav",
+  version: "0.1.0",
   requires: ["nextcloud"],
 
   chatTools(ctx): ChatTool[] {

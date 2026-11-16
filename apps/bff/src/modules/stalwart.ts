@@ -177,6 +177,7 @@ async function info(
 
 export const stalwartModule: BffModule<StalwartConfig> = {
   id: "stalwart",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

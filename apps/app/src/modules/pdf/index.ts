@@ -10,6 +10,7 @@ const PdfPage = lazy(() => import("./PdfPage").then((m) => ({ default: m.PdfPage
 /** Frontend-only PDF viewer — no BFF counterpart (D49). */
 export const pdfModule: AppModule = {
   id: "pdf",
+  version: "0.1.0",
   nav: { i18nKey: "modules.pdf.nav", group: "data" },
   routes: [{ path: "/pdf", Component: PdfPage }],
   i18n: { de, en, fr, ru },

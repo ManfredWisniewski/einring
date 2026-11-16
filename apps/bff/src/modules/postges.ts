@@ -54,6 +54,7 @@ function displayUrl(raw: string): string | null {
  */
 export const postgesModule: BffModule<PostgesConfig> = {
   id: SERVICE,
+  version: "0.1.0",
   configSchema,
   register(api, ctx, config) {
     const pgOpen: PgOpen = ctx.pgOpen ?? openPg;

@@ -88,6 +88,8 @@ export interface TableView {
 /** A module enabled on the BFF; `requires` lists the services it consumes. */
 export interface ModuleInfo {
   id: string;
+  /** Semver feature level from the module manifest (D69). */
+  version: string;
   requires: string[];
   /** Deployment display-name override from `MODULE_<ID>_TITLE` (D67). */
   title?: string;

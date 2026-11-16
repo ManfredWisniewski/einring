@@ -35,6 +35,7 @@ const configSchema = z.object({
  */
 export const schoolModule: BffModule<z.infer<typeof configSchema>> = {
   id: "school",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx, config): ChatTool[] {

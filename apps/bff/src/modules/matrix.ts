@@ -85,6 +85,7 @@ const senderName = (sender?: string) =>
  */
 export const matrixModule: BffModule<z.infer<typeof configSchema>> = {
   id: "matrix",
+  version: "0.1.0",
   configSchema,
 
   notifications(ctx) {

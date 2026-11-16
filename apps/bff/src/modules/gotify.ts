@@ -157,6 +157,7 @@ const options = (config: GotifyConfig): ConnectorOptions => ({
 
 export const gotifyModule: BffModule<GotifyConfig> = {
   id: "gotify",
+  version: "0.1.0",
   configSchema,
 
   notifications(ctx) {

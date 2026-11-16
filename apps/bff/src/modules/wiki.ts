@@ -290,6 +290,7 @@ const configSchema = z.object({
 
 export const wikiModule: BffModule<z.infer<typeof configSchema>> = {
   id: "wiki",
+  version: "0.1.0",
   requires: ["nextcloud"],
   configSchema,
 

@@ -48,6 +48,7 @@ export function loadFeatures(ctx: AppContext, sub: string): NextcloudFeatures {
 
 export const nextcloudModule: BffModule = {
   id: "nextcloud",
+  version: "0.1.0",
   requires: ["nextcloud"],
 
   register(api, ctx) {

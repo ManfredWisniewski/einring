@@ -67,6 +67,7 @@ const MIME: Record<string, string> = {
  */
 export const talkModule: BffModule<TalkConfig> = {
   id: "talk",
+  version: "0.1.0",
   requires: ["nextcloud"],
   configSchema,
 

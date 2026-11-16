@@ -41,7 +41,8 @@
     "close": "Close information",
     "title": "About {{name}}",
     "description": "{{name}} provides one interface for managing connected services.",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "modules": "Modules"
   },
   "nextcloud": {
     "title": "Nextcloud",

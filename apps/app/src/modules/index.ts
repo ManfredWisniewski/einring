@@ -68,6 +68,7 @@ export const appModules: AppModule[] = [
  */
 export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
   const backendEnabled = new Set(registry?.modules.map((m) => m.id) ?? []);
+  const versions = new Map((registry?.modules ?? []).map((m) => [m.id, m.version] as const));
   const titles = new Map(
     (registry?.modules ?? [])
       .filter((m) => m.title !== undefined)
@@ -81,7 +82,13 @@ export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
     )
     .map((m) => {
       const title = titles.get(m.id);
-      return title === undefined ? m : { ...m, title };
+      const version = versions.get(m.id);
+      if (title === undefined && version === undefined) return m;
+      return {
+        ...m,
+        ...(title !== undefined && { title }),
+        ...(version !== undefined && { version }),
+      };
     });
 }
 

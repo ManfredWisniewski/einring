@@ -47,6 +47,7 @@ const options = (config: TrekConfig): ConnectorOptions => ({
 
 export const trekModule: BffModule<TrekConfig> = {
   id: "trek",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

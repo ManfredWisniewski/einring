@@ -32,6 +32,7 @@ const rpcError = (id: JsonRpcRequest["id"], code: number, message: string) => ({
 
 export const einchatMcpModule: BffModule = {
   id: "einchat-mcp",
+  version: "0.1.0",
   register(api, ctx) {
     api.get("/tokens", async (req) => ({ tokens: ctx.store.listMcpTokens(req.user.sub) }));
 

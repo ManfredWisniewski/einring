@@ -7,9 +7,9 @@ vi.mock("~/api/hooks", () => ({
   useModuleRegistry: () => ({
     data: {
       modules: [
-        { id: "einhub", requires: [] },
-        { id: "wiki", requires: ["nextcloud"] },
-        { id: "settings", requires: [] },
+        { id: "einhub", version: "0.1.0", requires: [] },
+        { id: "wiki", version: "0.1.0", requires: ["nextcloud"] },
+        { id: "settings", version: "0.1.0", requires: [] },
       ],
     },
   }),

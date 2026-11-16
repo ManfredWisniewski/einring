@@ -14,6 +14,7 @@ interface Source {
 
 export const einhubModule: BffModule<EinHubConfig> = {
   id: "einhub",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

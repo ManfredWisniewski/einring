@@ -94,6 +94,7 @@ export interface TalkStatus {
 
 export const monitorModule: BffModule = {
   id: "monitor",
+  version: "0.1.0",
   requires: ["nextcloud"],
   register(api, ctx) {
     const { store, secrets, nextcloud } = ctx;

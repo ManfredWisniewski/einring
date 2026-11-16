@@ -121,6 +121,7 @@ const options = (config: YamtrackConfig): ConnectorOptions => ({
 
 export const yamtrackModule: BffModule<YamtrackConfig> = {
   id: "yamtrack",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

@@ -34,6 +34,7 @@ type EinChatConfig = z.infer<typeof configSchema>;
 
 export const einchatModule: BffModule<EinChatConfig> = {
   id: "einchat",
+  version: "0.1.0",
   configSchema,
   register(api, ctx, config) {
     const llm = ctx.llm;

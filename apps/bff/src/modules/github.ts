@@ -102,6 +102,7 @@ async function listThreads(ctx: AppContext, sub: string, limit: number) {
 
 export const githubModule: BffModule<GitHubConfig> = {
   id: "github",
+  version: "0.1.0",
   configSchema,
 
   notifications(ctx) {

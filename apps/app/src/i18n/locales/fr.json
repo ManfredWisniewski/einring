@@ -41,7 +41,8 @@
     "close": "Fermer les informations",
     "title": "À propos de {{name}}",
     "description": "{{name}} fournit une interface unique pour gérer les services connectés.",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "modules": "Modules"
   },
   "nextcloud": {
     "title": "Nextcloud",

@@ -41,7 +41,8 @@
     "close": "Information schließen",
     "title": "Über {{name}}",
     "description": "{{name}} bietet eine gemeinsame Oberfläche zur Verwaltung verbundener Dienste.",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "modules": "Module"
   },
   "nextcloud": {
     "title": "Nextcloud",

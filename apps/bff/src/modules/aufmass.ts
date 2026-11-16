@@ -321,6 +321,7 @@ const mandatoryColumnIds = (view: {
 
 export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
+  version: "0.3.6",
   requires: ["nextcloud"],
   configSchema,
   chatTools(ctx, config): ChatTool[] {

@@ -50,6 +50,9 @@ export interface NotificationSource {
  */
 export interface BffModule<TConfig = unknown> {
   id: string;
+  /** Semver feature level of the module (D69) — bumped by the change's author,
+   * reported on GET /api/modules. */
+  version: string;
   /** Services the module needs (e.g. "nextcloud") — reported via GET /api/modules. */
   requires?: string[];
   configSchema?: z.ZodType<TConfig>;

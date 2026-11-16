@@ -193,6 +193,7 @@ async function deleteMessage(
 
 export const emailModule: BffModule<EmailConfig> = {
   id: "email",
+  version: "0.1.0",
   configSchema,
 
   notifications(ctx) {

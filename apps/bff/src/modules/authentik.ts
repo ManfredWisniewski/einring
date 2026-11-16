@@ -176,6 +176,7 @@ async function gatherStatus(ctx: AppContext, sub: string): Promise<AuthentikStat
 
 export const authentikModule: BffModule<AuthentikConfig> = {
   id: "authentik",
+  version: "0.1.0",
   configSchema,
 
   chatTools(ctx): ChatTool[] {

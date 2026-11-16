@@ -41,7 +41,8 @@
     "close": "Закрыть информацию",
     "title": "О приложении {{name}}",
     "description": "{{name}} предоставляет единый интерфейс для управления подключёнными сервисами.",
-    "version": "Версия {{version}}"
+    "version": "Версия {{version}}",
+    "modules": "Модули"
   },
   "nextcloud": {
     "title": "Nextcloud",

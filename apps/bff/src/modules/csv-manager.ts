@@ -136,6 +136,7 @@ const pad = (cells: string[], width: number): string[] =>
 
 export const csvManagerModule: BffModule<z.infer<typeof configSchema>> = {
   id: "csv-manager",
+  version: "0.1.0",
   configSchema,
   register(api, ctx, config) {
     const { store } = ctx;
