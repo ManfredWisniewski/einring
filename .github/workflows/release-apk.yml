@@ -16,7 +16,13 @@ jobs:
         with:
           # +wit is not needed for the build; its ssh remote is unreachable from CI.
           submodules: false
-      - run: git submodule update --init biti # @/ alias target for the web build
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

@@ -18,7 +18,15 @@ jobs:
         with:
           # +wit content is not needed for lint/test/build; its ssh remote is unreachable from CI.
           submodules: false
-      - run: git submodule update --init biti # @/ alias target; github https remote is reachable
+      # biti is a private repo: GITHUB_TOKEN is scoped to einring and cannot
+      # clone it, so a PAT with contents:read on biti is required (BITI_PAT).
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -45,7 +53,13 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v4
-      - run: git submodule update --init biti # @/ alias target for the web build
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -84,7 +98,13 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v4
-      - run: git submodule update --init biti # Docker context needs biti/ for the in-image web build
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:

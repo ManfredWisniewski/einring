@@ -21,7 +21,13 @@ jobs:
         with:
           # +wit is in .dockerignore; its ssh:// remote is unreachable from CI anyway.
           submodules: false
-      - run: git submodule update --init biti # Docker context needs biti/ for the in-image web build
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
 
       - uses: docker/setup-qemu-action@v3
 
