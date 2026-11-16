@@ -68,11 +68,26 @@ export const appModules: AppModule[] = [
  */
 export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
   const backendEnabled = new Set(registry?.modules.map((m) => m.id) ?? []);
+  const titles = new Map(
+    (registry?.modules ?? [])
+      .filter((m) => m.title !== undefined)
+      .map((m) => [m.id, m.title] as const),
+  );
   const unrestricted = registry?.enabled === undefined;
   const appOnlyEnabled = new Set(registry?.enabled ?? []);
-  return appModules.filter((m) =>
-    m.hasBackend ? backendEnabled.has(m.id) : unrestricted || appOnlyEnabled.has(m.id),
-  );
+  return appModules
+    .filter((m) =>
+      m.hasBackend ? backendEnabled.has(m.id) : unrestricted || appOnlyEnabled.has(m.id),
+    )
+    .map((m) => {
+      const title = titles.get(m.id);
+      return title === undefined ? m : { ...m, title };
+    });
+}
+
+/** Display name for a module — deployment `MODULE_<ID>_TITLE` wins over the nav i18n key (D67). */
+export function moduleTitle(m: AppModule, t: (key: string) => string): string {
+  return m.title ?? t(m.nav?.i18nKey ?? m.id);
 }
 
 /** `modules.<id>` translation subtree for one language, across all bundled modules. */

@@ -23,6 +23,31 @@ function safeName(raw: string): string {
 
 const sendSchema = z.object({ text: z.string().min(1).max(32000) });
 
+const configSchema = z.object({
+  /**
+   * Comma-separated Talk conversation tokens the module is scoped to (D67).
+   * Unset/empty = all rooms. Filter semantics: surface scoping, not
+   * authorization — message/image/file routes keep answering any token.
+   */
+  ROOMS: z.preprocess(
+    (v) =>
+      typeof v === "string"
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : v,
+    z.array(z.string().min(1)).optional(),
+  ),
+});
+
+type TalkConfig = z.infer<typeof configSchema>;
+
+/** Allowlist set when ROOMS is configured, else null (no scoping). */
+function allowedRooms(config: TalkConfig): Set<string> | null {
+  return config.ROOMS?.length ? new Set(config.ROOMS) : null;
+}
+
 const MIME: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -40,20 +65,24 @@ const MIME: Record<string, string> = {
  * `messageParameters` rich objects pass through untouched so the app can
  * resolve `file` attachments via `/api/talk/file`.
  */
-export const talkModule: BffModule = {
+export const talkModule: BffModule<TalkConfig> = {
   id: "talk",
   requires: ["nextcloud"],
+  configSchema,
 
-  notifications(ctx) {
+  notifications(ctx, config) {
     return {
       // Rooms with unread messages → einhub items; dedupe by room token.
       async poll(sub) {
         const nc = ncFor(ctx, sub);
         if (!nc) return [];
+        const allowed = allowedRooms(config);
         try {
           const res = await nc.getTalkRooms();
           return (res.ocs?.data ?? [])
-            .filter((r) => (r.unreadMessages ?? 0) > 0)
+            .filter(
+              (r) => (r.unreadMessages ?? 0) > 0 && (!allowed || allowed.has(r.token)),
+            )
             .map((r) => ({
               sourceId: `talk:${r.token}`,
               title: r.displayName || r.name || "Talk",
@@ -67,22 +96,52 @@ export const talkModule: BffModule = {
     };
   },
 
-  register(api, ctx) {
+  register(api, ctx, config) {
     api.get("/rooms", async (req, reply) => {
       const nc = ncFor(ctx, req.user.sub);
       if (!nc) return reply.code(424).send({ error: "nextcloud is not connected" });
+      const allowed = allowedRooms(config);
       const res = await nc.getTalkRooms();
-      return {
-        rooms: (res.ocs?.data ?? []).map((r) => ({
-          token: r.token,
-          name: r.name ?? "",
-          displayName: r.displayName || r.name || "",
-          type: r.type ?? 0,
-          unread: r.unreadMessages ?? 0,
-          lastActivity: r.lastActivity ?? 0,
-          lastMessage: r.lastMessage?.message ?? null,
-        })),
-      };
+      const data = res.ocs?.data ?? [];
+      const joined = allowed ? data.filter((r) => allowed.has(r.token)) : data;
+      const rooms: {
+        token: string;
+        name: string;
+        displayName: string;
+        type: number;
+        unread: number;
+        lastActivity: number;
+        lastMessage: string | null;
+        member?: boolean;
+      }[] = joined.map((r) => ({
+        token: r.token,
+        name: r.name ?? "",
+        displayName: r.displayName || r.name || "",
+        type: r.type ?? 0,
+        unread: r.unreadMessages ?? 0,
+        lastActivity: r.lastActivity ?? 0,
+        lastMessage: r.lastMessage?.message ?? null,
+      }));
+      if (allowed) {
+        // Configured rooms the user hasn't joined surface as member:false
+        // stubs so the app can show "not a member" instead of hiding them (D67).
+        const seen = new Set(rooms.map((r) => r.token));
+        for (const token of config.ROOMS ?? []) {
+          if (!seen.has(token)) {
+            rooms.push({
+              token,
+              name: "",
+              displayName: "",
+              type: 0,
+              unread: 0,
+              lastActivity: 0,
+              lastMessage: null,
+              member: false,
+            });
+          }
+        }
+      }
+      return { rooms };
     });
 
     api.get("/rooms/:token/messages", async (req, reply) => {

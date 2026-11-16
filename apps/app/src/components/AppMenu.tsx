@@ -70,7 +70,7 @@ function ModulesDialog({ close }: { close: () => void }) {
               disabled={save.isPending}
             />
             <Label htmlFor={`app-module-${m.id}`}>
-              {t(`modules.${m.id}.nav`, { defaultValue: m.id })}
+              {m.title ?? t(`modules.${m.id}.nav`, { defaultValue: m.id })}
             </Label>
           </div>
         ))}

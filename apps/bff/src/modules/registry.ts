@@ -77,6 +77,8 @@ function envPrefix(id: string): string {
 export interface ResolvedModule {
   module: BffModule;
   config: unknown;
+  /** Deployment display-name override from `MODULE_<ID>_TITLE` (D67). */
+  title?: string;
 }
 
 /**
@@ -95,18 +97,21 @@ export function resolveModules(config: Config): ResolvedModule[] {
   return bffModules
     .filter((m) => !wanted || wanted.includes(m.id))
     .map((module) => {
-      if (!module.configSchema) return { module, config: undefined };
       const prefix = envPrefix(module.id);
       const env = Object.fromEntries(
         Object.entries(config.moduleEnv)
           .filter(([k]) => k.startsWith(prefix))
           .map(([k, v]) => [k.slice(prefix.length), v]),
       );
-      const parsed = module.configSchema.safeParse(env);
+      // TITLE is a generic registry-level key (D67) — it never reaches the
+      // module's config schema, so strict schemas can't choke on it.
+      const { TITLE: title, ...moduleEnv } = env;
+      if (!module.configSchema) return { module, config: undefined, title };
+      const parsed = module.configSchema.safeParse(moduleEnv);
       if (!parsed.success) {
         const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`);
         throw new Error(`Invalid config for module "${module.id}":\n${issues.join("\n")}`);
       }
-      return { module, config: parsed.data };
+      return { module, config: parsed.data, title };
     });
 }

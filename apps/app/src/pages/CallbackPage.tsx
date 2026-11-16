@@ -16,7 +16,16 @@ export function CallbackPage() {
         const returnTo = (user?.state as { returnTo?: string } | undefined)?.returnTo ?? "/";
         navigate(returnTo, { replace: true });
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        // Replayed callback URL (refresh/back/reopen after the state was already
+        // consumed — e.g. after a failed code exchange): go home instead of a dead end.
+        if (message.includes("No matching state found in storage")) {
+          navigate("/", { replace: true });
+          return;
+        }
+        setError(message);
+      });
   }, [navigate]);
 
   if (error) return <p className="alert alert--danger">{t("auth.failed", { reason: error })}</p>;

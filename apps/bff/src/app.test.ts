@@ -4147,6 +4147,85 @@ describe("talk", () => {
     ]);
   });
 
+  it("MODULE_TALK_ROOMS scopes the room list and stubs unjoined rooms (D67)", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url === "https://cloud.test/ocs/v2.php/apps/spreed/api/v4/room") {
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: [
+              { token: "t1", name: "sam", displayName: "Sam", unreadMessages: 1, lastActivity: 1 },
+              { token: "t2", name: "other", displayName: "Other", unreadMessages: 5 },
+            ],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl,
+      config: loadConfig({ ...testEnv(), MODULE_TALK_ROOMS: "t1,t3" }),
+    });
+    connect(store, secrets);
+    const res = await app.inject({ method: "GET", url: "/api/talk/rooms", headers: auth });
+    expect(res.json().rooms).toEqual([
+      {
+        token: "t1",
+        name: "sam",
+        displayName: "Sam",
+        type: 0,
+        unread: 1,
+        lastActivity: 1,
+        lastMessage: null,
+      },
+      {
+        token: "t3",
+        name: "",
+        displayName: "",
+        type: 0,
+        unread: 0,
+        lastActivity: 0,
+        lastMessage: null,
+        member: false,
+      },
+    ]);
+  });
+
+  it("MODULE_TALK_ROOMS filters the einhub unread poll (D67)", async () => {
+    const fetchImpl = fakeFetch((url) => {
+      if (url === "https://cloud.test/ocs/v2.php/apps/spreed/api/v4/room") {
+        return json({
+          ocs: {
+            meta: { status: "ok", statuscode: 200 },
+            data: [
+              { token: "t1", displayName: "Sam", unreadMessages: 2, lastActivity: 1700000000 },
+              { token: "t2", displayName: "Scoped", unreadMessages: 3, lastActivity: 1700000000 },
+            ],
+          },
+        });
+      }
+      return json({ error: `unexpected ${url}` }, 404);
+    });
+    const { app, auth, store, secrets } = await testApp({
+      fetchImpl,
+      config: loadConfig({
+        ...testEnv(),
+        MODULE_TALK_ROOMS: "t2",
+        MODULE_EINHUB_REFRESH_SECONDS: "0",
+      }),
+    });
+    connect(store, secrets);
+    await app.inject({ method: "GET", url: "/api/einhub/notifications", headers: auth });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/einhub/notifications",
+      headers: auth,
+    });
+    const items = res.json().notifications;
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((n: { title: string }) => n.title === "Scoped")).toBe(true);
+  });
+
   it("fetches history without moving the read marker", async () => {
     const fetchImpl = fakeFetch((url) => {
       if (url.startsWith("https://cloud.test/ocs/v2.php/apps/spreed/api/v1/chat/t1")) {
@@ -4968,6 +5047,21 @@ describe("module framework", () => {
     ).toBe(404);
     const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
     expect(mods.json()).toEqual({ modules: [], enabled: [] });
+  });
+
+  it("MODULE_<ID>_TITLE surfaces as title on /api/modules (D67)", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULE_TALK_TITLE: "Werkstatt-Chat" }),
+    });
+    const res = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
+    const talk = res
+      .json()
+      .modules.find((m: { id: string; title?: string }) => m.id === "talk");
+    expect(talk.title).toBe("Werkstatt-Chat");
+    const einhub = res
+      .json()
+      .modules.find((m: { id: string; title?: string }) => m.id === "einhub");
+    expect(einhub.title).toBeUndefined();
   });
 
   it("MODULES echoes the enabled set and tolerates app-only ids", async () => {

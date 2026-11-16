@@ -24,6 +24,11 @@ export interface AppModule {
   routes: ModuleRoute[];
   /** Optional settings view (D59): the nav gear opens it at `/<id>/settings` inside `app-main`. */
   settings?: ComponentType;
+  /**
+   * Deployment display-name override attached by `resolveAppModules` from the
+   * BFF registry (`MODULE_<ID>_TITLE`, D67) — prefer it over the nav i18n key.
+   */
+  title?: string;
   /** Locale bundles merged under `modules.<id>` in the default namespace. */
   i18n?: Partial<Record<"de" | "en" | "ru" | "fr", Record<string, unknown>>>;
 }

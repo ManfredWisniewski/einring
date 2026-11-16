@@ -8,5 +8,6 @@
   "send": "Senden",
   "attach": "Bild",
   "sendImage": "Bild senden",
-  "uploading": "Bild wird gesendet …"
+  "uploading": "Bild wird gesendet …",
+  "notMember": "Kein Mitglied dieser Unterhaltung"
 }

@@ -89,6 +89,8 @@ export interface TableView {
 export interface ModuleInfo {
   id: string;
   requires: string[];
+  /** Deployment display-name override from `MODULE_<ID>_TITLE` (D67). */
+  title?: string;
 }
 
 export interface ModuleRegistry {
@@ -560,6 +562,8 @@ export interface TalkRoom {
   unread: number;
   lastActivity: number;
   lastMessage: string | null;
+  /** `false` on allowlisted rooms (MODULE_TALK_ROOMS) the user hasn't joined (D67). */
+  member?: boolean;
 }
 
 export interface TalkRooms {

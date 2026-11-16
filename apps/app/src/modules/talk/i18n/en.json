@@ -8,5 +8,6 @@
   "send": "Send",
   "attach": "Image",
   "sendImage": "Send image",
-  "uploading": "Sending image …"
+  "uploading": "Sending image …",
+  "notMember": "Not a member of this conversation"
 }

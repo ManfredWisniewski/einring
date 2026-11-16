@@ -67,6 +67,12 @@ PUBLIC_URL=https://einring.example.com
 # Comma-separated enabled module ids; unset = all registered modules enabled
 # MODULES=einhub,tables,aufmass,monitor,wiki,csv-manager,einchat,einchat-mcp,yamtrack,audiobookshelf,navidrome,trek,email,gotify,gitlab,github,authentik,nextcloud,settings,einmusic,passman,talk,matrix,eindav,recipes,school,stalwart,postges
 # Per-module config: MODULE_<ID>_<KEY>, e.g.
+# MODULE_TALK_TITLE=Werkstatt-Chat  # MODULE_<ID>_TITLE overrides the module's display name
+#                                   # on all module-title surfaces; single literal, all locales
+# MODULE_TALK_ROOMS=abc123xy,def456yz  # scope talk to these conversation tokens (unset = all
+#                                     # rooms); allowed rooms the user hasn't joined show a
+#                                     # "not a member" state. Filter semantics — not authorization
+# MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 # MODULE_TABLES_APPLICATION_ID=3  # Tables application (context) id — from its /app/<id> URL;
 #                                 # the module lists the application's views/tables and edits
 #                                 # rows through them. Requires the Nextcloud Tables app.

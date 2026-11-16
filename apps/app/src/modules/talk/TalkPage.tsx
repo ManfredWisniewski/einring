@@ -76,7 +76,7 @@ function MessagePane({
   token: string;
   title: string;
   selfId: string | null;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   const { t } = useTranslation();
   const messages = useTalkMessages(token);
@@ -105,9 +105,11 @@ function MessagePane({
   return (
     <div className="stack talk-pane">
       <div className="row">
-        <Button variant="text" size="sm" onClick={onBack}>
-          {t("modules.talk.back")}
-        </Button>
+        {onBack && (
+          <Button variant="text" size="sm" onClick={onBack}>
+            {t("modules.talk.back")}
+          </Button>
+        )}
         <h2 className="text-lg" style={{ flex: 1 }}>
           {title}
         </h2>
@@ -222,16 +224,21 @@ function TalkPageInner() {
   const rooms = useTalkRooms();
   const connection = useNextcloudConnection();
   const [openToken, setOpenToken] = useState<string | null>(null);
-  const open = rooms.data?.rooms.find((r) => r.token === openToken);
+  const roomList = rooms.data?.rooms ?? [];
+  // Exactly one resolved room (e.g. a single-token MODULE_TALK_ROOMS scope)
+  // opens the conversation directly — no list step (D67).
+  const open =
+    roomList.find((r) => r.token === openToken) ??
+    (roomList.length === 1 ? roomList[0] : undefined);
   const selfId = connection.data?.status === "connected" ? connection.data.loginName : null;
 
   if (open) {
     return (
       <MessagePane
         token={open.token}
-        title={open.displayName || open.name}
+        title={open.displayName || open.name || open.token}
         selfId={selfId}
-        onBack={() => setOpenToken(null)}
+        onBack={roomList.length > 1 ? () => setOpenToken(null) : undefined}
       />
     );
   }
@@ -260,7 +267,12 @@ function TalkPageInner() {
               style={{ flex: 1, textAlign: "left" }}
               onClick={() => setOpenToken(r.token)}
             >
-              <span style={{ fontWeight: 600 }}>{r.displayName || r.name}</span>
+              <span style={{ fontWeight: 600 }}>{r.displayName || r.name || r.token}</span>
+              {r.member === false && (
+                <span className="muted" style={{ display: "block" }}>
+                  {t("modules.talk.notMember")}
+                </span>
+              )}
               {r.lastMessage && (
                 <span className="muted" style={{ display: "block" }}>
                   {r.lastMessage}

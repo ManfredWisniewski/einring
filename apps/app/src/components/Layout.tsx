@@ -15,7 +15,7 @@ import {
 } from "~/api/hooks";
 import { useAuth } from "~/auth/AuthProvider";
 import { useInstanceName } from "~/instance";
-import { resolveAppModules } from "~/modules";
+import { moduleTitle, resolveAppModules } from "~/modules";
 import { AppMenu } from "./AppMenu";
 import { LanguageSelect, ThemeSelect } from "./Settings";
 
@@ -66,16 +66,13 @@ export function Layout() {
   const q = query.trim().toLowerCase();
   const visible = navModules.filter(
     (m) =>
-      (q === "" ||
-        t(m.nav?.i18nKey ?? "")
-          .toLowerCase()
-          .includes(q)) &&
+      (q === "" || moduleTitle(m, t).toLowerCase().includes(q)) &&
       (tags.size === 0 || tags.has(m.nav?.group ?? "")),
   );
   const sorted = [...visible].sort((a, b) => {
     if (a.id === "einhub") return -1;
     if (b.id === "einhub") return 1;
-    return t(a.nav?.i18nKey ?? "").localeCompare(t(b.nav?.i18nKey ?? ""), i18n.language);
+    return moduleTitle(a, t).localeCompare(moduleTitle(b, t), i18n.language);
   });
 
   return (
@@ -138,7 +135,7 @@ export function Layout() {
             {sorted.map((m) => (
               <div key={m.id} className="app-nav__item">
                 <NavLink to={m.routes.at(0)?.path ?? "/"} className="app-nav__link">
-                  {t(m.nav?.i18nKey ?? "")}
+                  {moduleTitle(m, t)}
                   {m.id === "einhub" && unread > 0 && (
                     <span className="app-nav__badge">{unread}</span>
                   )}
@@ -147,7 +144,7 @@ export function Layout() {
                   <NavLink
                     to={`/${m.id}/settings`}
                     className="app-nav__settings"
-                    aria-label={t("nav.settings", { name: t(m.nav?.i18nKey ?? "") })}
+                    aria-label={t("nav.settings", { name: moduleTitle(m, t) })}
                   >
                     <Settings size={14} aria-hidden />
                   </NavLink>

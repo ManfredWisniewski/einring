@@ -364,3 +364,9 @@
 - MCP calls are rate-limited (SC-006).
 - The endpoint lives in the `einchat-mcp` module (own `MODULES` entry) and works without LLM configuration; v1 is stateless tools-only (`initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`) — no resources/prompts/sampling, `GET` → 405.
 - Token management in the einchat module's settings view (`/einchat/settings`): create (shown once, stored hashed, optional label), list, revoke.
+
+### A44 Talk room allowlist + deployment module titles (D67)
+
+- `MODULE_TALK_ROOMS=<token,token>` scopes the talk module's surface to the listed Talk conversation tokens: `GET /api/talk/rooms` returns only allowed rooms plus `{member:false}` stubs for allowed tokens the user hasn't joined; the EinHub unread poll filters to the same set. Unset = all rooms (unchanged). Message/image/file routes keep answering any token — filter semantics (preference), not authorization.
+- A single resolved room auto-opens its conversation without the room list; multiple rooms keep the list. Rooms the user hasn't joined show a localized "not a member" hint; opening one surfaces the upstream error.
+- `MODULE_<ID>_TITLE=<literal>` overrides any module's display name for the deployment: `GET /api/modules` carries it as `title`, and nav links, nav sort/search, the settings gear aria-label and the Modules dialog use it instead of the i18n key. Unset = i18n title; single literal across locales.
