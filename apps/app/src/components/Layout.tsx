@@ -14,6 +14,7 @@ import {
   useNextcloudSettings,
 } from "~/api/hooks";
 import { useAuth } from "~/auth/AuthProvider";
+import { isEmbedded } from "~/embedded";
 import { useInstanceName, useNav } from "~/instance";
 import { moduleTitle, resolveAppModules } from "~/modules";
 import { AppMenu } from "./AppMenu";
@@ -84,7 +85,7 @@ export function Layout() {
         <ThemeSelect />
         <LanguageSelect />
         <AppMenu />
-        {user && (
+        {user && !isEmbedded() && (
           <UiButton variant="text" onClick={() => void logout()}>
             {t("nav.logout")}
           </UiButton>

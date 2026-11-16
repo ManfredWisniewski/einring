@@ -86,6 +86,7 @@
 - The app password never appears in any response, including the session-minting poll response.
 - A poll without `flow` gets 400; an unknown/expired `flow` gets 409.
 - `DELETE /api/nextcloud/connection` removes the credential AND the user's sessions — the dead token gets 401.
+- The header "Abmelden" button is hidden in embedded mode — the session is minted by the Nextcloud flow, so there is no standalone logout action; disconnect stays reachable through the Nextcloud gate.
 - Standalone deployments (`?embedded` absent) are unchanged: Authentik login, user-scoped flows, no session minted on poll.
 - The served `index.html` carries `Content-Security-Policy: frame-ancestors 'self' <NEXTCLOUD origin>` so only the configured cloud may frame the app.
 

@@ -28,7 +28,7 @@ describe("AppMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "Info" }));
 
     expect(screen.getByRole("dialog", { name: "About Einring" })).toBeInTheDocument();
-    expect(screen.getByText("Version 0.1.0")).toBeInTheDocument();
+    expect(screen.getByText("Version 0.1.1")).toBeInTheDocument();
   });
 
   it("lists enabled modules except einhub and settings", async () => {

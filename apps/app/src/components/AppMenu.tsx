@@ -89,7 +89,7 @@ function InfoDialog({ close }: { close: () => void }) {
     <div className="stack">
       <DialogHeader title={t("info.title", { name })} close={close} />
       <p>{t("info.description", { name })}</p>
-      <p className="muted">{t("info.version", { version: "0.1.0" })}</p>
+      <p className="muted">{t("info.version", { version: "0.1.1" })}</p>
       <div>
         <span className="muted">{t("info.modules")}</span>
         <ul className="info-modules">
