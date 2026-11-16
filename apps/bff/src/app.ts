@@ -144,6 +144,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       api.get("/me", async (request) => request.user);
       api.get("/modules", async () => ({
         modules: modules.map(({ module }) => ({ id: module.id, requires: module.requires ?? [] })),
+        // The raw MODULES set — the app filters frontend-only modules against it
+        // (they never appear in `modules`). undefined = everything enabled.
+        enabled: deps.config.modules,
       }));
       registerNextcloudRoutes(api, ctx);
       for (const { module, config } of modules) {

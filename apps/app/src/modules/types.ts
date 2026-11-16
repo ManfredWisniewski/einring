@@ -8,7 +8,8 @@ export interface ModuleRoute {
 
 /**
  * App half of a module (D32–D35). Modules are bundled; `hasBackend` modules are
- * enabled via the BFF's `GET /api/modules` registry, frontend-only modules are always active.
+ * enabled via the BFF's `GET /api/modules` registry, frontend-only modules are
+ * active unless MODULES restricts the deployment (D33).
  */
 export interface AppModule {
   /** Stable id; must match the BFF module id when `hasBackend` is set. */

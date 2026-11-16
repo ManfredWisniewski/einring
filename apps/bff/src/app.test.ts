@@ -4967,7 +4967,24 @@ describe("module framework", () => {
       (await app.inject({ method: "GET", url: "/api/tables", headers: auth })).statusCode,
     ).toBe(404);
     const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
-    expect(mods.json()).toEqual({ modules: [] });
+    expect(mods.json()).toEqual({ modules: [], enabled: [] });
+  });
+
+  it("MODULES echoes the enabled set and tolerates app-only ids", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig({ ...testEnv(), MODULES: "aufmass,pdf" }),
+    });
+    const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
+    expect(mods.json()).toEqual({
+      modules: [{ id: "aufmass", requires: ["nextcloud"] }],
+      enabled: ["aufmass", "pdf"],
+    });
+  });
+
+  it("MODULES rejects unknown ids at startup", async () => {
+    await expect(
+      testApp({ config: loadConfig({ ...testEnv(), MODULES: "aufmass,bogus" }) }),
+    ).rejects.toThrow(/Unknown modules in MODULES: bogus/);
   });
 
   it("fails startup when an enabled module's env config is invalid", async () => {

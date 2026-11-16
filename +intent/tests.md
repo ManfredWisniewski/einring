@@ -48,7 +48,7 @@
 
 ### A07 Module framework
 
-- `GET /api/modules` returns the enabled module set from `MODULES` env; disabling a module removes its BFF routes (404) and its app route + nav entry.
+- `GET /api/modules` returns the enabled module set from `MODULES` env; disabling a module removes its BFF routes (404) and its app route + nav entry. The response also echoes the raw `MODULES` list as `enabled` (absent = unrestricted); app-only modules (e.g. `pdf`) are filtered by it — with `MODULES` set they must be listed to appear, and they are legal `MODULES` entries without a BFF counterpart.
 - Per-module env `MODULE_<ID>_*` is validated at BFF startup; invalid config of an enabled module fails fast; a disabled module's invalid config does not.
 - A frontend-only module can be enabled without a BFF part.
 - A module requiring `nextcloud` shows the connect card instead of its content while the service is disconnected.

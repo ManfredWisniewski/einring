@@ -33,14 +33,14 @@ export function Layout() {
       (["tables", "wiki"] as const).filter((id) => ncSettings.data?.settings[id] === false),
     );
     const prefDisabled = new Set(prefs.data?.disabled ?? []);
-    return resolveAppModules(registry.data?.modules).filter(
+    return resolveAppModules(registry.data).filter(
       (m) =>
         m.nav != null &&
         m.routes.length > 0 &&
         !hiddenByNc.has(m.id as "tables" | "wiki") &&
         !prefDisabled.has(m.id),
     );
-  }, [registry.data?.modules, ncSettings.data?.settings, prefs.data?.disabled]);
+  }, [registry.data, ncSettings.data?.settings, prefs.data?.disabled]);
   // Global hub poll: the unread badge updates no matter which page is open.
   const einhubOn = registry.data?.modules.some((m) => m.id === "einhub") ?? false;
   const hub = useEinHubNotifications(!!user && einhubOn);

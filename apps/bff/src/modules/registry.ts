@@ -29,6 +29,13 @@ import type { BffModule } from "./types.js";
 import { wikiModule } from "./wiki.js";
 import { yamtrackModule } from "./yamtrack.js";
 
+/**
+ * App-only module ids (no BFF part — see `apps/app/src/modules`, entries without
+ * `hasBackend`). They never register routes here, but MODULES may list them so
+ * the app can keep them enabled — an unknown id here would fail startup.
+ */
+const appOnlyModuleIds = new Set(["pdf"]);
+
 /** All modules known to the BFF. App-only modules (no backend part) don't appear here. */
 export const bffModules: BffModule[] = [
   einhubModule,
@@ -80,7 +87,7 @@ export function resolveModules(config: Config): ResolvedModule[] {
   const wanted = config.modules;
   if (wanted) {
     const known = new Set(bffModules.map((m) => m.id));
-    const unknown = wanted.filter((id) => !known.has(id));
+    const unknown = wanted.filter((id) => !known.has(id) && !appOnlyModuleIds.has(id));
     if (unknown.length) {
       throw new Error(`Unknown modules in MODULES: ${unknown.join(", ")}`);
     }

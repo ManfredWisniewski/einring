@@ -96,7 +96,7 @@ function Routing() {
   const registry = useModuleRegistry(!!user);
   const ready = !loading && (!user || !registry.isPending);
   const router = useMemo(
-    () => (ready ? buildRouter(resolveAppModules(registry.data?.modules)) : null),
+    () => (ready ? buildRouter(resolveAppModules(registry.data)) : null),
     [ready, registry.data],
   );
   if (user && registry.isError) {

@@ -1,4 +1,4 @@
-import type { ModuleInfo } from "~/api/types";
+import type { ModuleRegistry } from "~/api/types";
 import { audiobookshelfModule } from "./audiobookshelf";
 import { aufmassModule } from "./aufmass";
 import { authentikModule } from "./authentik";
@@ -62,12 +62,17 @@ export const appModules: AppModule[] = [
 ];
 
 /**
- * Active modules for this deployment: frontend-only modules are always active,
- * backend modules only when listed by the BFF registry (its MODULES env is the source of truth).
+ * Active modules for this deployment: backend modules only when listed by the
+ * BFF registry (its MODULES env is the source of truth); frontend-only modules
+ * are always active unless MODULES restricts the deployment (D33).
  */
-export function resolveAppModules(registry?: ModuleInfo[]): AppModule[] {
-  const enabled = new Set(registry?.map((m) => m.id) ?? []);
-  return appModules.filter((m) => !m.hasBackend || enabled.has(m.id));
+export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
+  const backendEnabled = new Set(registry?.modules.map((m) => m.id) ?? []);
+  const unrestricted = registry?.enabled === undefined;
+  const appOnlyEnabled = new Set(registry?.enabled ?? []);
+  return appModules.filter((m) =>
+    m.hasBackend ? backendEnabled.has(m.id) : unrestricted || appOnlyEnabled.has(m.id),
+  );
 }
 
 /** `modules.<id>` translation subtree for one language, across all bundled modules. */

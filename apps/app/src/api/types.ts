@@ -93,6 +93,8 @@ export interface ModuleInfo {
 
 export interface ModuleRegistry {
   modules: ModuleInfo[];
+  /** The raw MODULES list; absent (undefined) means every module is enabled. */
+  enabled?: string[];
 }
 
 export interface ServerHealth {
