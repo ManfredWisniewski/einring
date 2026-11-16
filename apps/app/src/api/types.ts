@@ -218,6 +218,8 @@ export interface EinChatMessage {
 
 export interface EinChatStatus {
   configured: boolean;
+  /** Deployment-scoped input placeholder (MODULE_EINCHAT_PLACEHOLDER); unset = i18n default. */
+  placeholder?: string;
   /** Tool names offered by enabled provider modules (e.g. yamtrack_search_media). */
   tools: string[];
 }

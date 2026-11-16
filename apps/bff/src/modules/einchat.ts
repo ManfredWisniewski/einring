@@ -25,9 +25,17 @@ const toolsBodySchema = z.object({
   disabled: z.array(z.string().min(1).max(100)).max(200),
 });
 
-export const einchatModule: BffModule = {
+const configSchema = z.object({
+  /** Deployment-scoped input placeholder — overrides the app's localized example
+   * question. Single literal across locales (same reasoning as D67 titles). */
+  PLACEHOLDER: z.string().min(1).optional(),
+});
+type EinChatConfig = z.infer<typeof configSchema>;
+
+export const einchatModule: BffModule<EinChatConfig> = {
   id: "einchat",
-  register(api, ctx) {
+  configSchema,
+  register(api, ctx, config) {
     const llm = ctx.llm;
     const collected = collectTools(ctx);
 
@@ -35,6 +43,7 @@ export const einchatModule: BffModule = {
       const off = disabledTools(ctx, req.user.sub);
       return {
         configured: llm !== null,
+        placeholder: config.PLACEHOLDER,
         tools: collected.filter((c) => !off.has(c.tool.name)).map((c) => c.tool.name),
       };
     });

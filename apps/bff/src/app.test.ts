@@ -1759,6 +1759,14 @@ describe("einchat", () => {
     ).toBe(424);
   });
 
+  it("exposes the configured input placeholder on status", async () => {
+    const { app, auth } = await testApp({
+      config: loadConfig(chatEnv({ MODULE_EINCHAT_PLACEHOLDER: "Wie viele m² verbaut?" })),
+    });
+    const status = await app.inject({ method: "GET", url: "/api/einchat/status", headers: auth });
+    expect(status.json().placeholder).toBe("Wie viele m² verbaut?");
+  });
+
   it("lists enabled provider tools in status", async () => {
     const { app, auth } = await testApp({ config: loadConfig(chatEnv()) });
     const status = await app.inject({ method: "GET", url: "/api/einchat/status", headers: auth });

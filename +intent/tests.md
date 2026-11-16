@@ -375,3 +375,15 @@
 
 - `EINRING_NAV=false` hides the two module-discovery surfaces: the nav sidebar's search/tags controls and the Menu's Modules entry. Unset or any truthy value = current behavior (bool parsing: only `0`/`false`/`no`/`off`, case-insensitive, mean false). Display gate only — `GET /api/modules` and all module routes keep answering.
 - The flag ships on the public `GET /api/config` response as `nav`; older images ignore the unknown env var.
+
+### A46 Module versions (D69)
+
+- Every `BffModule` declares a required semver `version` literal; `GET /api/modules` returns it per enabled module (aufmass reports `0.3.6` at introduction). A module without `version` fails the registry.
+- `resolveAppModules` attaches the registry version to `AppModule`; frontend-only modules without a registry entry set `version` on `AppModule` directly.
+- The header Info dialog lists every enabled module — backend and frontend-only — with its resolved version next to the app version.
+
+### A47 EinChat input placeholder env + page layout (D33)
+
+- `MODULE_EINCHAT_PLACEHOLDER=<literal>` surfaces as `placeholder` on `GET /api/einchat/status` and overrides the chat input's localized example question; unset = the i18n default. Single literal across locales (same reasoning as D67 titles).
+- The EinChat page renders the data-connections ("Datenverbindungen") section below the message input row.
+- The `.chat-thread` container reserves no dead height — it hugs its content; assistant markdown bubbles render without phantom blank lines (`pre-wrap` applies to user bubbles only).

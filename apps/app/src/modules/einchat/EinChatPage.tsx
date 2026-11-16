@@ -115,7 +115,6 @@ export function EinChatPage() {
 
   return (
     <div className="stack">
-      <Connections tools={tools.data?.tools ?? []} />
       <div className="chat-thread stack" role="log" aria-label={t("modules.einchat.nav")}>
         {messages.length === 0 && <p className="muted">{t("modules.einchat.empty")}</p>}
         {messages.map((m, i) => (
@@ -144,7 +143,7 @@ export function EinChatPage() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder={t("modules.einchat.placeholder")}
+            placeholder={status.data.placeholder ?? t("modules.einchat.placeholder")}
             aria-label={t("modules.einchat.inputLabel")}
           />
         </div>
@@ -157,6 +156,7 @@ export function EinChatPage() {
           {t("modules.einchat.tools", { tools: status.data.tools.join(", ") })}
         </span>
       )}
+      <Connections tools={tools.data?.tools ?? []} />
     </div>
   );
 }

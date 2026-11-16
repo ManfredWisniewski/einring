@@ -974,7 +974,6 @@ a {
 /* --- EinChat ------------------------------------------------------------ */
 
 .chat-thread {
-  min-height: 12rem;
   max-height: 60vh;
   overflow-y: auto;
   gap: var(--space-3);
@@ -984,13 +983,13 @@ a {
   max-width: 85%;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  white-space: pre-wrap;
 }
 
 .chat-msg--user {
   align-self: flex-end;
   background: var(--accent-subtle);
   border: 1px solid var(--surface-border);
+  white-space: pre-wrap;
 }
 
 .chat-msg--assistant {
