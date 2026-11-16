@@ -564,7 +564,17 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (!Number.isInteger(rowId) || rowId <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "expected {data: {columnId: value}}" });
       }
-      const row = await nc.updateRow(rowId, parsed.data.data ?? {});
+      let row;
+      try {
+        row = await nc.updateRow(rowId, parsed.data.data ?? {});
+      } catch (e) {
+        // Pass upstream 4xx through so clients see the real cause (e.g. a row
+        // shared read-only) instead of an opaque 502.
+        if (e instanceof NextcloudError) {
+          return reply.code(e.status < 500 ? e.status : 502).send({ error: e.message });
+        }
+        throw e;
+      }
       const flat = flattenRow(row);
       let original: boolean | undefined;
       // Recompute restmenge so the client can swap the row in without a refetch;
@@ -606,9 +616,16 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
         return reply.code(400).send({ error: "node must be view|table and a positive id" });
       }
       const data = parsed.data.data ?? {};
-      const row =
-        type === "view" ? await nc.createRowInView(id, data) : await nc.createRowInTable(id, data);
-      return reply.code(201).send(flattenRow(row));
+      try {
+        const row =
+          type === "view" ? await nc.createRowInView(id, data) : await nc.createRowInTable(id, data);
+        return reply.code(201).send(flattenRow(row));
+      } catch (e) {
+        if (e instanceof NextcloudError) {
+          return reply.code(e.status < 500 ? e.status : 502).send({ error: e.message });
+        }
+        throw e;
+      }
     });
 
     api.delete("/nodes/:type/:id/rows/:rowId", async (req, reply) => {
@@ -630,6 +647,9 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       } catch (e) {
         if (e instanceof NextcloudError && e.status === 404) {
           return reply.code(404).send({ error: "row not found" });
+        }
+        if (e instanceof NextcloudError) {
+          return reply.code(e.status < 500 ? e.status : 502).send({ error: e.message });
         }
         throw e;
       }

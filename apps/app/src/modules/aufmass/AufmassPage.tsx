@@ -241,6 +241,9 @@ function NodeGrid({
   const patchRow = useAufmassPatchRow(node);
   const [filters, setFilters] = useState<Record<number, string | Set<string>>>({});
   const [amountRow, setAmountRow] = useState<TableRow | null>(null);
+  // Mutation errors render inside their dialog — a page-level banner hides behind the modal.
+  const [amountError, setAmountError] = useState<string>();
+  const [addError, setAddError] = useState<string>();
   const tableRef = useRef<HTMLTableElement>(null);
 
   // Per-user, per-node column visibility — persisted in localStorage so it
@@ -534,12 +537,22 @@ function NodeGrid({
       </div>
       <AddRowDialog
         open={addOpen}
-        onOpenChange={onAddOpenChange}
+        onOpenChange={(o) => {
+          setAddError(undefined);
+          onAddOpenChange(o);
+        }}
         columns={data.allColumns ?? data.columns}
         title={addRowLabel(t, node.title)}
         pending={addRow.isPending}
+        error={addError}
         onSubmit={(data) =>
-          addRow.mutate({ node, data }, { onSuccess: () => onAddOpenChange(false) })
+          addRow.mutate(
+            { node, data },
+            {
+              onSuccess: () => onAddOpenChange(false),
+              onError: (e) => setAddError(t("modules.aufmass.error", { status: statusOf(e) })),
+            },
+          )
         }
       />
       {data.verbautColumnId !== undefined && (
@@ -571,13 +584,22 @@ function NodeGrid({
             );
           })()}
           pending={patchRow.isPending}
-          onClose={() => setAmountRow(null)}
+          error={amountError}
+          onClose={() => {
+            setAmountError(undefined);
+            setAmountRow(null);
+          }}
           onSubmit={(amount) => {
             if (!amountRow) return;
             const current = Number(amountRow.cells[String(data.verbautColumnId)]) || 0;
+            setAmountError(undefined);
             patchRow.mutate(
               { rowId: amountRow.id, data: { [data.verbautColumnId!]: current + amount } },
-              { onSuccess: () => setAmountRow(null) },
+              {
+                onSuccess: () => setAmountRow(null),
+                onError: (e) =>
+                  setAmountError(t("modules.aufmass.error", { status: statusOf(e) })),
+              },
             );
           }}
         />
@@ -737,6 +759,7 @@ function AddRowDialog({
   columns,
   title,
   pending,
+  error,
   onSubmit,
 }: {
   open: boolean;
@@ -744,6 +767,7 @@ function AddRowDialog({
   columns: TableColumn[];
   title: string;
   pending: boolean;
+  error?: string;
   onSubmit: (data: Record<string, unknown>) => void;
 }) {
   const { t } = useTranslation();
@@ -832,6 +856,7 @@ function AddRowDialog({
               </div>
             ))}
           </div>
+          {error && <div className="alert alert--danger">{error}</div>}
           <div className="row" style={{ justifyContent: "flex-end" }}>
             <Button variant="text" onClick={() => onOpenChange(false)} disabled={pending}>
               {t("modules.aufmass.cancel")}
@@ -856,6 +881,7 @@ function AddAmountDialog({
   item,
   unit,
   pending,
+  error,
   onClose,
   onSubmit,
 }: {
@@ -870,6 +896,7 @@ function AddAmountDialog({
   decimals?: number;
   unit: string;
   pending: boolean;
+  error?: string;
   onClose: () => void;
   onSubmit: (amount: number) => void;
 }) {
@@ -941,6 +968,7 @@ function AddAmountDialog({
               />
             </div>
           </div>
+          {error && <div className="alert alert--danger">{error}</div>}
           <div className="row" style={{ justifyContent: "flex-end" }}>
             <Button variant="text" tabIndex={-1} onClick={onClose} disabled={pending}>
               {t("modules.aufmass.cancel")}
