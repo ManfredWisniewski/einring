@@ -439,7 +439,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (config.APPLICATION_ID === undefined) {
         return reply.code(424).send({ error: "aufmass application id not configured" });
       }
-      const nc = ncFor(ctx, req.user!.sub);
+      const nc = ncFor(ctx, req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -467,7 +467,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.get("/nodes/:type/:id", async (req, reply) => {
-      const nc = ncFor(ctx, req.user!.sub);
+      const nc = ncFor(ctx, req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -555,7 +555,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     const dataSchema = z.object({ data: z.record(z.string(), z.unknown()).optional() }).strict();
 
     api.patch("/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(ctx, req.user!.sub);
+      const nc = ncFor(ctx, req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -564,7 +564,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (!Number.isInteger(rowId) || rowId <= 0 || !parsed.success) {
         return reply.code(400).send({ error: "expected {data: {columnId: value}}" });
       }
-      let row;
+      let row: TablesRow;
       try {
         row = await nc.updateRow(rowId, parsed.data.data ?? {});
       } catch (e) {
@@ -604,7 +604,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.post("/nodes/:type/:id/rows", async (req, reply) => {
-      const nc = ncFor(ctx, req.user!.sub);
+      const nc = ncFor(ctx, req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -618,7 +618,9 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       const data = parsed.data.data ?? {};
       try {
         const row =
-          type === "view" ? await nc.createRowInView(id, data) : await nc.createRowInTable(id, data);
+          type === "view"
+            ? await nc.createRowInView(id, data)
+            : await nc.createRowInTable(id, data);
         return reply.code(201).send(flattenRow(row));
       } catch (e) {
         if (e instanceof NextcloudError) {
@@ -629,7 +631,7 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.delete("/nodes/:type/:id/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(ctx, req.user!.sub);
+      const nc = ncFor(ctx, req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }

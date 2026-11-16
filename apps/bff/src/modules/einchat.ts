@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { AppContext } from "../app.js";
 import type { ChatMessage } from "../llm/client.js";
 import { makeRateLimiter } from "../rate-limit.js";
 import { collectTools, disabledTools } from "./chat-tools.js";

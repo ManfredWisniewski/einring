@@ -93,46 +93,46 @@ export function Layout() {
       {user && navModules.length > 0 && (
         <nav className="app-nav" aria-label={t("nav.label")}>
           {nav && (
-          <div className="app-nav__controls">
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-              placeholder={t("nav.search")}
-              aria-label={t("nav.search")}
-              className="app-nav__search"
-            />
-            <MenuTrigger>
-              <Button
-                className={buttonVariants({ variant: "outlined", size: "sm" })}
-                aria-label={t("nav.tags")}
-              >
-                {t("nav.tags")}
-                {tags.size > 0 ? ` (${tags.size})` : ""}
-              </Button>
-              <Popover placement="bottom start">
-                <fieldset className="app-menu--tags" aria-label={t("nav.tags")}>
-                  {allTags.map((g) => (
-                    <div key={g} className="app-menu__item">
-                      <Checkbox
-                        id={`nav-tag-${g}`}
-                        checked={tags.has(g)}
-                        onCheckedChange={(checked) =>
-                          setTags((prev) => {
-                            const next = new Set(prev);
-                            if (checked === true) next.add(g);
-                            else next.delete(g);
-                            return next;
-                          })
-                        }
-                      />
-                      <Label htmlFor={`nav-tag-${g}`}>{t(`nav.group.${g}`)}</Label>
-                    </div>
-                  ))}
-                </fieldset>
-              </Popover>
-            </MenuTrigger>
-          </div>
+            <div className="app-nav__controls">
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                placeholder={t("nav.search")}
+                aria-label={t("nav.search")}
+                className="app-nav__search"
+              />
+              <MenuTrigger>
+                <Button
+                  className={buttonVariants({ variant: "outlined", size: "sm" })}
+                  aria-label={t("nav.tags")}
+                >
+                  {t("nav.tags")}
+                  {tags.size > 0 ? ` (${tags.size})` : ""}
+                </Button>
+                <Popover placement="bottom start">
+                  <fieldset className="app-menu--tags" aria-label={t("nav.tags")}>
+                    {allTags.map((g) => (
+                      <div key={g} className="app-menu__item">
+                        <Checkbox
+                          id={`nav-tag-${g}`}
+                          checked={tags.has(g)}
+                          onCheckedChange={(checked) =>
+                            setTags((prev) => {
+                              const next = new Set(prev);
+                              if (checked === true) next.add(g);
+                              else next.delete(g);
+                              return next;
+                            })
+                          }
+                        />
+                        <Label htmlFor={`nav-tag-${g}`}>{t(`nav.group.${g}`)}</Label>
+                      </div>
+                    ))}
+                  </fieldset>
+                </Popover>
+              </MenuTrigger>
+            </div>
           )}
           {sorted.length === 0 && <p className="muted app-nav__empty">{t("nav.noMatches")}</p>}
           <div className="app-nav__links">

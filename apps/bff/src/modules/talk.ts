@@ -80,9 +80,7 @@ export const talkModule: BffModule<TalkConfig> = {
         try {
           const res = await nc.getTalkRooms();
           return (res.ocs?.data ?? [])
-            .filter(
-              (r) => (r.unreadMessages ?? 0) > 0 && (!allowed || allowed.has(r.token)),
-            )
+            .filter((r) => (r.unreadMessages ?? 0) > 0 && (!allowed || allowed.has(r.token)))
             .map((r) => ({
               sourceId: `talk:${r.token}`,
               title: r.displayName || r.name || "Talk",

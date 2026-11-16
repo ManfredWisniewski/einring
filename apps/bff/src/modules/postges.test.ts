@@ -101,7 +101,8 @@ describe("postges module", () => {
     const cred = store.getServiceCredential("user-1", "postges");
     expect(cred?.url).toBe("db.test:5432/shop");
     const secrets = createSecretBox(env.ENCRYPTION_KEY ?? "");
-    expect(secrets.open(cred!.secretSealed)).toBe(CONN);
+    if (!cred) throw new Error("expected stored postges credential");
+    expect(secrets.open(cred.secretSealed)).toBe(CONN);
     expect(JSON.stringify(res.json())).not.toContain("s3cret");
   });
 

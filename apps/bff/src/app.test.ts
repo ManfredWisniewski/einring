@@ -661,8 +661,8 @@ describe("tables", () => {
     });
     expect(patch.statusCode).toBe(200);
     expect(seen.puts).toHaveLength(1);
-    expect(seen.puts[0]!.url).toContain("/api/1/rows/10");
-    expect(seen.puts[0]!.body).toEqual({ data: { "2": false } });
+    expect(seen.puts[0]?.url).toContain("/api/1/rows/10");
+    expect(seen.puts[0]?.body).toEqual({ data: { "2": false } });
     expect(patch.json().cells["2"]).toBe(false);
 
     const created = await app.inject({
@@ -4635,7 +4635,7 @@ ${bodies}</d:multistatus>`;
             { status: 207 },
           );
         }
-        return new Response("unexpected " + url, { status: 404 });
+        return new Response(`unexpected ${url}`, { status: 404 });
       }),
     });
     connect(store, secrets);
@@ -4663,7 +4663,7 @@ ${bodies}</d:multistatus>`;
         }
         if (init?.method === "PUT" && url.endsWith(".vcf"))
           return new Response("", { status: 201 });
-        return new Response("unexpected " + url, { status: 404 });
+        return new Response(`unexpected ${url}`, { status: 404 });
       }),
     });
     connect(store, secrets);
@@ -4721,7 +4721,7 @@ ${bodies}</d:multistatus>`;
         }
         if (init?.method === "PUT" && url.endsWith(".ics"))
           return new Response("", { status: 201 });
-        return new Response("unexpected " + url, { status: 404 });
+        return new Response(`unexpected ${url}`, { status: 404 });
       }),
     });
     connect(store, secrets);
@@ -4777,7 +4777,7 @@ ${bodies}</d:multistatus>`;
         if (url === `${NC}${FILES}/notes.txt` && init?.method === "DELETE") {
           return new Response("", { status: 200 });
         }
-        return new Response("unexpected " + url, { status: 404 });
+        return new Response(`unexpected ${url}`, { status: 404 });
       }),
     });
     connect(store, secrets);
@@ -4818,7 +4818,7 @@ ${bodies}</d:multistatus>`;
     connect(store, secrets);
     const res = await app.inject({
       method: "DELETE",
-      url: "/api/eindav/contact?href=" + encodeURIComponent("https://evil.test/x.vcf"),
+      url: `/api/eindav/contact?href=${encodeURIComponent("https://evil.test/x.vcf")}`,
       headers: auth,
     });
     expect(res.statusCode).toBe(400);
@@ -5068,9 +5068,7 @@ describe("module framework", () => {
       config: loadConfig({ ...testEnv(), MODULE_TALK_TITLE: "Werkstatt-Chat" }),
     });
     const res = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
-    const talk = res
-      .json()
-      .modules.find((m: { id: string; title?: string }) => m.id === "talk");
+    const talk = res.json().modules.find((m: { id: string; title?: string }) => m.id === "talk");
     expect(talk.title).toBe("Werkstatt-Chat");
     const einhub = res
       .json()

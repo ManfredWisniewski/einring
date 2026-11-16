@@ -133,7 +133,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
       if (config.APPLICATION_ID === undefined) {
         return reply.code(424).send({ error: "tables application id not configured" });
       }
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -161,7 +161,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.get("/nodes/:type/:id", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -197,7 +197,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     const dataSchema = z.object({ data: z.record(z.string(), z.unknown()).optional() }).strict();
 
     api.patch("/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -211,7 +211,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.post("/nodes/:type/:id/rows", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
@@ -229,7 +229,7 @@ export const tablesModule: BffModule<z.infer<typeof configSchema>> = {
     });
 
     api.delete("/nodes/:type/:id/rows/:rowId", async (req, reply) => {
-      const nc = ncFor(req.user!.sub);
+      const nc = ncFor(req.user.sub);
       if (!nc) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }

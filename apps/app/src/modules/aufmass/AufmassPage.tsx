@@ -590,15 +590,15 @@ function NodeGrid({
             setAmountRow(null);
           }}
           onSubmit={(amount) => {
-            if (!amountRow) return;
-            const current = Number(amountRow.cells[String(data.verbautColumnId)]) || 0;
+            const verbautId = data.verbautColumnId;
+            if (!amountRow || verbautId === undefined) return;
+            const current = Number(amountRow.cells[String(verbautId)]) || 0;
             setAmountError(undefined);
             patchRow.mutate(
-              { rowId: amountRow.id, data: { [data.verbautColumnId!]: current + amount } },
+              { rowId: amountRow.id, data: { [verbautId]: current + amount } },
               {
                 onSuccess: () => setAmountRow(null),
-                onError: (e) =>
-                  setAmountError(t("modules.aufmass.error", { status: statusOf(e) })),
+                onError: (e) => setAmountError(t("modules.aufmass.error", { status: statusOf(e) })),
               },
             );
           }}

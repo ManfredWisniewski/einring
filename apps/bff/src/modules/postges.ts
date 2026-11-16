@@ -1,6 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { AppContext } from "../app.js";
 import { listTables } from "../pg/catalog.js";
 import { isAuthError, openPg, type PgClient, PgError, type PgOpen } from "../pg/client.js";
 import { browseTable, deleteRow, insertRow, updateRow } from "../pg/table.js";

@@ -209,7 +209,6 @@ function SubmissionMedia({ s }: { s: SchoolHomeworkSubmission }) {
   const Tag = s.mediaMime?.startsWith("video/") ? "video" : "audio";
   return (
     <div className="stack" style={{ gap: "var(--space-1)" }}>
-      {/* biome-ignore lint/a11y/useMediaCaption: student recordings carry no captions */}
       <Tag controls src={url} style={{ maxWidth: "100%" }} />
       <a className="linklike muted" href={url} download={s.mediaName ?? "recording"}>
         {s.mediaName}
