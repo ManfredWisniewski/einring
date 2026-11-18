@@ -39,6 +39,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # OCI labels carry the app + per-module versions (D69 manifests) so a
+      # deployment can inspect an image and decide whether any enabled module
+      # actually changed — without pulling or running it.
+      - name: Resolve version labels
+        id: vers
+        run: |
+          app=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' apps/app/package.json | head -1)
+          declare -A mods
+          for f in apps/bff/src/modules/*.ts; do
+            case "$f" in *.test.ts) continue ;; esac
+            v=$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$f" | head -1)
+            [ -n "$v" ] && mods[$(basename "$f" .ts)]=$v
+          done
+          for f in apps/app/src/modules/*/index.ts; do
+            [ -f "$f" ] || continue
+            v=$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$f" | head -1)
+            id=$(basename "$(dirname "$f")")
+            [ -n "$v" ] && mods[$id]=${mods[$id]:-$v}
+          done
+          body=$(printf '%s\n' "${!mods[@]}" | sort | while read -r id; do
+            printf '"%s":"%s",' "$id" "${mods[$id]}"
+          done)
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "modules={${body%,}}" >> "$GITHUB_OUTPUT"
+
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -46,7 +71,10 @@ jobs:
           tags: |
             type=sha
             type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
+          labels: |
+            org.einring.app.version=${{ steps.vers.outputs.app }}
+            org.einring.modules=${{ steps.vers.outputs.modules }}
 
       # Single-arch build loaded into the runner for the smoke test; the push
       # build below reuses this buildx cache.

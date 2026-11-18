@@ -315,6 +315,7 @@
 - `GET`/`DELETE /api/email/message/<accountId|messageId>` operate on the owning account — 404 for unknown message or account.
 - EinHub dedupes by composite `sourceId` across accounts; `email_recent`/`email_read` accept composite ids.
 - The email settings page (D59) lists accounts with add/remove; the `/email` inbox shows the merged list with an account tag. DE + EN + RU + FR.
+- One shared `EmailAccountForm` drives both add paths: the settings-page add card and the `/email` empty state when no account exists (posting to `/api/email/accounts`, not the legacy `/credentials` route). The form clears its fields after a successful add.
 
 ### A38 Stalwart module (read-only server info, D62)
 
@@ -354,6 +355,7 @@
 - **Wer/wann (FR-005)**: rows expose the Tables row meta `createdBy`/`createdAt`/`lastEditBy`/`lastEditAt`; the grid shows the last editor and timestamp in a trailing meta column ("—" when absent).
 - **Status/entfällt/zusätzlich (FR-009)**: status travels as a `selection` column (options from the schema — dropdown edit); a `selection`+`check` column titled matching `entfällt` renders as a checkbox and strikes/dims the whole row; new (unplanned) positions are appended via add-row. `Raum`/`LV-Nummer` stay text-editable for manual assignment (FR-011); `Verbaut` keeps the number stepper.
 - **Summen (FR-013)**: a footer row sums every `number`/computed column that has at least one numeric cell value.
+- Mutation errors surface upstream: `PATCH`/`POST`/`DELETE` row routes return the `NextcloudError.status` when it is < 500 (else 502) instead of collapsing to 502, and the `/aufmass` page shows mutation failures in a localized dialog rather than silently.
 
 ### A43 EinChat MCP server (spec: `+wit/specs/einring/einchat-mcp/`)
 
@@ -388,3 +390,18 @@
 - `MODULE_EINCHAT_PLACEHOLDER=<literal>` surfaces as `placeholder` on `GET /api/einchat/status` and overrides the chat input's localized example question; unset = the i18n default. Single literal across locales (same reasoning as D67 titles).
 - The EinChat page renders the data-connections ("Datenverbindungen") section below the message input row.
 - The `.chat-thread` container reserves no dead height — it hugs its content; assistant markdown bubbles render without phantom blank lines (`pre-wrap` applies to user bubbles only).
+
+### A48 Image version labels + tags (spec: `+wit/specs/einring/image-version-labels/`)
+
+- Every published image carries `org.einring.app.version` (app semver) and `org.einring.modules` (sorted JSON `{moduleId: version}` covering BFF and frontend-only modules), readable via `docker manifest inspect`/`skopeo inspect` without pulling or running.
+- Every build is tagged `latest`; `v*` pushes also tag the release name, branch pushes also `sha-<commit>`. No per-module image tags are emitted.
+
+### A49 EinMusic YouTube download — MusicDL (spec: `+wit/specs/einring/einmusic-ytdl/`)
+
+- `POST /api/musicdl/downloads` with a valid YouTube http(s) URL creates a persisted job and returns its id immediately; invalid/non-YouTube URLs are rejected before any child process runs (SC-004).
+- A video URL produces one EinMusic track that lists and streams like an upload (SC-001); a playlist URL of N videos produces N tracks (SC-002).
+- Per-item failures are reported on the job without losing the other items (SC-003); job state (SQLite `musicdl_jobs`) survives page reload.
+- Resubmitting an already-imported video id reports the existing track instead of duplicating (dedupe by `source_video_id`).
+- Downloads count against the upload quota; items beyond quota fail and keep no files (SC-005); playlists over 50 items are rejected up front.
+- The `musicdl` module is independently toggleable via `MODULES`; missing python/yt-dlp fails the job with a clear error, not a hang.
+- App `musicdl` page submits URLs and shows per-item results; all strings localized de+en, token styling only (SC-006).
