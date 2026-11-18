@@ -1041,3 +1041,33 @@ export interface PostgesRows {
   offset: number;
   limit: number;
 }
+
+export interface MusicdlItem {
+  url: string;
+  title?: string;
+  videoId?: string;
+  ok: boolean;
+  deduped?: boolean;
+  trackId?: number;
+  error?: string;
+}
+
+export interface MusicdlJob {
+  id: number;
+  url: string;
+  state: "pending" | "running" | "done" | "failed";
+  total: number;
+  done: number;
+  items: MusicdlItem[];
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface MusicdlJobs {
+  jobs: MusicdlJob[];
+}
+
+export interface MusicdlJobResponse {
+  job: MusicdlJob;
+}

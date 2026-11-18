@@ -13,6 +13,7 @@ import { gitlabModule } from "./gitlab";
 import { gotifyModule } from "./gotify";
 import { matrixModule } from "./matrix";
 import { monitorModule } from "./monitor";
+import { musicdlModule } from "./musicdl";
 import { navidromeModule } from "./navidrome";
 import { nextcloudModule } from "./nextcloud";
 import { passmanModule } from "./passman";
@@ -50,6 +51,7 @@ export const appModules: AppModule[] = [
   authentikModule,
   nextcloudModule,
   einmusicModule,
+  musicdlModule,
   pdfModule,
   passmanModule,
   talkModule,

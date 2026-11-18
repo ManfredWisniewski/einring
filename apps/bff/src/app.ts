@@ -26,6 +26,8 @@ export interface AppDeps {
   imapOpen?: ImapOpen;
   /** Postgres opener for the postges module (and future pg-backed modules); injectable for tests. */
   pgOpen?: PgOpen;
+  /** Child-process spawner for the musicdl worker; injectable for tests. */
+  spawnChild?: typeof import("node:child_process").spawn;
   logger?: boolean | object;
 }
 

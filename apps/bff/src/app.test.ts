@@ -5042,6 +5042,7 @@ describe("module framework", () => {
         { id: "audiobookshelf", version: "0.1.0", requires: [] },
         { id: "navidrome", version: "0.1.0", requires: [] },
         { id: "einmusic", version: "0.1.0", requires: [] },
+        { id: "musicdl", version: "0.1.0", requires: [] },
         { id: "trek", version: "0.1.0", requires: [] },
         { id: "email", version: "0.1.0", requires: [] },
         { id: "gotify", version: "0.1.0", requires: [] },

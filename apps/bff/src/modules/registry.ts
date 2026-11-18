@@ -14,6 +14,7 @@ import { gitlabModule } from "./gitlab.js";
 import { gotifyModule } from "./gotify.js";
 import { matrixModule } from "./matrix.js";
 import { monitorModule } from "./monitor.js";
+import { musicdlModule } from "./musicdl.js";
 import { navidromeModule } from "./navidrome.js";
 import { nextcloudModule } from "./nextcloud.js";
 import { passmanModule } from "./passman.js";
@@ -50,6 +51,7 @@ export const bffModules: BffModule[] = [
   audiobookshelfModule,
   navidromeModule,
   einmusicModule,
+  musicdlModule,
   trekModule,
   emailModule,
   gotifyModule,

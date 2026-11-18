@@ -96,7 +96,22 @@ export interface MusicTrackRow {
   sub: string;
   title: string;
   bytes: number;
+  /** YouTube video id when the track came from musicdl (dedupe key); null for uploads. */
+  sourceVideoId: string | null;
   createdAt: string;
+}
+
+/** musicdl download job (spec einmusic-ytdl): `items` is a JSON array of per-video results. */
+export interface MusicdlJobRow {
+  id: number;
+  sub: string;
+  url: string;
+  state: string;
+  total: number;
+  items: string;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
 }
 
 export interface MusicPlaylistRow {
@@ -206,8 +221,31 @@ export interface Store {
   listMusicTracks(sub: string): Omit<MusicTrackRow, "sub">[];
   /** Aggregate upload usage (bytes + count) for quota enforcement. */
   musicUsage(sub: string): { bytes: number; tracks: number };
-  createMusicTrack(sub: string, title: string, bytes: number): Omit<MusicTrackRow, "sub">;
+  createMusicTrack(
+    sub: string,
+    title: string,
+    bytes: number,
+    sourceVideoId?: string | null,
+  ): Omit<MusicTrackRow, "sub">;
   getMusicTrack(sub: string, id: number): Omit<MusicTrackRow, "sub"> | undefined;
+  /** Dedupe lookup for musicdl imports. */
+  getMusicTrackByVideoId(sub: string, videoId: string): Omit<MusicTrackRow, "sub"> | undefined;
+  /** musicdl jobs (spec einmusic-ytdl). */
+  createMusicdlJob(sub: string, url: string): Omit<MusicdlJobRow, "sub">;
+  /** Full-row update — the module writes the whole job state each step. */
+  updateMusicdlJob(
+    id: number,
+    j: {
+      state: string;
+      total: number;
+      items: string;
+      error: string | null;
+      finishedAt: string | null;
+    },
+  ): void;
+  getMusicdlJob(sub: string, id: number): Omit<MusicdlJobRow, "sub"> | undefined;
+  /** Newest-first, capped. */
+  listMusicdlJobs(sub: string, limit: number): Omit<MusicdlJobRow, "sub">[];
   /** Deletes the row + playlist references; false when the sub doesn't own `id`. */
   deleteMusicTrack(sub: string, id: number): boolean;
   listMusicPlaylists(sub: string): (Omit<MusicPlaylistRow, "sub"> & { trackCount: number })[];
@@ -326,9 +364,22 @@ CREATE TABLE IF NOT EXISTS music_tracks (
   sub TEXT NOT NULL,
   title TEXT NOT NULL,
   bytes INTEGER NOT NULL,
+  source_video_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS music_tracks_sub ON music_tracks(sub);
+CREATE TABLE IF NOT EXISTS musicdl_jobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub TEXT NOT NULL,
+  url TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'pending',
+  total INTEGER NOT NULL DEFAULT 0,
+  items TEXT NOT NULL DEFAULT '[]',
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS musicdl_jobs_sub ON musicdl_jobs(sub, id);
 CREATE TABLE IF NOT EXISTS music_playlists (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sub TEXT NOT NULL,
@@ -366,6 +417,15 @@ function migrate(db: DatabaseSync) {
   ]) {
     if (!flowCols.has(col)) db.exec(`ALTER TABLE login_flows ADD COLUMN ${col} TEXT`);
   }
+  const trackCols = new Set(
+    (db.prepare("PRAGMA table_info(music_tracks)").all() as { name: string }[]).map((c) => c.name),
+  );
+  if (!trackCols.has("source_video_id")) {
+    db.exec("ALTER TABLE music_tracks ADD COLUMN source_video_id TEXT");
+  }
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS music_tracks_video ON music_tracks(sub, source_video_id) WHERE source_video_id IS NOT NULL",
+  );
 }
 
 /** `path` may be ":memory:" for tests. */
@@ -518,14 +578,30 @@ export function openStore(path: string): Store {
   const markNotif = db.prepare("UPDATE notifications SET read = 1 WHERE id = ? AND sub = ?");
   const markAllNotifs = db.prepare("UPDATE notifications SET read = 1 WHERE sub = ?");
   const listTracks = db.prepare(
-    "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? ORDER BY title",
+    "SELECT id, title, bytes, source_video_id AS sourceVideoId, created_at AS createdAt FROM music_tracks WHERE sub = ? ORDER BY title",
   );
   const trackUsage = db.prepare(
     "SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS tracks FROM music_tracks WHERE sub = ?",
   );
-  const putTrack = db.prepare("INSERT INTO music_tracks (sub, title, bytes) VALUES (?, ?, ?)");
+  const putTrack = db.prepare(
+    "INSERT INTO music_tracks (sub, title, bytes, source_video_id) VALUES (?, ?, ?, ?)",
+  );
   const getTrack = db.prepare(
-    "SELECT id, title, bytes, created_at AS createdAt FROM music_tracks WHERE sub = ? AND id = ?",
+    "SELECT id, title, bytes, source_video_id AS sourceVideoId, created_at AS createdAt FROM music_tracks WHERE sub = ? AND id = ?",
+  );
+  const getTrackByVideo = db.prepare(
+    "SELECT id, title, bytes, source_video_id AS sourceVideoId, created_at AS createdAt FROM music_tracks WHERE sub = ? AND source_video_id = ?",
+  );
+  const JOB_COLS =
+    "id, url, state, total, items, error, created_at AS createdAt, finished_at AS finishedAt";
+  const putJob = db.prepare("INSERT INTO musicdl_jobs (sub, url) VALUES (?, ?)");
+  const getJob = db.prepare(`SELECT ${JOB_COLS} FROM musicdl_jobs WHERE sub = ? AND id = ?`);
+  const getJobById = db.prepare(`SELECT ${JOB_COLS} FROM musicdl_jobs WHERE id = ?`);
+  const listJobs = db.prepare(
+    `SELECT ${JOB_COLS} FROM musicdl_jobs WHERE sub = ? ORDER BY id DESC LIMIT ?`,
+  );
+  const updJob = db.prepare(
+    "UPDATE musicdl_jobs SET state = ?, total = ?, items = ?, error = ?, finished_at = ? WHERE id = ?",
   );
   const delTrack = db.prepare("DELETE FROM music_tracks WHERE sub = ? AND id = ?");
   const delTrackRefs = db.prepare("DELETE FROM music_playlist_tracks WHERE track_id = ?");
@@ -700,11 +776,21 @@ export function openStore(path: string): Store {
     markAllNotificationsRead: (sub) => void markAllNotifs.run(sub),
     listMusicTracks: (sub) => listTracks.all(sub) as Omit<MusicTrackRow, "sub">[],
     musicUsage: (sub) => trackUsage.get(sub) as { bytes: number; tracks: number },
-    createMusicTrack: (sub, title, bytes) => {
-      const id = Number(putTrack.run(sub, title, bytes).lastInsertRowid);
+    createMusicTrack: (sub, title, bytes, sourceVideoId) => {
+      const id = Number(putTrack.run(sub, title, bytes, sourceVideoId ?? null).lastInsertRowid);
       return getTrack.get(sub, id) as Omit<MusicTrackRow, "sub">;
     },
     getMusicTrack: (sub, id) => getTrack.get(sub, id) as Omit<MusicTrackRow, "sub"> | undefined,
+    getMusicTrackByVideoId: (sub, videoId) =>
+      getTrackByVideo.get(sub, videoId) as Omit<MusicTrackRow, "sub"> | undefined,
+    createMusicdlJob: (sub, url) => {
+      const id = Number(putJob.run(sub, url).lastInsertRowid);
+      return getJobById.get(id) as Omit<MusicdlJobRow, "sub">;
+    },
+    updateMusicdlJob: (id, j) =>
+      void updJob.run(j.state, j.total, j.items, j.error, j.finishedAt, id),
+    getMusicdlJob: (sub, id) => getJob.get(sub, id) as Omit<MusicdlJobRow, "sub"> | undefined,
+    listMusicdlJobs: (sub, limit) => listJobs.all(sub, limit) as Omit<MusicdlJobRow, "sub">[],
     deleteMusicTrack: (sub, id) => {
       const res = delTrack.run(sub, id);
       if (res.changes > 0) delTrackRefs.run(id);

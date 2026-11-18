@@ -44,6 +44,8 @@ import type {
   Me,
   ModulePrefs,
   ModuleRegistry,
+  MusicdlJobResponse,
+  MusicdlJobs,
   NavidromePlaylistDetail,
   NavidromePlaylists,
   NextcloudFeatures,
@@ -138,6 +140,7 @@ export const keys = {
   einmusicPlaylist: (id: number) => ["einmusic", "playlist", id] as const,
   navidromePlaylists: ["einmusic", "navidrome", "playlists"] as const,
   navidromePlaylist: (id: string) => ["einmusic", "navidrome", "playlist", id] as const,
+  musicdlJobs: ["musicdl", "jobs"] as const,
 };
 
 /** Enabled modules per the BFF registry — the source of truth for routes and nav (D33). */
@@ -2034,5 +2037,29 @@ export function usePostgesDelete(table: { schema: string; name: string } | null)
         { pk },
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["postges", "rows"] }),
+  });
+}
+
+// --- MusicDL (spec einmusic-ytdl) -----------------------------------------
+
+/** Recent download jobs; polls while any job is still active. */
+export function useMusicdlJobs() {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.musicdlJobs,
+    queryFn: () => api.get<MusicdlJobs>("/musicdl/downloads"),
+    refetchInterval: (q) =>
+      q.state.data?.jobs.some((j) => j.state === "pending" || j.state === "running")
+        ? 3_000
+        : false,
+  });
+}
+
+export function useSubmitMusicdl() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => api.post<MusicdlJobResponse>("/musicdl/downloads", { url }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.musicdlJobs }),
   });
 }

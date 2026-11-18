@@ -1,0 +1,22 @@
+{
+  "nav": "MusicDL",
+  "title": "Musik-Download",
+  "intro": "YouTube-Link oder Playlist einfügen — die Musik landet in deiner EinMusic-Bibliothek.",
+  "urlLabel": "YouTube-Link",
+  "urlPlaceholder": "https://www.youtube.com/watch?v=… oder eine Playlist",
+  "submit": "Herunterladen",
+  "submitting": "Lädt …",
+  "invalidUrl": "Das ist kein gültiger YouTube-Link.",
+  "submitError": "Der Download konnte nicht gestartet werden.",
+  "openLibrary": "Zur EinMusic-Bibliothek",
+  "jobs": "Downloads",
+  "empty": "Noch keine Downloads.",
+  "state_pending": "Wartet",
+  "state_running": "Läuft",
+  "state_done": "Fertig",
+  "state_failed": "Fehlgeschlagen",
+  "progress": "{{done}}/{{total}} Videos",
+  "item_ok": "Importiert",
+  "item_deduped": "Bereits vorhanden",
+  "item_failed": "Fehlgeschlagen"
+}

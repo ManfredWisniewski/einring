@@ -1,0 +1,22 @@
+{
+  "nav": "MusicDL",
+  "title": "Music download",
+  "intro": "Paste a YouTube link or playlist — the music lands in your EinMusic library.",
+  "urlLabel": "YouTube link",
+  "urlPlaceholder": "https://www.youtube.com/watch?v=… or a playlist",
+  "submit": "Download",
+  "submitting": "Downloading …",
+  "invalidUrl": "That is not a valid YouTube link.",
+  "submitError": "The download could not be started.",
+  "openLibrary": "Open EinMusic library",
+  "jobs": "Downloads",
+  "empty": "No downloads yet.",
+  "state_pending": "Pending",
+  "state_running": "Running",
+  "state_done": "Done",
+  "state_failed": "Failed",
+  "progress": "{{done}}/{{total}} videos",
+  "item_ok": "Imported",
+  "item_deduped": "Already in library",
+  "item_failed": "Failed"
+}

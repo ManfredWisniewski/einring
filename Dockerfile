@@ -27,9 +27,13 @@ RUN pnpm --filter @einring/tokens build \
  && pnpm --filter @einring/bff deploy --prod --legacy /out/bff
 
 FROM node:22-alpine
+# musicdl module: yt-dlp worker needs python3 + ffmpeg on PATH
+RUN apk add --no-cache python3 yt-dlp ffmpeg
 ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 DATA_DIR=/data STATIC_DIR=/srv/web
 WORKDIR /srv/bff
 COPY --from=build /out/bff ./
+# wit_pytools submodule: the musicdl worker imports ytdlptools from here
+COPY wit_pytools /srv/bff/wit_pytools
 COPY --from=build /repo/apps/app/dist /srv/web
 RUN mkdir -p /data && chown node:node /data
 USER node

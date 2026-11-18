@@ -11,6 +11,7 @@ Einring ships as a single Docker image: the Fastify BFF serves the API under `/a
   - Signing key assigned (the BFF validates JWTs against the provider's JWKS — a keyless provider returns an empty JWKS and every API call fails with 401)
   - Scopes: `openid profile email`
 - A reachable **Nextcloud** instance (`NEXTCLOUD_URL`); app passwords are obtained per user via Login Flow v2 at runtime
+- For `make dev` work on the `musicdl` module, the dev host needs **python3**, **yt-dlp** and **ffmpeg** on PATH — the Docker image bundles all three itself. `wit_pytools` must be checked out (submodule).
 
 ## 1. Get the image
 
@@ -108,6 +109,10 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_POSTGES_MAX_PAGE=200     # rows per page cap (default 200)
 # MODULE_POSTGES_TIMEOUT_MS=10000 # Postgres connect/query timeout (default 10000)
 # MODULE_EINHUB_REFRESH_SECONDS=60  # min seconds between upstream notification polls per user
+# MODULE_MUSICDL_MAX_ITEMS=50       # playlist item cap per download job (default 50)
+# MODULE_MUSICDL_MAX_TRACKS=500     # per-user quota — same semantics as the einmusic upload quota
+# MODULE_MUSICDL_MAX_TOTAL_BYTES=   # default 2 GiB
+# MODULE_MUSICDL_PYTHON=            # python executable override (default python3 / python on Windows)
 # --- school module (D56) ----------------------------------------------------
 # Authentik group names that map to school roles (see "School module" below):
 # MODULE_SCHOOL_GROUP_ADMIN=einring-school-admin
