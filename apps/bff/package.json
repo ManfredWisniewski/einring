@@ -1,6 +1,6 @@
 {
   "name": "@einring/bff",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Backend-for-frontend: validates Authentik tokens, holds Nextcloud app passwords, proxies service APIs, serves the web build.",
   "type": "module",

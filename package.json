@@ -1,6 +1,6 @@
 {
   "name": "einring",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "One ring to control them all - a mobile/web UI to manage services via their APIs.",
   "packageManager": "pnpm@10.34.5",
