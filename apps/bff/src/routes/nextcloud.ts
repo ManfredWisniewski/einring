@@ -299,9 +299,7 @@ export function registerNextcloudPublicRoutes(api: FastifyInstance, ctx: AppCont
       reply.code(429);
       return { status: "disconnected" };
     }
-    const body = request.body as
-      | { loginName?: unknown; appPassword?: unknown }
-      | undefined;
+    const body = request.body as { loginName?: unknown; appPassword?: unknown } | undefined;
     const loginName = typeof body?.loginName === "string" ? body.loginName.trim() : "";
     const appPassword = typeof body?.appPassword === "string" ? body.appPassword.trim() : "";
     if (!loginName || !appPassword) {

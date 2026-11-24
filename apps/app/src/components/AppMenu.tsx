@@ -1,6 +1,5 @@
 import { Menu as MenuIcon } from "lucide-react";
 import { useState } from "react";
-import pkg from "../../package.json";
 import {
   Button,
   Dialog,
@@ -19,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "~/api/hooks";
 import { useInstanceName, useNav } from "~/instance";
 import { moduleTitle, resolveAppModules } from "~/modules";
+import pkg from "../../package.json";
 
 type DialogId = "modules" | "info";
 

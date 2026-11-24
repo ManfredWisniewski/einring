@@ -22,8 +22,7 @@ export function isEmbedded(): boolean {
     }
     // A stored session token only ever exists in embedded or MDM-managed
     // sessions — its presence marks embedded-style auth across cold starts.
-    embeddedCache =
-      sessionStorage.getItem(EMBEDDED_KEY) === "1" || getSessionToken() !== null;
+    embeddedCache = sessionStorage.getItem(EMBEDDED_KEY) === "1" || getSessionToken() !== null;
   } catch {
     embeddedCache = false;
   }
