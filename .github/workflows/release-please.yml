@@ -1,0 +1,26 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+# Runs on every merge to main: opens/updates a release PR that bumps
+# package.json versions + CHANGELOG from conventional commits. Merging the PR
+# creates the v* tag + GitHub release, which triggers release-apk.yml.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release PR + tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # PAT needed: tags created with the default GITHUB_TOKEN do NOT
+          # trigger downstream workflows (release-apk.yml on v* tags).
+          # RELEASE_PLEASE_PAT needs contents:write on this repo.
+          token: ${{ secrets.RELEASE_PLEASE_PAT || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

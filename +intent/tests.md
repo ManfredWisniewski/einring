@@ -405,3 +405,12 @@
 - Downloads count against the upload quota; items beyond quota fail and keep no files (SC-005); playlists over 50 items are rejected up front.
 - The `musicdl` module is independently toggleable via `MODULES`; missing python/yt-dlp fails the job with a clear error, not a hang.
 - App `musicdl` page submits URLs and shows per-item results; all strings localized de+en, token styling only (SC-006).
+
+### A50 MDM managed configuration — `einring_api_url` (spec: `+wit/specs/common/android-appconfig/`)
+
+- `apps/app/android` declares `res/xml/app_restrictions.xml` with the string restriction `einring_api_url` (title/description via string resources) and registers it through the `android.content.APP_RESTRICTIONS` meta-data inside `<application>` (FR-001..FR-003).
+- The `AppConfig` Capacitor plugin reads `RestrictionsManager.getApplicationRestrictions()` through one typed getter per key; absent service, missing bundle, blank or whitespace-only values resolve to "not configured" without crashing (FR-004, FR-005).
+- On Android a pushed `einring_api_url` overrides the baked `VITE_API_URL` before the first BFF request (`/api/config` and OIDC settings resolution); scheme-less values normalize to `https://…` and trailing slashes are stripped (FR-006, FR-007 — applied once at startup).
+- With no managed configuration the app behaves identically to before: the `VITE_API_URL` build default applies unchanged (NFR-002); the mechanism uses standard Android APIs only — no vendor SDK — and never logs managed values (NFR-001, NFR-003).
+- `DEPLOYMENT.md` documents the Knox Manage procedure for assigning managed configuration to `de.wit.einring` (FR-010).
+- Manual e2e on a Knox Manage–enrolled device: a pushed `einring_api_url` reaches the plugin and the app talks to that BFF; clearing the key restores the build default (SC-001, SC-002, FR-009). einring v1 declares a single key — the spec's config-group criterion (SC-005) is not exercised.

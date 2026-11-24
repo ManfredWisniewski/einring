@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { initManagedConfig } from "~/appconfig";
 import { config } from "~/config";
 
 /** Deployment whitelabel from the BFF's public /api/config (INSTANCE_* env). */
@@ -54,6 +55,9 @@ export function loadInstanceConfig(): Promise<void> {
 }
 
 async function doLoad(): Promise<void> {
+  // MDM managed configuration wins over the baked VITE_API_URL — resolved here so
+  // every caller (main.tsx, oidc.ts) is gated on the same promise (A50).
+  await initManagedConfig();
   try {
     const res = await fetch(`${config.apiUrl}/api/config`, {
       signal: AbortSignal.timeout(5_000),

@@ -10,7 +10,8 @@
       "!**/build",
       "!packages/tokens/build",
       "!biti",
-      "!+wit"
+      "!+wit",
+      "!wit_pytools"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

@@ -44,6 +44,13 @@ function fakeSpawn(
   }) as typeof import("node:child_process").spawn;
 }
 
+/** The worker's staging dir arrives as argv[2] — the fake spawn must see it. */
+function stagingDir(args: string[]): string {
+  const dir = args[2];
+  if (!dir) throw new Error("fakeSpawn: staging dir arg missing");
+  return dir;
+}
+
 /** Write a fake audio file into the job's staging dir and return its path. */
 function stageFile(stagingDir: string, name: string, bytes = 10): string {
   const p = resolve(stagingDir, name);
@@ -112,9 +119,9 @@ describe("musicdl", () => {
   });
 
   it("imports one track per playlist item into the user's library", async () => {
-    const { app, store, auth, dataDir } = await dlApp(
+    const { app, store, auth } = await dlApp(
       fakeSpawn((args) => {
-        const staging = args[2]!;
+        const staging = stagingDir(args);
         const f1 = stageFile(staging, "A [v1].mp3");
         const f2 = stageFile(staging, "B [v2].mp3");
         return {
@@ -142,7 +149,7 @@ describe("musicdl", () => {
   });
 
   it("reports a failed item without losing the others", async () => {
-    const { app, store, auth, dataDir } = await dlApp(
+    const { app, store, auth } = await dlApp(
       fakeSpawn((args) => ({
         lines: [
           { type: "resolved", count: 2 },
@@ -152,7 +159,7 @@ describe("musicdl", () => {
             title: "A",
             video_id: "v1",
             ok: true,
-            file_path: stageFile(args[2]!, "A.mp3"),
+            file_path: stageFile(stagingDir(args), "A.mp3"),
           },
           {
             type: "item",
@@ -174,13 +181,13 @@ describe("musicdl", () => {
     });
     const job = await waitJob(app, auth, res.json().job.id);
     expect(job.state).toBe("done");
-    expect(job.items[1]!.ok).toBe(false);
-    expect(job.items[1]!.error).toContain("unavailable");
+    expect(job.items[1]?.ok).toBe(false);
+    expect(job.items[1]?.error).toContain("unavailable");
     expect(store.listMusicTracks("user-1")).toHaveLength(1);
   });
 
   it("dedupes by video id instead of duplicating the track", async () => {
-    const { app, store, auth, dataDir } = await dlApp(
+    const { app, store, auth } = await dlApp(
       fakeSpawn((args) => ({
         lines: [
           { type: "resolved", count: 1 },
@@ -190,7 +197,7 @@ describe("musicdl", () => {
             title: "A",
             video_id: "v1",
             ok: true,
-            file_path: stageFile(args[2]!, "A.mp3"),
+            file_path: stageFile(stagingDir(args), "A.mp3"),
           },
           { type: "done" },
         ],
@@ -208,11 +215,11 @@ describe("musicdl", () => {
     }
     expect(store.listMusicTracks("user-1")).toHaveLength(1);
     const jobs = store.listMusicdlJobs("user-1", 10);
-    expect(JSON.parse(jobs[0]!.items)[0].deduped).toBe(true);
+    expect(JSON.parse(jobs[0]?.items ?? "[]")[0].deduped).toBe(true);
   });
 
   it("marks items beyond the quota as failed and keeps no file", async () => {
-    const { app, store, auth, dataDir } = await dlApp(
+    const { app, store, auth } = await dlApp(
       fakeSpawn((args) => ({
         lines: [
           { type: "resolved", count: 2 },
@@ -222,7 +229,7 @@ describe("musicdl", () => {
             title: "A",
             video_id: "v1",
             ok: true,
-            file_path: stageFile(args[2]!, "A.mp3"),
+            file_path: stageFile(stagingDir(args), "A.mp3"),
           },
           {
             type: "item",
@@ -230,7 +237,7 @@ describe("musicdl", () => {
             title: "B",
             video_id: "v2",
             ok: true,
-            file_path: stageFile(args[2]!, "B.mp3"),
+            file_path: stageFile(stagingDir(args), "B.mp3"),
           },
           { type: "done" },
         ],
@@ -245,9 +252,9 @@ describe("musicdl", () => {
     });
     const job = await waitJob(app, auth, res.json().job.id);
     expect(job.state).toBe("done");
-    expect(job.items[0]!.ok).toBe(true);
-    expect(job.items[1]!.ok).toBe(false);
-    expect(job.items[1]!.error).toContain("quota");
+    expect(job.items[0]?.ok).toBe(true);
+    expect(job.items[1]?.ok).toBe(false);
+    expect(job.items[1]?.error).toContain("quota");
     expect(store.listMusicTracks("user-1")).toHaveLength(1);
   });
 

@@ -214,7 +214,8 @@ function runJob(ctx: AppContext, config: MusicdlConfig, sub: string, jobId: numb
     cleanup();
   };
 
-  const rl = createInterface({ input: child.stdout! });
+  if (!child.stdout) throw new Error("musicdl worker spawned without stdout");
+  const rl = createInterface({ input: child.stdout });
   rl.on("close", () => {
     rlDone = true;
     finish();

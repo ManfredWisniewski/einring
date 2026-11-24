@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MDM managed configuration schema (spec: +wit/specs/common/android-appconfig).
+     Registered via the android.content.APP_RESTRICTIONS meta-data in AndroidManifest.xml. -->
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+    <restriction
+        android:defaultValue=""
+        android:description="@string/restriction_api_url_description"
+        android:key="einring_api_url"
+        android:restrictionType="string"
+        android:title="@string/restriction_api_url_title" />
+</restrictions>

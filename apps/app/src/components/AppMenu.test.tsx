@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import i18n from "~/i18n";
+import pkg from "../../package.json";
 import { AppMenu } from "./AppMenu";
 
 vi.mock("~/api/hooks", () => ({
@@ -28,7 +29,7 @@ describe("AppMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "Info" }));
 
     expect(screen.getByRole("dialog", { name: "About Einring" })).toBeInTheDocument();
-    expect(screen.getByText("Version 0.1.1")).toBeInTheDocument();
+    expect(screen.getByText(`Version ${pkg.version}`)).toBeInTheDocument();
   });
 
   it("lists enabled modules except einhub and settings", async () => {

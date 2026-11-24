@@ -1,5 +1,6 @@
 import { Menu as MenuIcon } from "lucide-react";
 import { useState } from "react";
+import pkg from "../../package.json";
 import {
   Button,
   Dialog,
@@ -89,7 +90,7 @@ function InfoDialog({ close }: { close: () => void }) {
     <div className="stack">
       <DialogHeader title={t("info.title", { name })} close={close} />
       <p>{t("info.description", { name })}</p>
-      <p className="muted">{t("info.version", { version: "0.1.1" })}</p>
+      <p className="muted">{t("info.version", { version: pkg.version })}</p>
       <div>
         <span className="muted">{t("info.modules")}</span>
         <ul className="info-modules">

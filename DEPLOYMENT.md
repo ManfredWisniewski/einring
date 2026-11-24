@@ -332,6 +332,23 @@ Restoring into a fresh deployment requires the **same `ENCRYPTION_KEY`** — sea
 
 The Docker image is web-only. To build an Android APK that talks to the deployed BFF, set `VITE_API_URL=https://einring.example.com` in `apps/app/.env.local`, then `pnpm --filter @einring/app android:sync` and build in Android Studio. The `einring://auth/callback` redirect URI must be registered in the Authentik provider.
 
+## MDM managed configuration (Android)
+
+The app declares an Android managed-configuration schema (`apps/app/android/app/src/main/res/xml/app_restrictions.xml`, mechanism spec: `+wit/specs/common/android-appconfig/`). An MDM can push key/value pairs per package — no per-customer build needed. A pushed value overrides the baked `VITE_API_URL` at app start; unset or blank keeps the build default.
+
+| Key | Type | Effect |
+|---|---|---|
+| `einring_api_url` | string | BFF base URL the app connects to; scheme-less values normalize to `https://…` |
+
+Verified on **Samsung Knox Manage**:
+
+1. Enrol the device and install the app (`de.wit.einring`) through Knox Manage.
+2. Open the app's managed-configuration surface for the package in the Knox Manage console — the declared keys appear with their titles and descriptions.
+3. Set `einring_api_url` to the deployment BFF (e.g. `https://einring.example.com`) and apply the policy.
+4. On the device, (re)start the app — it now talks to that BFF. Clearing the key and re-applying restores the build default.
+
+Managed values are read once at startup; a config pushed while the app runs takes effect on the next start.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |

@@ -4,4 +4,8 @@
     <string name="title_activity_main">Einring</string>
     <string name="package_name">de.wit.einring</string>
     <string name="custom_url_scheme">de.wit.einring</string>
+
+    <!-- Managed configuration (MDM) — labels rendered by the MDM console -->
+    <string name="restriction_api_url_title">BFF URL</string>
+    <string name="restriction_api_url_description">Base URL of the einring backend (BFF) the app connects to.</string>
 </resources>
