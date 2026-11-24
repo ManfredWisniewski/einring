@@ -1,8 +1,11 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { config } from "~/config";
+import { getSessionToken, markEmbedded, setSessionToken } from "~/embedded";
 
 export interface AppConfigPlugin {
   getApiUrl(): Promise<{ value: string | null }>;
+  getUsername?(): Promise<{ value: string | null }>;
+  getAppPassword?(): Promise<{ value: string | null }>;
 }
 
 /** Present only in the Android WebView — the plugin is registered natively (D54 pattern). */
@@ -25,10 +28,41 @@ export function normalizeManagedUrl(raw: string): string {
 export async function initManagedConfig(plugin: AppConfigPlugin | null = native): Promise<void> {
   if (!plugin) return;
   try {
-    const { value } = await plugin.getApiUrl();
-    const url = value ? normalizeManagedUrl(value) : "";
+    const [{ value: rawUrl }, { value: rawUser }, { value: rawPassword }] = await Promise.all([
+      plugin.getApiUrl(),
+      plugin.getUsername?.() ?? Promise.resolve({ value: null }),
+      plugin.getAppPassword?.() ?? Promise.resolve({ value: null }),
+    ]);
+    const url = rawUrl ? normalizeManagedUrl(rawUrl) : "";
     if (url) config.apiUrl = url;
+    const username = rawUser?.trim() ?? "";
+    const appPassword = rawPassword?.trim() ?? "";
+    // Credential group (FR-008): acts only when complete; an existing session wins.
+    if (username && appPassword && !getSessionToken()) {
+      await mintManagedSession(username, appPassword);
+    }
   } catch {
     // plugin missing or restrictions unreadable — keep the build default
+  }
+}
+
+/** MDM credential group → BFF-verified embedded-style session (ref. impl. bb2a5da).
+ *  On failure the normal interactive path stays available. */
+async function mintManagedSession(username: string, appPassword: string): Promise<void> {
+  try {
+    const res = await fetch(`${config.apiUrl}/api/nextcloud/managed-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ loginName: username, appPassword }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return;
+    const body = (await res.json()) as { status?: string; sessionToken?: string };
+    if (body.status === "connected" && body.sessionToken) {
+      setSessionToken(body.sessionToken);
+      markEmbedded();
+    }
+  } catch {
+    // unreachable BFF or invalid credentials — interactive login stays available
   }
 }

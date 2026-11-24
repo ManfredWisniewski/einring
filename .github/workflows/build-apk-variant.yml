@@ -1,0 +1,151 @@
+name: build-apk-variant
+
+# Whitelabeled APK per dispatch: same codebase, different native identity
+# (applicationId, launcher name, redirect scheme, optional icon, module allowlist).
+# Runtime branding (instance name/theme/cssVars/modules) still comes from the
+# BFF's /api/config — these inputs only cover what the BFF cannot change.
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: Artifact label, e.g. customer slug -> einring-<slug>-<version>.apk
+        required: true
+      app_id:
+        description: applicationId / MDM package id (must differ per variant for co-install)
+        required: false
+        default: de.wit.einring
+      app_name:
+        description: Launcher label (strings.xml app_name)
+        required: false
+        default: Einring
+      redirect_scheme:
+        description: OIDC redirect scheme -> <scheme>://auth/callback (needs matching Authentik client entry)
+        required: false
+        default: einring
+      modules:
+        description: Comma-separated module allowlist baked into the APK (VITE_MODULES); empty = all enabled
+        required: false
+      api_url:
+        description: Baked BFF URL default (VITE_API_URL); empty = repo vars value; MDM still overrides
+        required: false
+      authentik_issuer:
+        description: VITE_AUTHENTIK_ISSUER; empty = repo vars value
+        required: false
+      authentik_client_id:
+        description: VITE_AUTHENTIK_CLIENT_ID; empty = repo vars value
+        required: false
+      icon_url:
+        description: Optional URL to a 1024x1024 PNG; regenerates Android icon + splash assets
+        required: false
+      version_name:
+        description: versionName; empty = apps/app/package.json version
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Signed variant APK
+    runs-on: ubuntu-latest
+    env:
+      SLUG: ${{ inputs.slug }}
+      APP_ID: ${{ inputs.app_id }}
+      APP_NAME: ${{ inputs.app_name }}
+      REDIRECT_SCHEME: ${{ inputs.redirect_scheme }}
+      ICON_URL: ${{ inputs.icon_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # +wit is not needed for the build; its ssh remote is unreachable from CI.
+          submodules: false
+      - name: Fetch biti submodule
+        env:
+          BITI_PAT: ${{ secrets.BITI_PAT }}
+        run: |
+          test -n "$BITI_PAT" || { echo "::error::BITI_PAT secret missing — needs contents:read on ManfredWisniewski/biti"; exit 1; }
+          git config --global url."https://x-access-token:${BITI_PAT}@github.com/".insteadOf "https://github.com/"
+          git -c http.https://github.com/.extraheader= submodule update --init biti
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 cmdline-tools;latest
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tokens:build
+      - run: pnpm --filter @einring/app build
+        env:
+          CAP_APP_ID: ${{ inputs.app_id }}
+          CAP_APP_NAME: ${{ inputs.app_name }}
+          VITE_REDIRECT_SCHEME: ${{ inputs.redirect_scheme }}
+          VITE_MODULES: ${{ inputs.modules }}
+          VITE_API_URL: ${{ inputs.api_url || vars.VITE_API_URL }}
+          VITE_AUTHENTIK_ISSUER: ${{ inputs.authentik_issuer || vars.VITE_AUTHENTIK_ISSUER }}
+          VITE_AUTHENTIK_CLIENT_ID: ${{ inputs.authentik_client_id || vars.VITE_AUTHENTIK_CLIENT_ID }}
+      - run: pnpm --filter @einring/app cap sync android
+        env:
+          CAP_APP_ID: ${{ inputs.app_id }}
+          CAP_APP_NAME: ${{ inputs.app_name }}
+
+      - name: Apply brand identity
+        working-directory: apps/app/android
+        run: |
+          node -e '
+            const fs = require("fs");
+            const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+            const name = esc(process.env.APP_NAME);
+            const strings = "app/src/main/res/values/strings.xml";
+            fs.writeFileSync(strings, fs.readFileSync(strings, "utf8")
+              .replace(/(<string name="app_name">)[^<]*/, `$1${name}`)
+              .replace(/(<string name="title_activity_main">)[^<]*/, `$1${name}`));
+            if (process.env.REDIRECT_SCHEME !== "einring") {
+              const manifest = "app/src/main/AndroidManifest.xml";
+              fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8")
+                .replace("android:scheme=\"einring\"", `android:scheme="${process.env.REDIRECT_SCHEME}"`));
+            }
+          '
+          grep -E "app_name|title_activity_main|android:scheme" app/src/main/res/values/strings.xml app/src/main/AndroidManifest.xml
+
+      - name: Generate brand icon + splash
+        if: inputs.icon_url != ''
+        working-directory: apps/app
+        run: |
+          mkdir -p assets
+          curl -fsSL "$ICON_URL" -o assets/icon.png
+          npx --yes @capacitor/assets generate --android
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/einring.keystore"
+
+      - name: Resolve version name
+        run: |
+          VERSION="${{ inputs.version_name }}"
+          [ -z "$VERSION" ] && VERSION=$(node -p "require('./apps/app/package.json').version")
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Assemble signed release APK
+        working-directory: apps/app/android
+        env:
+          EINRING_KEYSTORE_FILE: ${{ runner.temp }}/einring.keystore
+          EINRING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          EINRING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          EINRING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          EINRING_VERSION_CODE: ${{ github.run_number }}
+          EINRING_VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PappId="$APP_ID"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/einring-${SLUG}-${EINRING_VERSION_NAME}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einring-${{ inputs.slug }}-apk
+          path: ${{ runner.temp }}/einring-${{ inputs.slug }}-*.apk

@@ -28,6 +28,16 @@ const schema = z.object({
     z.boolean().default(false),
   ),
   /**
+   * Require the claim-code step for authenticated login flows (default: on).
+   * When off, a flow initiated and claimed by the same Authentik user completes
+   * in one step — but only when the Nextcloud login name equals the claimer's
+   * `preferred_username`; mismatched identities keep the code path.
+   */
+  CLAIM_CODE_REQUIRED: z.preprocess(
+    (v) => (typeof v === "string" ? !/^(0|false|no|off)$/i.test(v.trim()) : v),
+    z.boolean().default(true),
+  ),
+  /**
    * Hide the module-discovery UI surfaces (nav search/tags controls, the
    * Menu's Modules entry) for whitelabel deployments (D68). Unset = shown;
    * display gate only — `/api/modules` and module routes keep answering.

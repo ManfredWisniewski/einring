@@ -28,6 +28,7 @@ const MAX_CLAIM_ATTEMPTS = 5;
 const flowStartLimit = makeRateLimiter(10, 10 * 60_000);
 const flowPollLimit = makeRateLimiter(60, 60_000);
 const flowClaimLimit = makeRateLimiter(30, 60_000);
+const managedSessionLimit = makeRateLimiter(10, 10 * 60_000);
 /** Wrong-code attempts per flow id; the flow dies after MAX_CLAIM_ATTEMPTS. */
 const claimAttempts = new Map<string, number>();
 
@@ -37,6 +38,7 @@ const claimAttempts = new Map<string, number>();
  *   POST   /api/nextcloud/login-flow        -> { login, flow }                   (auth optional)
  *   POST   /api/nextcloud/login-flow/poll   -> pending | awaiting_claim          (auth optional)
  *   POST   /api/nextcloud/login-flow/claim  -> connected(+sessionToken?)         (auth optional)
+ *   POST   /api/nextcloud/managed-session   -> connected(+sessionToken)          (anonymous; MDM autologin)
  *   GET    /api/nextcloud/connection        -> ConnectionStatus                  (auth)
  *   DELETE /api/nextcloud/connection        -> 204, drops credential + sessions  (auth)
  *
@@ -165,10 +167,19 @@ export function registerNextcloudPublicRoutes(api: FastifyInstance, ctx: AppCont
     // Embedded deployments default to one-step completion: the finished upstream
     // login is itself the proof, so the credential lands on nc:<login> and the
     // session goes straight to the poller. EMBEDDED_CLAIM_REQUIRED restores the
-    // completer-bound claim step; authed-initiated flows always keep it.
-    if (!pending.initiatorSub && !user && !ctx.config.EMBEDDED_CLAIM_REQUIRED) {
+    // completer-bound claim step there. For authenticated flows,
+    // CLAIM_CODE_REQUIRED=false allows one-step too — but only when the flow was
+    // initiated by this same user AND the completed Nextcloud login equals their
+    // Authentik preferred_username; identity mismatch keeps the code path, so a
+    // flow completed by someone else can never be claimed without the file code.
+    const selfCompleted =
+      !!user &&
+      pending.initiatorSub === user.sub &&
+      !ctx.config.CLAIM_CODE_REQUIRED &&
+      result.loginName === user.preferredUsername;
+    if ((!pending.initiatorSub && !user && !ctx.config.EMBEDDED_CLAIM_REQUIRED) || selfCompleted) {
       const cred: NextcloudCredential = {
-        sub: `${EMBEDDED_SUB_PREFIX}${result.loginName}`,
+        sub: user?.sub ?? `${EMBEDDED_SUB_PREFIX}${result.loginName}`,
         server: result.server,
         loginName: result.loginName,
         appPasswordSealed: secrets.seal(result.appPassword),
@@ -177,12 +188,15 @@ export function registerNextcloudPublicRoutes(api: FastifyInstance, ctx: AppCont
       store.saveCredential(cred);
       store.deletePendingFlow(pending.sub);
       if (old) void revokeCredential(ctx, old, request.log);
-      const sessionToken = randomBytes(32).toString("base64url");
-      store.saveSession(
-        hashToken(sessionToken),
-        cred.sub,
-        new Date(Date.now() + SESSION_TTL_MS).toISOString(),
-      );
+      let sessionToken: string | undefined;
+      if (!user) {
+        sessionToken = randomBytes(32).toString("base64url");
+        store.saveSession(
+          hashToken(sessionToken),
+          cred.sub,
+          new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+        );
+      }
       return {
         status: "connected",
         loginName: cred.loginName,
@@ -271,6 +285,58 @@ export function registerNextcloudPublicRoutes(api: FastifyInstance, ctx: AppCont
       status: "connected",
       loginName: cred.loginName,
       displayName: await resolveDisplayName(ctx, store.getCredential(sub) ?? cred),
+      server: cred.server,
+      sessionToken,
+    };
+  });
+
+  // MDM autologin (spec android-appconfig FR-008): the pushed username + app
+  // password are verified against Nextcloud, sealed like a login-flow credential
+  // and mint an embedded-style session. Same trust level as an anonymous
+  // claim — proof of a valid Nextcloud credential doubles as sign-in.
+  api.post("/nextcloud/managed-session", async (request, reply): Promise<ConnectionStatus> => {
+    if (!managedSessionLimit.allow(request.ip)) {
+      reply.code(429);
+      return { status: "disconnected" };
+    }
+    const body = request.body as
+      | { loginName?: unknown; appPassword?: unknown }
+      | undefined;
+    const loginName = typeof body?.loginName === "string" ? body.loginName.trim() : "";
+    const appPassword = typeof body?.appPassword === "string" ? body.appPassword.trim() : "";
+    if (!loginName || !appPassword) {
+      reply.code(400);
+      return { status: "disconnected" };
+    }
+    let displayName: string | null = null;
+    try {
+      const nc = nextcloud.withCredentials(loginName, appPassword);
+      displayName = (await nc.getOwnUser()).ocs.data.displayname ?? null;
+    } catch {
+      reply.code(401);
+      return { status: "disconnected" };
+    }
+    const sub = `${EMBEDDED_SUB_PREFIX}${loginName}`;
+    const old = store.getCredential(sub);
+    const cred: NextcloudCredential = {
+      sub,
+      server: ctx.config.NEXTCLOUD_URL,
+      loginName,
+      displayName,
+      appPasswordSealed: secrets.seal(appPassword),
+    };
+    store.saveCredential(cred);
+    if (old) void revokeCredential(ctx, old, request.log);
+    const sessionToken = randomBytes(32).toString("base64url");
+    store.saveSession(
+      hashToken(sessionToken),
+      sub,
+      new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+    );
+    return {
+      status: "connected",
+      loginName: cred.loginName,
+      displayName: cred.displayName ?? null,
       server: cred.server,
       sessionToken,
     };

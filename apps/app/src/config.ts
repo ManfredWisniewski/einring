@@ -10,9 +10,16 @@ export const config = {
   authentikClientId: env.VITE_AUTHENTIK_CLIENT_ID as string,
   /** Empty string = same origin (browser). Android builds need the full BFF URL. */
   apiUrl: ((env.VITE_API_URL as string | undefined) ?? "").replace(/\/+$/, ""),
-  /** Custom scheme the Android app is registered for; web uses an https callback route. */
-  nativeRedirectUri: "einring://auth/callback",
+  /** Custom scheme the Android app is registered for; web uses an https callback route.
+   *  Variant builds override it via VITE_REDIRECT_SCHEME + a matching manifest intent-filter. */
+  nativeRedirectUri: `${(env.VITE_REDIRECT_SCHEME as string | undefined) ?? "einring"}://auth/callback`,
   webRedirectPath: "/auth/callback",
+  /** Build-time module allowlist (VITE_MODULES csv) — intersected with the BFF registry
+   *  in modules/index.ts; undefined = no app-side restriction. */
+  modules: (env.VITE_MODULES as string | undefined)
+    ?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 };
 
 export function redirectUri(): string {

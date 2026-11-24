@@ -301,7 +301,9 @@ The app can run inside a Nextcloud **External sites** iframe — Authentik login
 
 How it works: the anonymous login flow is keyed by a random `flow` id; when it completes, the BFF mints an opaque session token (`nc:<loginName>` identity, 30-day expiry, stored hashed) that the app sends as `Bearer` for all API calls. The Nextcloud app password still never leaves the BFF. The `?embedded` flag lives in sessionStorage, so it can't leak into a standalone tab of the same deployment.
 
-Optional hardening: `EMBEDDED_CLAIM_REQUIRED=true` adds a claim step — after the Nextcloud login completes, the BFF writes `einring-sign-in-<6-digit-code>.txt` into the user's own files and only releases the session to a caller presenting that code. This binds the session to the party that actually logged in (an unclaimed `flow` id is a bearer capability otherwise). Standalone Authentik flows always require the code, regardless of this setting.
+Optional hardening: `EMBEDDED_CLAIM_REQUIRED=true` adds a claim step — after the Nextcloud login completes, the BFF writes `einring-sign-in-<6-digit-code>.txt` into the user's own files and only releases the session to a caller presenting that code. This binds the session to the party that actually logged in (an unclaimed `flow` id is a bearer capability otherwise).
+
+Standalone (Authentik) flows default to the same claim step; `CLAIM_CODE_REQUIRED=false` allows one-step completion for a flow initiated and claimed by the same user, but only when the completed Nextcloud login name equals the claimer's Authentik `preferred_username` — an identity mismatch still falls back to the code, so a flow completed by someone else can never be claimed without it. Only disable it on deployments where Authentik and Nextcloud share usernames.
 
 ## Updating
 
@@ -339,6 +341,8 @@ The app declares an Android managed-configuration schema (`apps/app/android/app/
 | Key | Type | Effect |
 |---|---|---|
 | `einring_api_url` | string | BFF base URL the app connects to; scheme-less values normalize to `https://…` |
+| `einring_username` | string | Nextcloud login name for MDM autologin — only acts together with `einring_app_password` |
+| `einring_app_password` | string | Nextcloud app password; the BFF verifies it (`POST /api/nextcloud/managed-session`), seals it server-side and returns an embedded-style session — the app never stores the credential |
 
 Verified on **Samsung Knox Manage**:
 
@@ -346,6 +350,7 @@ Verified on **Samsung Knox Manage**:
 2. Open the app's managed-configuration surface for the package in the Knox Manage console — the declared keys appear with their titles and descriptions.
 3. Set `einring_api_url` to the deployment BFF (e.g. `https://einring.example.com`) and apply the policy.
 4. On the device, (re)start the app — it now talks to that BFF. Clearing the key and re-applying restores the build default.
+5. For autologin, set `einring_username` + `einring_app_password` (a Nextcloud app password for that user) — at the next start the app signs in without any interactive step. Setting only one of the two keys keeps the normal login path.
 
 Managed values are read once at startup; a config pushed while the app runs takes effect on the next start.
 

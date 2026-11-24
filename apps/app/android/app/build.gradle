@@ -6,7 +6,8 @@ android {
     namespace = "de.wit.einring"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "de.wit.einring"
+        // -PappId=… overrides for whitelabel variant builds (build-apk-variant.yml).
+        applicationId (project.findProperty("appId") ?: "de.wit.einring")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode = (System.getenv("EINRING_VERSION_CODE") ?: "1").toInteger()

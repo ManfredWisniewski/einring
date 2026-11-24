@@ -20,11 +20,23 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class AppConfigPlugin extends Plugin {
 
     static final String KEY_API_URL = "einring_api_url";
+    static final String KEY_USERNAME = "einring_username";
+    static final String KEY_APP_PASSWORD = "einring_app_password";
 
     /** Typed getter per consumed key (FR-004). */
     @PluginMethod
     public void getApiUrl(PluginCall call) {
         call.resolve(new JSObject().put("value", managedString(KEY_API_URL)));
+    }
+
+    @PluginMethod
+    public void getUsername(PluginCall call) {
+        call.resolve(new JSObject().put("value", managedString(KEY_USERNAME)));
+    }
+
+    @PluginMethod
+    public void getAppPassword(PluginCall call) {
+        call.resolve(new JSObject().put("value", managedString(KEY_APP_PASSWORD)));
     }
 
     /** Absent service, missing bundle, blank or whitespace-only -> null = "not configured" (FR-005). */

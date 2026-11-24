@@ -1,4 +1,5 @@
 import type { ModuleRegistry } from "~/api/types";
+import { config } from "~/config";
 import { audiobookshelfModule } from "./audiobookshelf";
 import { aufmassModule } from "./aufmass";
 import { authentikModule } from "./authentik";
@@ -78,7 +79,10 @@ export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
   );
   const unrestricted = registry?.enabled === undefined;
   const appOnlyEnabled = new Set(registry?.enabled ?? []);
+  // VITE_MODULES (variant builds): app-side allowlist on top of the BFF registry.
+  const allowlist = config.modules ? new Set(config.modules) : undefined;
   return appModules
+    .filter((m) => allowlist === undefined || allowlist.has(m.id))
     .filter((m) =>
       m.hasBackend ? backendEnabled.has(m.id) : unrestricted || appOnlyEnabled.has(m.id),
     )

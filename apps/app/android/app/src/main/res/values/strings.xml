@@ -8,4 +8,8 @@
     <!-- Managed configuration (MDM) — labels rendered by the MDM console -->
     <string name="restriction_api_url_title">BFF URL</string>
     <string name="restriction_api_url_description">Base URL of the einring backend (BFF) the app connects to.</string>
+    <string name="restriction_username_title">Nextcloud username</string>
+    <string name="restriction_username_description">Login name used with the app password for MDM autologin; both must be set.</string>
+    <string name="restriction_app_password_title">Nextcloud app password</string>
+    <string name="restriction_app_password_description">App password for MDM autologin; the BFF verifies it against Nextcloud and keeps it sealed — the app never stores it.</string>
 </resources>

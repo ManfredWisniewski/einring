@@ -20,11 +20,24 @@ export function isEmbedded(): boolean {
     if (new URLSearchParams(window.location.search).get("embedded") === "nextcloud") {
       sessionStorage.setItem(EMBEDDED_KEY, "1");
     }
-    embeddedCache = sessionStorage.getItem(EMBEDDED_KEY) === "1";
+    // A stored session token only ever exists in embedded or MDM-managed
+    // sessions — its presence marks embedded-style auth across cold starts.
+    embeddedCache =
+      sessionStorage.getItem(EMBEDDED_KEY) === "1" || getSessionToken() !== null;
   } catch {
     embeddedCache = false;
   }
   return embeddedCache;
+}
+
+/** Marks this tab embedded-equivalent — MDM-managed sessions authenticate like embedded ones. */
+export function markEmbedded(): void {
+  embeddedCache = true;
+  try {
+    sessionStorage.setItem(EMBEDDED_KEY, "1");
+  } catch {
+    // storage unavailable — the session token in localStorage still marks embedded
+  }
 }
 
 export function getSessionToken(): string | null {

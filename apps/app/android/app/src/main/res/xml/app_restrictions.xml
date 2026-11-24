@@ -8,4 +8,17 @@
         android:key="einring_api_url"
         android:restrictionType="string"
         android:title="@string/restriction_api_url_title" />
+    <!-- Credential group: both keys must be set for MDM autologin (FR-008). -->
+    <restriction
+        android:defaultValue=""
+        android:description="@string/restriction_username_description"
+        android:key="einring_username"
+        android:restrictionType="string"
+        android:title="@string/restriction_username_title" />
+    <restriction
+        android:defaultValue=""
+        android:description="@string/restriction_app_password_description"
+        android:key="einring_app_password"
+        android:restrictionType="string"
+        android:title="@string/restriction_app_password_title" />
 </restrictions>

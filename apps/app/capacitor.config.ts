@@ -5,8 +5,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const devServerUrl = process.env.CAP_SERVER_URL;
 
 const config: CapacitorConfig = {
-  appId: "de.wit.einring",
-  appName: "Einring",
+  // Variant builds (build-apk-variant.yml) override both via CAP_* env.
+  appId: process.env.CAP_APP_ID ?? "de.wit.einring",
+  appName: process.env.CAP_APP_NAME ?? "Einring",
   webDir: "dist",
   server: {
     androidScheme: "https",

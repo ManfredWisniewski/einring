@@ -2,6 +2,7 @@ import type { UserManager } from "oidc-client-ts";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { config } from "~/config";
 import { clearSessionToken, getSessionToken, isEmbedded, setSessionToken } from "~/embedded";
+import { loadInstanceConfig } from "~/instance";
 import { getUserManager, listenForNativeCallback, logout, login as oidcLogin } from "./oidc";
 
 /** Minimal identity — oidc profile fields for standalone, /api/me fields for embedded. */
@@ -24,9 +25,22 @@ export interface AuthState {
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const embedded = isEmbedded();
+  const [embedded, setEmbedded] = useState(isEmbedded);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // MDM managed sessions mint inside initManagedConfig (via loadInstanceConfig) —
+  // re-check the embedded flag once startup config settles so autologin applies
+  // on the first launch too, not only from a stored session token.
+  useEffect(() => {
+    let alive = true;
+    void loadInstanceConfig().then(() => {
+      if (alive) setEmbedded(isEmbedded());
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (embedded) {

@@ -414,3 +414,25 @@
 - With no managed configuration the app behaves identically to before: the `VITE_API_URL` build default applies unchanged (NFR-002); the mechanism uses standard Android APIs only — no vendor SDK — and never logs managed values (NFR-001, NFR-003).
 - `DEPLOYMENT.md` documents the Knox Manage procedure for assigning managed configuration to `de.wit.einring` (FR-010).
 - Manual e2e on a Knox Manage–enrolled device: a pushed `einring_api_url` reaches the plugin and the app talks to that BFF; clearing the key restores the build default (SC-001, SC-002, FR-009). einring v1 declares a single key — the spec's config-group criterion (SC-005) is not exercised.
+
+### A51 Whitelabel variant APK (workflow: `build-apk-variant.yml`)
+
+- Manual `workflow_dispatch` builds a signed release APK with dispatch inputs for `slug`, `app_id`, `app_name`, `redirect_scheme`, `modules`, `api_url`, `authentik_*`, `icon_url` and `version_name`.
+- `app_id` maps to Gradle `applicationId` via `-PappId` (default `de.wit.einring`); `app_name` patches `strings.xml` `app_name`/`title_activity_main` XML-escaped; `redirect_scheme` != `einring` rewrites the manifest intent-filter and the app's `nativeRedirectUri` (`VITE_REDIRECT_SCHEME`).
+- `VITE_MODULES` (csv) intersects the bundled app modules with the BFF registry result in `resolveAppModules`; unset = no app-side restriction. BFF `/api/config` branding (name/theme/cssVars/nav) still applies at runtime.
+- `icon_url` (optional) downloads a 1024x1024 PNG and regenerates Android assets via `@capacitor/assets`.
+- Output: signed APK artifact `einring-<slug>-<version>.apk` (same keystore as release-apk); `version_name` defaults to `apps/app/package.json` version.
+
+### A52 MDM managed configuration — autologin credential group (spec: `+wit/specs/common/android-appconfig/`)
+
+- `app_restrictions.xml` additionally declares `einring_username` and `einring_app_password` (string type, title/description via string resources); the `AppConfig` plugin exposes one typed getter per key (FR-001, FR-004).
+- Both keys configured → at startup the app POSTs them to `POST /api/nextcloud/managed-session`; on `connected` it stores the returned `sessionToken` and authenticates embedded-style (FR-008). Only one key set → normal interactive login; an existing session token is never re-minted.
+- The BFF route verifies the pair against Nextcloud (`getOwnUser`), seals the app password under `nc:<loginName>`, revokes a replaced credential, mints a 30-day session token and returns `connected`; bad credentials → 401, missing fields → 400, rate-limited.
+- Managed values are never logged (NFR-003); the app password is not persisted client-side — only the einring session token is stored.
+- `DEPLOYMENT.md` documents the credential-group keys and the Knox Manage autologin procedure (FR-010).
+
+### A53 Claim-code-free Nextcloud connect (env: `CLAIM_CODE_REQUIRED`)
+
+- Default (`true` or unset): authenticated login flows keep the completer-bound claim step — the BFF writes `einring-sign-in-<code>.txt` into the completer's files and only `/login-flow/claim` with that code releases the credential.
+- `CLAIM_CODE_REQUIRED=false`: a flow initiated and polled by the same authenticated user completes in one step — credential bound to `user.sub`, no code file — but only when the completed Nextcloud `loginName` equals the user's Authentik `preferred_username`; any mismatch falls back to the claim-code path unchanged.
+- Anonymous (embedded) flows are unaffected — they still follow `EMBEDDED_CLAIM_REQUIRED`.
