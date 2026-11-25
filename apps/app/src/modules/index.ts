@@ -80,7 +80,7 @@ export function resolveAppModules(registry?: ModuleRegistry): AppModule[] {
   const unrestricted = registry?.enabled === undefined;
   const appOnlyEnabled = new Set(registry?.enabled ?? []);
   // VITE_MODULES (variant builds): app-side allowlist on top of the BFF registry.
-  const allowlist = config.modules ? new Set(config.modules) : undefined;
+  const allowlist = config.modules?.length ? new Set(config.modules) : undefined;
   return appModules
     .filter((m) => allowlist === undefined || allowlist.has(m.id))
     .filter((m) =>
