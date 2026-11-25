@@ -1,0 +1,31 @@
+name: build-apk-wuttke-app
+
+# One-click whitelabel APK for the Wuttke deployment — wraps build-apk-variant.yml
+# with fixed customer inputs. The brand icon lives in the repo at
+# brands/wuttke-app/icon.png — commit a 1024x1024 PNG there before the first run.
+# Authentik: register "wuttkeapp://auth/callback" on the provider this BFF serves —
+# a distinct scheme keeps the OIDC callback unambiguous when the generic einring
+# APK is installed on the same device.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: versionName; empty = apps/app/package.json version
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    uses: ./.github/workflows/build-apk-variant.yml
+    secrets: inherit
+    with:
+      slug: wuttke-app
+      app_id: de.wuttke-klimatechnik.app
+      app_name: "Wuttke App"
+      redirect_scheme: wuttkeapp
+      modules: "einhub,nextcloud,settings,aufmass"
+      api_url: "https://aufmass.wuttke-klimatechnik.de"
+      icon_path: brands/wuttke-app/icon.png
+      version_name: ${{ inputs.version_name }}

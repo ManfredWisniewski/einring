@@ -37,9 +37,58 @@ on:
       icon_url:
         description: Optional URL to a 1024x1024 PNG; regenerates Android icon + splash assets
         required: false
+      icon_path:
+        description: Optional repo path to a 1024x1024 PNG (e.g. brands/<slug>/icon.png); wins over icon_url
+        required: false
+      icon_bg:
+        description: Adaptive-icon + splash background colour (hex); used with icon_url/icon_path
+        required: false
+        default: "#ffffff"
       version_name:
         description: versionName; empty = apps/app/package.json version
         required: false
+  workflow_call:
+    inputs:
+      slug:
+        required: true
+        type: string
+      app_id:
+        required: false
+        type: string
+        default: de.wit.einring
+      app_name:
+        required: false
+        type: string
+        default: Einring
+      redirect_scheme:
+        required: false
+        type: string
+        default: einring
+      modules:
+        required: false
+        type: string
+      api_url:
+        required: false
+        type: string
+      authentik_issuer:
+        required: false
+        type: string
+      authentik_client_id:
+        required: false
+        type: string
+      icon_url:
+        required: false
+        type: string
+      icon_path:
+        required: false
+        type: string
+      icon_bg:
+        required: false
+        type: string
+        default: "#ffffff"
+      version_name:
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -115,12 +164,27 @@ jobs:
           grep -E "app_name|title_activity_main|android:scheme" app/src/main/res/values/strings.xml app/src/main/AndroidManifest.xml
 
       - name: Generate brand icon + splash
-        if: inputs.icon_url != ''
+        if: inputs.icon_url != '' || inputs.icon_path != ''
         working-directory: apps/app
+        env:
+          ICON_BG: ${{ inputs.icon_bg }}
+          ICON_PATH: ${{ inputs.icon_path }}
         run: |
           mkdir -p assets
-          curl -fsSL "$ICON_URL" -o assets/icon.png
-          npx --yes @capacitor/assets generate --android
+          if [ -n "$ICON_PATH" ]; then
+            cp "$GITHUB_WORKSPACE/$ICON_PATH" assets/icon.png
+          else
+            curl -fsSL "$ICON_URL" -o assets/icon.png
+          fi
+          # icon.png doubles as splash/foreground source; @capacitor/assets
+          # composites it over ICON_BG for adaptive icons + splash screens.
+          cp assets/icon.png assets/splash.png
+          cp assets/icon.png assets/splash-dark.png
+          npx --yes @capacitor/assets generate --android \
+            --iconBackgroundColor "$ICON_BG" \
+            --iconBackgroundColorDark "$ICON_BG" \
+            --splashBackgroundColor "$ICON_BG" \
+            --splashBackgroundColorDark "$ICON_BG"
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/einring.keystore"

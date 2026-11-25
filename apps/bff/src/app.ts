@@ -146,13 +146,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     async (api) => {
       api.addHook("preHandler", requireAuth(deps.verifyToken));
       api.get("/me", async (request) => request.user);
-      api.get("/modules", async () => ({
-        modules: modules.map(({ module, title }) => ({
-          id: module.id,
-          version: module.version,
-          requires: module.requires ?? [],
-          title,
-        })),
+      api.get("/modules", async (request) => ({
+        modules: (
+          await Promise.all(
+            modules.map(async ({ module, title, config }) =>
+              !module.hasAccess || (await module.hasAccess(ctx, request.user, config))
+                ? { id: module.id, version: module.version, requires: module.requires ?? [], title }
+                : undefined,
+            ),
+          )
+        ).filter((m) => m !== undefined),
         // The raw MODULES set — the app filters frontend-only modules against it
         // (they never appear in `modules`). undefined = everything enabled.
         enabled: deps.config.modules,

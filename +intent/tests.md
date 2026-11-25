@@ -417,10 +417,10 @@
 
 ### A51 Whitelabel variant APK (workflow: `build-apk-variant.yml`)
 
-- Manual `workflow_dispatch` builds a signed release APK with dispatch inputs for `slug`, `app_id`, `app_name`, `redirect_scheme`, `modules`, `api_url`, `authentik_*`, `icon_url` and `version_name`.
+- Manual `workflow_dispatch` builds a signed release APK with dispatch inputs for `slug`, `app_id`, `app_name`, `redirect_scheme`, `modules`, `api_url`, `authentik_*`, `icon_url`, `icon_bg` and `version_name`.
 - `app_id` maps to Gradle `applicationId` via `-PappId` (default `de.wit.einring`); `app_name` patches `strings.xml` `app_name`/`title_activity_main` XML-escaped; `redirect_scheme` != `einring` rewrites the manifest intent-filter and the app's `nativeRedirectUri` (`VITE_REDIRECT_SCHEME`).
 - `VITE_MODULES` (csv) intersects the bundled app modules with the BFF registry result in `resolveAppModules`; unset = no app-side restriction. BFF `/api/config` branding (name/theme/cssVars/nav) still applies at runtime.
-- `icon_url` (optional) downloads a 1024x1024 PNG and regenerates Android assets via `@capacitor/assets`.
+- `icon_url`/`icon_path` (optional; repo path `brands/<slug>/icon.png` wins) loads a 1024x1024 PNG and regenerates Android icon + splash assets via `@capacitor/assets`, composited over `icon_bg`. Per-customer wrappers (e.g. `build-apk-wuttke-app.yml`) call it as a reusable workflow with fixed inputs.
 - Output: signed APK artifact `einring-<slug>-<version>.apk` (same keystore as release-apk); `version_name` defaults to `apps/app/package.json` version.
 
 ### A52 MDM managed configuration — autologin credential group (spec: `+wit/specs/common/android-appconfig/`)
@@ -436,3 +436,10 @@
 - Default (`true` or unset): authenticated login flows keep the completer-bound claim step — the BFF writes `einring-sign-in-<code>.txt` into the completer's files and only `/login-flow/claim` with that code releases the credential.
 - `CLAIM_CODE_REQUIRED=false`: a flow initiated and polled by the same authenticated user completes in one step — credential bound to `user.sub`, no code file — but only when the completed Nextcloud `loginName` equals the user's Authentik `preferred_username`; any mismatch falls back to the claim-code path unchanged.
 - Anonymous (embedded) flows are unaffected — they still follow `EMBEDDED_CLAIM_REQUIRED`.
+
+### A54 Aufmass module hidden without readable tables (BffModule `hasAccess`)
+
+- `BffModule` may define `hasAccess(ctx, user, config)` — `GET /api/modules` drops modules returning `false`, removing them from nav, routes and the feed for that user.
+- aufmass implements it: users whose Nextcloud credential cannot reach the configured application context — no credential, unreadable context, or zero readable nodes (meta fetch fails for all) — do not see the module. `APPLICATION_ID` unset → visible (misconfiguration surfaces on the page, not as a hidden module).
+- Direct route access is unaffected — hiding is display-level, not authorization; Nextcloud ACLs still bound the data.
+- Users with at least one readable node see the module exactly as before.

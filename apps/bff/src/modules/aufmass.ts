@@ -319,9 +319,44 @@ const mandatoryColumnIds = (view: {
 }) =>
   new Set((view.columnSettings ?? []).filter((s) => s.mandatory === true).map((s) => s.columnId));
 
+/** The application context plus every node the user can actually read —
+ *  null when there's no credential or the context can't be fetched. */
+async function fetchApplication(
+  ctx: AppContext,
+  sub: string,
+  appId: number,
+  log?: { warn: (obj: unknown, msg: string) => void },
+) {
+  const nc = ncFor(ctx, sub);
+  if (!nc) return null;
+  let data: TablesContext;
+  try {
+    data = (await nc.getContext(appId)).ocs?.data ?? {};
+  } catch {
+    return null;
+  }
+  // Context nodes carry no title — resolve each node's display title via its
+  // v1 meta endpoint; nodes the user cannot read are dropped from the list.
+  const settled = await Promise.allSettled(
+    contextNodes(data).map(async (node) => {
+      const meta = node.type === "view" ? await nc.getView(node.id) : await nc.getTable(node.id);
+      return { ...node, title: meta.title || node.title };
+    }),
+  );
+  for (const r of settled) {
+    if (r.status === "rejected") {
+      log?.warn({ err: String(r.reason) }, "aufmass node meta fetch failed");
+    }
+  }
+  return {
+    name: (data.name ?? data.title ?? "").trim() || `Application ${appId}`,
+    nodes: settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
+  };
+}
+
 export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
-  version: "0.3.6",
+  version: "0.3.7",
   requires: ["nextcloud"],
   configSchema,
   chatTools(ctx, config): ChatTool[] {
@@ -432,6 +467,14 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
     ];
   },
 
+  // Hidden when the user can read no aufmass table (no credential, unreadable
+  // context, or zero readable nodes) — GET /api/modules drops it then.
+  async hasAccess(ctx, user, config) {
+    if (config.APPLICATION_ID === undefined) return true;
+    const app = await fetchApplication(ctx, user.sub, config.APPLICATION_ID);
+    return (app?.nodes.length ?? 0) > 0;
+  },
+
   register(api: FastifyInstance, ctx, config) {
     const nodeType = (s: string): NodeType | null =>
       s === "view" ? "view" : s === "table" ? "table" : null;
@@ -440,31 +483,11 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (config.APPLICATION_ID === undefined) {
         return reply.code(424).send({ error: "aufmass application id not configured" });
       }
-      const nc = ncFor(ctx, req.user.sub);
-      if (!nc) {
+      const app = await fetchApplication(ctx, req.user.sub, config.APPLICATION_ID, req.log);
+      if (!app) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }
-      const ctxRes = await nc.getContext(config.APPLICATION_ID);
-      const data = ctxRes.ocs?.data ?? {};
-      // Context nodes carry no title — resolve each node's display title via its
-      // v1 meta endpoint; nodes the user cannot read are dropped from the list.
-      const settled = await Promise.allSettled(
-        contextNodes(data).map(async (node) => {
-          const meta =
-            node.type === "view" ? await nc.getView(node.id) : await nc.getTable(node.id);
-          return { ...node, title: meta.title || node.title };
-        }),
-      );
-      for (const r of settled) {
-        if (r.status === "rejected") {
-          req.log.warn({ err: String(r.reason) }, "aufmass node meta fetch failed");
-        }
-      }
-      const nodes = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-      return {
-        name: (data.name ?? data.title ?? "").trim() || `Application ${config.APPLICATION_ID}`,
-        nodes,
-      };
+      return app;
     });
 
     api.get("/nodes/:type/:id", async (req, reply) => {

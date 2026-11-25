@@ -58,5 +58,8 @@ export interface BffModule<TConfig = unknown> {
   configSchema?: z.ZodType<TConfig>;
   chatTools?(ctx: AppContext, config: TConfig): ChatTool[];
   notifications?(ctx: AppContext, config: TConfig): NotificationSource;
+  /** Per-user visibility check — `GET /api/modules` drops the module when this
+   *  returns false (e.g. aufmass hides when the user can read no tables). */
+  hasAccess?(ctx: AppContext, user: AuthUser, config: TConfig): Promise<boolean>;
   register(api: FastifyInstance, ctx: AppContext, config: TConfig): void;
 }

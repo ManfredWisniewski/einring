@@ -334,6 +334,24 @@ Restoring into a fresh deployment requires the **same `ENCRYPTION_KEY`** — sea
 
 The Docker image is web-only. To build an Android APK that talks to the deployed BFF, set `VITE_API_URL=https://einring.example.com` in `apps/app/.env.local`, then `pnpm --filter @einring/app android:sync` and build in Android Studio. The `einring://auth/callback` redirect URI must be registered in the Authentik provider.
 
+## Whitelabel APK variants
+
+`build-apk-variant.yml` (Actions → *Run workflow*) builds a signed customer APK from dispatch inputs — no per-customer code or fork needed:
+
+| Input | Effect |
+|---|---|
+| `slug` | Artifact label — `einring-<slug>-<version>.apk` |
+| `app_id` | `applicationId` — must differ per customer for co-install/MDM |
+| `app_name` | Android launcher name (`strings.xml`) |
+| `redirect_scheme` | OIDC scheme `<scheme>://auth/callback` — register in the Authentik provider |
+| `icon_url` / `icon_path` + `icon_bg` | 1024×1024 PNG (URL or repo path like `brands/<slug>/icon.png`) → regenerates icon + splash over the background colour |
+| `modules` | `VITE_MODULES` csv — app-side module allowlist |
+| `api_url`, `authentik_*` | Baked defaults — BFF `/api/config` and MDM still override |
+
+Runtime branding (instance name, theme, CSS vars, modules) stays BFF-driven via `/api/config` — variant inputs only cover what the BFF cannot change (native identity).
+
+Per-customer wrappers call the variant workflow with fixed inputs — `build-apk-wuttke-app.yml` (`de.wuttke-klimatechnik.app`, launcher "Wuttke", `wuttkeapp://` scheme, icon from `brands/wuttke-app/icon.png`). Add a new customer by copying that file, editing the `with:` block and committing `brands/<slug>/icon.png`.
+
 ## MDM managed configuration (Android)
 
 The app declares an Android managed-configuration schema (`apps/app/android/app/src/main/res/xml/app_restrictions.xml`, mechanism spec: `+wit/specs/common/android-appconfig/`). An MDM can push key/value pairs per package — no per-customer build needed. A pushed value overrides the baked `VITE_API_URL` at app start; unset or blank keeps the build default.
