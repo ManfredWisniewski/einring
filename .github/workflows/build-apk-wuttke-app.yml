@@ -25,7 +25,6 @@ jobs:
       app_id: de.wuttke.app
       app_name: "Wuttke"
       redirect_scheme: wuttkeapp
-      modules: "einhub,nextcloud,settings,aufmass,einchat,talk"
       api_url: "https://aufmass.wuttke-klimatechnik.de"
       icon_path: brands/wuttke-app/icon.png
       version_name: ${{ inputs.version_name }}
