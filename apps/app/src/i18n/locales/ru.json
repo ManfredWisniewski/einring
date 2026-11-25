@@ -71,7 +71,8 @@
   "menu": {
     "open": "Меню",
     "modules": "Модули",
-    "info": "Инфо"
+    "info": "Инфо",
+    "debug": "Отладка"
   },
   "modulesDialog": {
     "title": "Модули",

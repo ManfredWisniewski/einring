@@ -166,6 +166,8 @@ export interface TalkMessage {
 export interface OwnUser {
   id?: string;
   displayname?: string;
+  /** The user's own Nextcloud group ids. */
+  groups?: string[];
   quota?: { free?: number; used?: number; total?: number; relative?: number };
 }
 

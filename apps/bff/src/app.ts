@@ -159,7 +159,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
                 // module visible; its own pages surface the real error.
                 request.log.warn({ err, module: module.id }, "module hasAccess check failed");
               }
-              return { id: module.id, version: module.version, requires: module.requires ?? [], title };
+              return {
+                id: module.id,
+                version: module.version,
+                requires: module.requires ?? [],
+                title,
+              };
             }),
           )
         ).filter((m) => m !== undefined),

@@ -69,6 +69,9 @@ export interface TableNode {
 export interface TablesApplication {
   name: string;
   nodes: TableNode[];
+  /** aufmass only: group-view suffixes assigned to the user via their NC groups
+   *  (`MODULE_AUFMASS_ROLE_GROUP_MAP`; unmatched suffixes match same-named groups). */
+  roles?: string[];
 }
 
 export interface TableView {

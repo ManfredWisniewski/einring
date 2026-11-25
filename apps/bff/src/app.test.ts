@@ -5032,7 +5032,7 @@ describe("module framework", () => {
       modules: [
         { id: "einhub", version: "0.1.0", requires: [] },
         { id: "tables", version: "0.1.0", requires: ["nextcloud"] },
-        { id: "aufmass", version: "0.3.7", requires: ["nextcloud"] },
+        { id: "aufmass", version: "0.3.8", requires: ["nextcloud"] },
         { id: "monitor", version: "0.1.0", requires: ["nextcloud"] },
         { id: "wiki", version: "0.1.0", requires: ["nextcloud"] },
         { id: "csv-manager", version: "0.1.0", requires: [] },
@@ -5091,7 +5091,7 @@ describe("module framework", () => {
     });
     const mods = await app.inject({ method: "GET", url: "/api/modules", headers: auth });
     expect(mods.json()).toEqual({
-      modules: [{ id: "aufmass", version: "0.3.7", requires: ["nextcloud"] }],
+      modules: [{ id: "aufmass", version: "0.3.8", requires: ["nextcloud"] }],
       enabled: ["aufmass", "pdf"],
     });
   });

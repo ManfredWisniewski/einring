@@ -36,7 +36,29 @@ const configSchema = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().default("original"),
   ),
+  /** Role-view assignment: csv `suffix:NC group` pairs — a `*_<suffix>` view is
+   *  only assigned to members of the mapped group. Unmapped suffixes match a
+   *  group of the same (lowercased) name. */
+  ROLE_GROUP_MAP: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().optional(),
+  ),
 });
+
+/** Group-view suffixes the app splits node titles on (`<table>_<suffix>`). */
+const GROUP_VIEW_SUFFIXES = ["gf", "plan", "monteur", "abrechnung"] as const;
+
+/** `suffix → lowercased NC group names`; unset suffixes match their own name. */
+function roleGroupMap(raw?: string): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const pair of (raw ?? "").split(",")) {
+    const [suffix, group] = pair.split(":").map((s) => s.trim().toLowerCase());
+    if (suffix && group) {
+      map.set(suffix, (map.get(suffix) ?? new Set()).add(group));
+    }
+  }
+  return map;
+}
 
 type NodeType = "view" | "table";
 
@@ -326,9 +348,22 @@ async function fetchApplication(
   sub: string,
   appId: number,
   log?: { warn: (obj: unknown, msg: string) => void },
+  roleMapRaw?: string,
 ) {
   const nc = ncFor(ctx, sub);
   if (!nc) return null;
+  // Own NC groups resolve which group-view suffixes the app may auto-select —
+  // ACLs can't express it (an application share grants read on all nodes).
+  const ownGroups = new Set(
+    ((await nc.getOwnUser().catch(() => null))?.ocs?.data?.groups ?? []).map((g) =>
+      g.toLowerCase(),
+    ),
+  );
+  const roleMap = roleGroupMap(roleMapRaw);
+  const roles = GROUP_VIEW_SUFFIXES.filter((sfx) => {
+    const mapped = roleMap.get(sfx);
+    return mapped ? [...mapped].some((g) => ownGroups.has(g)) : ownGroups.has(sfx);
+  });
   let data: TablesContext;
   try {
     data = (await nc.getContext(appId)).ocs?.data ?? {};
@@ -351,12 +386,13 @@ async function fetchApplication(
   return {
     name: (data.name ?? data.title ?? "").trim() || `Application ${appId}`,
     nodes: settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
+    roles,
   };
 }
 
 export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
   id: "aufmass",
-  version: "0.3.7",
+  version: "0.3.8",
   requires: ["nextcloud"],
   configSchema,
   chatTools(ctx, config): ChatTool[] {
@@ -483,7 +519,13 @@ export const aufmassModule: BffModule<z.infer<typeof configSchema>> = {
       if (config.APPLICATION_ID === undefined) {
         return reply.code(424).send({ error: "aufmass application id not configured" });
       }
-      const app = await fetchApplication(ctx, req.user.sub, config.APPLICATION_ID, req.log);
+      const app = await fetchApplication(
+        ctx,
+        req.user.sub,
+        config.APPLICATION_ID,
+        req.log,
+        config.ROLE_GROUP_MAP,
+      );
       if (!app) {
         return reply.code(424).send({ error: "nextcloud is not connected" });
       }

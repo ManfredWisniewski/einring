@@ -443,3 +443,9 @@
 - aufmass implements it: users whose Nextcloud credential cannot reach the configured application context — no credential, unreadable context, or zero readable nodes (meta fetch fails for all) — do not see the module. `APPLICATION_ID` unset → visible (misconfiguration surfaces on the page, not as a hidden module).
 - Direct route access is unaffected — hiding is display-level, not authorization; Nextcloud ACLs still bound the data.
 - Users with at least one readable node see the module exactly as before.
+
+### A55 Aufmass role views + debug group switcher (spec: `+wit/specs/einring/aufmass/`)
+
+- `GET /api/aufmass/` returns `roles`: the group-view suffixes (`gf|plan|monteur|abrechnung`) assigned to the caller via their Nextcloud groups — `MODULE_AUFMASS_ROLE_GROUP_MAP` csv `suffix:NC-group` pairs; unmapped suffixes match a same-named (lowercased) group. Application-shared views stay readable upstream — `roles` is an einring-side assignment because Tables cannot unshare views inside a shared application.
+- The page auto-opens and navigates to the user's own role view (first `roles` entry with a matching view, else the base table); the group-view switcher is hidden by default.
+- The hamburger menu's "Debug" item toggles `einring:debug` (localStorage + `einring-debug` event); while on, the switcher offers every readable group view again. Debug is display-level only — upstream readability is unchanged.

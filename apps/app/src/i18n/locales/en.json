@@ -71,7 +71,8 @@
   "menu": {
     "open": "Menu",
     "modules": "Modules",
-    "info": "Info"
+    "info": "Info",
+    "debug": "Debug view"
   },
   "modulesDialog": {
     "title": "Modules",

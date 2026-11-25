@@ -26,6 +26,7 @@ import {
 import type { TableColumn, TableNode, TableRow, TableView } from "~/api/types";
 import { formatCell, formatNumber } from "~/components/DataTable";
 import { NextcloudGate } from "~/components/NextcloudGate";
+import { DEBUG_EVENT, isDebug } from "~/debug";
 
 const statusOf = (e: unknown) => (e instanceof ApiError ? e.status : "?");
 
@@ -95,10 +96,27 @@ function AufmassContent() {
   const [node, setNode] = useState<TableNode | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
-  // Auto-open the first node once the application loads.
+  // Auto-open the user's role view of the first base once the application loads.
   useEffect(() => {
-    if (node === null && app.data?.nodes.length) setNode(app.data.nodes[0] ?? null);
+    const nodes = app.data?.nodes;
+    if (node !== null || !nodes?.length) return;
+    const first = nodes[0];
+    if (!first) return;
+    const base = baseOf(first.title);
+    const role = (app.data?.roles ?? [])
+      .map((g) =>
+        nodes.find((n) => n.type === "view" && groupOf(n.title) === g && baseOf(n.title) === base),
+      )
+      .find(Boolean);
+    setNode(role ?? first);
   }, [app.data, node]);
+
+  const [debug, setDebug] = useState(isDebug());
+  useEffect(() => {
+    const on = () => setDebug(isDebug());
+    window.addEventListener(DEBUG_EVENT, on);
+    return () => window.removeEventListener(DEBUG_EVENT, on);
+  }, []);
 
   if (app.isPending) return <p className="muted">{t("modules.aufmass.loading")}</p>;
   if (app.isError) {
@@ -123,10 +141,20 @@ function AufmassContent() {
     data.nodes.find((n) => n.type === "view" && groupOf(n.title) === g && baseOf(n.title) === base);
   const primaryOf = (base: string) =>
     data.nodes.find((n) => n.title === base) ?? data.nodes.find((n) => baseOf(n.title) === base);
+  // Each NC group sees only its assigned role view (BFF `roles`); the group
+  // switcher — and switching itself — only exists while Debug is on.
+  const roleView = (base: string) => {
+    for (const g of data.roles ?? []) {
+      const v = viewFor(base, g as Group);
+      if (v) return v;
+    }
+    return undefined;
+  };
   const pick = (base: string) => {
-    const preferred = group
-      ? (viewFor(base, group) ?? primaryOf(base))
-      : (viewFor(base, "gf") ?? primaryOf(base));
+    const preferred =
+      debug && group
+        ? (viewFor(base, group) ?? primaryOf(base))
+        : (roleView(base) ?? primaryOf(base));
     if (preferred) setNode(preferred);
   };
   const hasGroupViews = currentBase !== null && GROUPS.some((g) => viewFor(currentBase, g));
@@ -146,7 +174,7 @@ function AufmassContent() {
           </Button>
         ))}
         <Button variant="text">{t("modules.aufmass.einbauteileliste")}</Button>
-        {node && currentBase && hasGroupViews && (
+        {node && currentBase && hasGroupViews && debug && (
           <Select
             value={group ?? ""}
             onValueChange={(g) => {

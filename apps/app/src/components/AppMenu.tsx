@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useModulePrefs, useModuleRegistry, useSaveModulePrefs } from "~/api/hooks";
+import { toggleDebug } from "~/debug";
 import { useInstanceName, useNav } from "~/instance";
 import { moduleTitle, resolveAppModules } from "~/modules";
 import pkg from "../../package.json";
@@ -121,7 +122,16 @@ export function AppMenu() {
           <MenuIcon className="size-4" aria-hidden />
         </Button>
         <Popover placement="bottom end">
-          <Menu className="app-menu" onAction={(key) => setOpen(key as DialogId)}>
+          <Menu
+            className="app-menu"
+            onAction={(key) => {
+              if (key === "debug") {
+                toggleDebug();
+              } else {
+                setOpen(key as DialogId);
+              }
+            }}
+          >
             {nav && (
               <MenuItem id="modules" className="app-menu__item">
                 {t("menu.modules")}
@@ -129,6 +139,9 @@ export function AppMenu() {
             )}
             <MenuItem id="info" className="app-menu__item">
               {t("menu.info")}
+            </MenuItem>
+            <MenuItem id="debug" className="app-menu__item">
+              {t("menu.debug")}
             </MenuItem>
           </Menu>
         </Popover>
