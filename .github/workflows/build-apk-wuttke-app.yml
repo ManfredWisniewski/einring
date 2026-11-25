@@ -23,7 +23,7 @@ jobs:
     with:
       slug: wuttke-app
       app_id: de.wuttke-klimatechnik.app
-      app_name: "Wuttke App"
+      app_name: "Wuttke"
       redirect_scheme: wuttkeapp
       modules: "einhub,nextcloud,settings,aufmass"
       api_url: "https://aufmass.wuttke-klimatechnik.de"
