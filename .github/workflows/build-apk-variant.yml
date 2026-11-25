@@ -108,6 +108,14 @@ jobs:
         with:
           # +wit is not needed for the build; its ssh remote is unreachable from CI.
           submodules: false
+      - name: Validate variant inputs
+        run: |
+          # app_id must be a valid Java package (Android rejects hyphens);
+          # redirect_scheme must be a valid URI scheme.
+          [[ "$APP_ID" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$ ]] \
+            || { echo "::error::Invalid app_id '$APP_ID' — dot-separated Java identifiers only (no hyphens), e.g. de.acme.app"; exit 1; }
+          [[ "$REDIRECT_SCHEME" =~ ^[A-Za-z][A-Za-z0-9+.-]*$ ]] \
+            || { echo "::error::Invalid redirect_scheme '$REDIRECT_SCHEME'"; exit 1; }
       - name: Fetch biti submodule
         env:
           BITI_PAT: ${{ secrets.BITI_PAT }}

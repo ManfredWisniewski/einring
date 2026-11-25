@@ -22,7 +22,7 @@ jobs:
     secrets: inherit
     with:
       slug: wuttke-app
-      app_id: de.wuttke-klimatechnik.app
+      app_id: de.wuttke.app
       app_name: "Wuttke"
       redirect_scheme: wuttkeapp
       modules: "einhub,nextcloud,settings,aufmass"
