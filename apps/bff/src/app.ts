@@ -149,11 +149,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       api.get("/modules", async (request) => ({
         modules: (
           await Promise.all(
-            modules.map(async ({ module, title, config }) =>
-              !module.hasAccess || (await module.hasAccess(ctx, request.user, config))
-                ? { id: module.id, version: module.version, requires: module.requires ?? [], title }
-                : undefined,
-            ),
+            modules.map(async ({ module, title, config }) => {
+              try {
+                if (module.hasAccess && !(await module.hasAccess(ctx, request.user, config))) {
+                  return undefined;
+                }
+              } catch (err) {
+                // A broken check must not nuke the whole registry — keep the
+                // module visible; its own pages surface the real error.
+                request.log.warn({ err, module: module.id }, "module hasAccess check failed");
+              }
+              return { id: module.id, version: module.version, requires: module.requires ?? [], title };
+            }),
           )
         ).filter((m) => m !== undefined),
         // The raw MODULES set — the app filters frontend-only modules against it
