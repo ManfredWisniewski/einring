@@ -80,6 +80,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_AUFMASS_APPLICATION_ID=4  # same shape — the aufmass module's own Tables application
 # MODULE_AUFMASS_PLANNED_COLUMN=Anz       # title of the planned-quantity column (default Anz)
 # MODULE_AUFMASS_VERBAUT_COLUMN=Verbaut   # title of the installed-quantity column (default Verbaut)
+# MODULE_AUFMASS_ROLE_GROUP_MAP=gf:Geschäftsleitung,monteur:Monteur   # view-suffix → NC group; unmapped suffixes match a same-named group
 # MODULE_WIKI_SYNC_TTL_S=300
 # MODULE_WIKI_ROOT=.Collectives  # older Nextcloud installs may use Collectives
 # MODULE_CSV_MANAGER_MAX_BYTES=5242880  # import body limit (default 5 MiB)

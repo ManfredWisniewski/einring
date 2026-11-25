@@ -439,7 +439,7 @@
 
 ### A54 Aufmass module hidden without readable tables (BffModule `hasAccess`)
 
-- `BffModule` may define `hasAccess(ctx, user, config)` — `GET /api/modules` drops modules returning `false`, removing them from nav, routes and the feed for that user.
+- `BffModule` may define `hasAccess(ctx, user, config)` — `GET /api/modules` drops modules returning `false`, removing them from nav, routes and the feed for that user. A throwing `hasAccess` keeps the module visible and logs a warning — a broken check must never blank the registry.
 - aufmass implements it: users whose Nextcloud credential cannot reach the configured application context — no credential, unreadable context, or zero readable nodes (meta fetch fails for all) — do not see the module. `APPLICATION_ID` unset → visible (misconfiguration surfaces on the page, not as a hidden module).
 - Direct route access is unaffected — hiding is display-level, not authorization; Nextcloud ACLs still bound the data.
 - Users with at least one readable node see the module exactly as before.
