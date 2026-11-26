@@ -453,6 +453,106 @@ export interface ItsaplanTickets {
   columns: Record<string, ItsaplanColumn[]>;
 }
 
+/** One EinTime entry as the BFF serves it — `end` null marks the running timer. */
+export interface EintimeEntry {
+  id: string;
+  start: string;
+  end: string | null;
+  description: string;
+  provider: string | null;
+  projectExternalId: string | null;
+  taskExternalId: string | null;
+  clientName: string | null;
+  projectName: string | null;
+  taskName: string | null;
+  billable: boolean;
+  origin: string;
+  running: boolean;
+  tags: string[];
+}
+
+/** An entry expanded into a per-day segment by the BFF midnight splitter (spec eintime FR-005). */
+export interface EintimeSegment extends EintimeEntry {
+  entryId: string;
+  /** Local day key `YYYY-MM-DD` this segment belongs to. */
+  day: string;
+  segStart: string;
+  segEnd: string;
+}
+
+export interface EintimeEntries {
+  entries: EintimeSegment[];
+}
+
+export interface EintimeTimer {
+  running: EintimeEntry | null;
+}
+
+/** Mapped client from the provider layer (itsaplan: team). */
+export interface EintimeClient {
+  provider: string;
+  externalId: string;
+  name: string;
+}
+
+/** Mapped project (itsaplan: board). */
+export interface EintimeProject {
+  provider: string;
+  externalId: string;
+  clientExternalId: string | null;
+  name: string;
+}
+
+/** Mapped task (itsaplan: assigned open ticket). */
+export interface EintimeTask {
+  provider: string;
+  externalId: string;
+  projectExternalId: string;
+  name: string;
+  url: string | null;
+}
+
+export interface EintimeProjects {
+  providers: string[];
+  clients: EintimeClient[];
+  projects: EintimeProject[];
+  tasks: EintimeTask[];
+}
+
+export interface EintimeTag {
+  id: string;
+  name: string;
+}
+
+export interface EintimeTags {
+  tags: EintimeTag[];
+}
+
+export interface EintimeEntryResponse {
+  entry: EintimeEntry;
+}
+
+export interface EintimeReportGroup {
+  key: string;
+  name: string | null;
+  minutes: number;
+  entryCount: number;
+}
+
+export interface EintimeReportEntry extends EintimeEntry {
+  minutes: number;
+  member: string;
+}
+
+export interface EintimeReport {
+  range: { from: string | null; to: string | null };
+  member: { sub: string; name: string | null };
+  groupBy: "project" | "task" | "client";
+  groups: EintimeReportGroup[];
+  totalMinutes: number;
+  entries: EintimeReportEntry[];
+}
+
 /** One GitHub notification thread (D44). */
 export interface GitHubNotification {
   id: string;

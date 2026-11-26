@@ -186,7 +186,9 @@ function mapTicket(i: ItsaplanIssueRaw, web: string, cols?: ColumnMap): Itsaplan
   };
 }
 
-async function listBoards(ctx: AppContext, sub: string) {
+// Exported for the eintime provider adapter (spec eintime FR-009) — same functions the
+// routes/chatTools/notifications use; no duplicated upstream calls.
+export async function listBoards(ctx: AppContext, sub: string) {
   const cred = credFor(ctx, sub);
   if (!cred) return { notConnected: true as const };
   const res = await itsaplanGet<ItsaplanProjectRaw[]>(ctx, cred.url, cred.secret, "/projects");
@@ -196,7 +198,7 @@ async function listBoards(ctx: AppContext, sub: string) {
   return { boards: res.body.map((p) => mapBoard(p, web)) };
 }
 
-async function listTickets(ctx: AppContext, sub: string, limit: number) {
+export async function listTickets(ctx: AppContext, sub: string, limit: number) {
   const cred = credFor(ctx, sub);
   if (!cred) return { notConnected: true as const };
   const me = await itsaplanGet<ItsaplanMe>(ctx, cred.url, cred.secret, "/me");

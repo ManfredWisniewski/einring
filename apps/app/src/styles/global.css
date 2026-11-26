@@ -1162,3 +1162,121 @@ a {
   flex-direction: column;
   gap: var(--spacing-2);
 }
+
+/* --- EinTime (spec eintime) -------------------------------------------- */
+.eintime-timer__clock {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+}
+.eintime-entry__time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.eintime-entry__dur {
+  min-width: 3.5rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.eintime-entry__proj {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eintime-grid {
+  display: flex;
+  gap: var(--space-1);
+}
+.eintime-grid__axis {
+  position: relative;
+  width: 3rem;
+  flex-shrink: 0;
+  height: 1152px;
+  margin-top: 2rem;
+}
+.eintime-grid__hour {
+  position: absolute;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+.eintime-grid__day {
+  flex: 1;
+  min-width: 0;
+}
+.eintime-grid__dayhead {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  height: 2rem;
+}
+.eintime-col {
+  position: relative;
+  height: 1152px;
+  border-left: 1px solid var(--surface-border);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 47px,
+    var(--surface-border) 47px,
+    var(--surface-border) 48px
+  );
+  touch-action: none;
+  user-select: none;
+}
+.eintime-block {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-base);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.eintime-block--running {
+  border-style: dashed;
+}
+.eintime-block--preview {
+  border-style: dashed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.eintime-block__label {
+  font-size: var(--font-size-xs);
+  color: var(--accent-subtle-fg);
+  padding: 0 var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.eintime-block__edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.eintime-block__edge--top {
+  top: 0;
+}
+.eintime-block__edge--bottom {
+  bottom: 0;
+}
+.eintime-cell {
+  width: 4.5rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+.eintime-cell:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -1px;
+}

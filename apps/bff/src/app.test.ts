@@ -1802,6 +1802,9 @@ describe("einchat", () => {
         "stalwart_principals",
         "itsaplan_boards",
         "itsaplan_tickets",
+        "eintime_entries",
+        "eintime_projects",
+        "eintime_report",
       ],
     });
   });
@@ -1919,7 +1922,7 @@ describe("einchat", () => {
       { name: "yamtrack_search_media", module: "yamtrack", enabled: true },
       { name: "yamtrack_list_media", module: "yamtrack", enabled: true },
     ]);
-    expect(all.json().tools.length).toBe(29);
+    expect(all.json().tools.length).toBe(32);
     const put = await app.inject({
       method: "PUT",
       url: "/api/einchat/tools",
@@ -5062,6 +5065,7 @@ describe("module framework", () => {
         { id: "stalwart", version: "0.1.0", requires: [] },
         { id: "postges", version: "0.1.0", requires: [] },
         { id: "itsaplan", version: "0.1.0", requires: [] },
+        { id: "eintime", version: "0.1.0", requires: [] },
       ],
     });
   });

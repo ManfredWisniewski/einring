@@ -462,3 +462,15 @@
 - The page's filter row narrows both lists by board (multi-select) and tickets by priority (single-select; empty = all); tickets sort by priority rank then title; the refresh button refetches tickets (SC-007).
 - `PATCH /api/itsaplan/tickets/:issueId` forwards `estimateMinutes`/`columnId` to upstream `PATCH /issues/:id` — `400` on invalid payloads, `409` on `wip_limit_exceeded` (SC-008); on boards with `timeEstimateEnabled` a ticket shows `h:mm` (`0:00` unset) and its Start/Pause timer saves the accumulated minutes; only one timer runs at a time (SC-008).
 - Each ticket's state pill (colour dot + column name) lists its board's columns and PATCHes `columnId` on selection — the `columns` map ships with the tickets response (SC-009).
+
+### A57 EinTime module (spec: `+wit/specs/einring/eintime/`)
+
+- `POST /api/eintime/timer` starts a running entry (all fields optional); `GET /api/eintime/timer` returns it or null; `PATCH` edits description/project/task/tags/billable without stopping; `POST /timer/stop` closes at server time. Starting while one runs stops and saves the previous first — at most one running entry per `sub` (SC-001).
+- On an itsaplan ticket-timer save, the app additionally `POST`s the session `{start, end, provider:"itsaplan", projectRef, taskRef}` to `/api/eintime/entries` (only while `eintime` is enabled) — the stored entry carries the mapped project+task, correct times and `origin:"itsaplan"`; a failed upstream estimate PATCH still produces the local entry (SC-002).
+- `GET /api/eintime/entries?from&to` returns day-segmented entries (cross-midnight entries split at 00:00, running entry included); the app day list rolls them under localized day headers, newest first, with per-day totals and a running marker (SC-003).
+- The week view paints new entries via drag and resizes via edge-drag at minute precision; week/day zoom switch (SC-004, manual).
+- The timesheet parses `2`, `2.5`, `2h 30min`, `1:30` (and `2:30`, `90m`) to the matching minutes; a cell aggregates same-day entries of its project+task row; row/day/week totals update on every write (SC-005).
+- `GET /api/eintime/report?from&to&groupBy&client&project&task&tag&billable` returns grouped totals (groupBy `project`/`task`/`client`) plus entry rows (description, project, task, tags, billable, exact times); `member` = caller (SC-006).
+- `GET /api/eintime/projects` returns `{clients, projects, tasks}` mapped from itsaplan (team→client, board→project, assigned ticket→task); entries keep name snapshots so upstream rename/archive doesn't blank them; disconnected itsaplan degrades the pickers only (SC-007).
+- `eintime` behaves as a standard einring module: `MODULES` enablement, `MODULE_EINTIME_*` startup validation, semver on `GET /api/modules`, settings gear, de/en/ru/fr strings, token styling only (SC-008).
+- EinChat gets `eintime_entries`, `eintime_projects`, `eintime_report` tools answering the caller's data or an empty state — never another user's (SC-009).

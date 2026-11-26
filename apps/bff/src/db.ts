@@ -121,6 +121,45 @@ export interface MusicPlaylistRow {
   createdAt: string;
 }
 
+/** EinTime entry (spec eintime): `end` null = the running timer; *_name fields are snapshots. */
+export interface TimeEntryRow {
+  id: string;
+  sub: string;
+  start: string;
+  end: string | null;
+  description: string;
+  provider: string | null;
+  projectExternalId: string | null;
+  taskExternalId: string | null;
+  clientName: string | null;
+  projectName: string | null;
+  taskName: string | null;
+  billable: number;
+  origin: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Editable fields of a time entry; `end: null` is not assignable here (a stopped entry stays stopped). */
+export interface TimeEntryPatch {
+  start?: string;
+  end?: string;
+  description?: string;
+  provider?: string | null;
+  projectExternalId?: string | null;
+  taskExternalId?: string | null;
+  clientName?: string | null;
+  projectName?: string | null;
+  taskName?: string | null;
+  billable?: number;
+}
+
+export interface TimeTagRow {
+  id: string;
+  sub: string;
+  name: string;
+}
+
 export interface McpTokenRow {
   sub: string;
   tokenHash: string;
@@ -257,6 +296,22 @@ export interface Store {
   setPlaylistTracks(playlistId: number, trackIds: number[]): void;
   renameMusicPlaylist(sub: string, id: number, name: string): boolean;
   deleteMusicPlaylist(sub: string, id: number): boolean;
+  /** EinTime (spec eintime): entry CRUD; `end IS NULL` marks the one running entry per sub. */
+  createTimeEntry(e: Omit<TimeEntryRow, "createdAt" | "updatedAt">): TimeEntryRow;
+  getTimeEntry(sub: string, id: string): TimeEntryRow | undefined;
+  getRunningTimeEntry(sub: string): TimeEntryRow | undefined;
+  /** Entries overlapping [from, to) (running counts as open-ended); either bound optional. */
+  listTimeEntries(sub: string, from?: string, to?: string): TimeEntryRow[];
+  /** Partial update; always bumps updated_at. Returns the updated row or undefined. */
+  updateTimeEntry(sub: string, id: string, patch: TimeEntryPatch): TimeEntryRow | undefined;
+  deleteTimeEntry(sub: string, id: string): boolean;
+  listTimeTags(sub: string): TimeTagRow[];
+  /** INSERT OR IGNORE + select by (sub, name) — returns the row whether new or existing. */
+  ensureTimeTag(sub: string, id: string, name: string): TimeTagRow;
+  /** entryId → tag names for a batch of entries. */
+  timeEntryTagNames(entryIds: string[]): Map<string, string[]>;
+  /** Atomic replace of an entry's tag set. */
+  setTimeEntryTags(entryId: string, tagIds: string[]): void;
   close(): void;
 }
 
@@ -394,6 +449,37 @@ CREATE TABLE IF NOT EXISTS music_playlist_tracks (
   PRIMARY KEY (playlist_id, track_id)
 );
 CREATE INDEX IF NOT EXISTS music_playlist_tracks_pl ON music_playlist_tracks(playlist_id);
+CREATE TABLE IF NOT EXISTS eintime_entries (
+  id TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  start TEXT NOT NULL,
+  "end" TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  provider TEXT,
+  project_external_id TEXT,
+  task_external_id TEXT,
+  client_name TEXT,
+  project_name TEXT,
+  task_name TEXT,
+  billable INTEGER NOT NULL DEFAULT 0,
+  origin TEXT NOT NULL DEFAULT 'manual',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS eintime_entries_sub ON eintime_entries(sub, start);
+CREATE UNIQUE INDEX IF NOT EXISTS eintime_running ON eintime_entries(sub) WHERE "end" IS NULL;
+CREATE TABLE IF NOT EXISTS eintime_tags (
+  id TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(sub, name)
+);
+CREATE TABLE IF NOT EXISTS eintime_entry_tags (
+  entry_id TEXT NOT NULL,
+  tag_id TEXT NOT NULL,
+  PRIMARY KEY (entry_id, tag_id)
+);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -626,6 +712,54 @@ export function openStore(path: string): Store {
     "INSERT INTO music_playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
   );
 
+  const TIME_COLS = `id, sub, start, "end", description, provider,
+    project_external_id AS projectExternalId, task_external_id AS taskExternalId,
+    client_name AS clientName, project_name AS projectName, task_name AS taskName,
+    billable, origin, created_at AS createdAt, updated_at AS updatedAt`;
+  const putTimeEntry = db.prepare(
+    `INSERT INTO eintime_entries (id, sub, start, "end", description, provider,
+       project_external_id, task_external_id, client_name, project_name, task_name,
+       billable, origin)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const getTimeEntry = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ? AND id = ?`,
+  );
+  const getRunningTime = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ? AND "end" IS NULL`,
+  );
+  const listTimeAll = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ? ORDER BY start DESC`,
+  );
+  const listTimeRange = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ?
+       AND start < ? AND ("end" IS NULL OR "end" > ?) ORDER BY start DESC`,
+  );
+  const listTimeFrom = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ?
+       AND ("end" IS NULL OR "end" > ?) ORDER BY start DESC`,
+  );
+  const listTimeTo = db.prepare(
+    `SELECT ${TIME_COLS} FROM eintime_entries WHERE sub = ? AND start < ? ORDER BY start DESC`,
+  );
+  const delTimeEntry = db.prepare("DELETE FROM eintime_entries WHERE sub = ? AND id = ?");
+  const listTags = db.prepare("SELECT id, sub, name FROM eintime_tags WHERE sub = ? ORDER BY name");
+  const getTagByName = db.prepare(
+    "SELECT id, sub, name FROM eintime_tags WHERE sub = ? AND name = ?",
+  );
+  const putTag = db.prepare("INSERT OR IGNORE INTO eintime_tags (id, sub, name) VALUES (?, ?, ?)");
+  const entryTagNames = db.prepare(
+    `SELECT et.entry_id AS entryId, t.name FROM eintime_entry_tags et
+       JOIN eintime_tags t ON t.id = et.tag_id WHERE et.entry_id = ?`,
+  );
+  const delEntryTags = db.prepare("DELETE FROM eintime_entry_tags WHERE entry_id = ?");
+  const delOrphanEntryTags = db.prepare(
+    `DELETE FROM eintime_entry_tags WHERE entry_id NOT IN (SELECT id FROM eintime_entries)`,
+  );
+  const putEntryTag = db.prepare(
+    "INSERT OR IGNORE INTO eintime_entry_tags (entry_id, tag_id) VALUES (?, ?)",
+  );
+
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
 
   /** Shared by wiki_pages and wiki_chunks — `table` is a fixed string, never user input. */
@@ -822,6 +956,92 @@ export function openStore(path: string): Store {
       const res = delPlaylist.run(sub, id);
       if (res.changes > 0) delPlaylistTracks.run(id);
       return res.changes > 0;
+    },
+    createTimeEntry: (e) => {
+      putTimeEntry.run(
+        e.id,
+        e.sub,
+        e.start,
+        e.end,
+        e.description,
+        e.provider,
+        e.projectExternalId,
+        e.taskExternalId,
+        e.clientName,
+        e.projectName,
+        e.taskName,
+        e.billable,
+        e.origin,
+      );
+      return getTimeEntry.get(e.sub, e.id) as unknown as TimeEntryRow;
+    },
+    getTimeEntry: (sub, id) => getTimeEntry.get(sub, id) as unknown as TimeEntryRow | undefined,
+    getRunningTimeEntry: (sub) => getRunningTime.get(sub) as unknown as TimeEntryRow | undefined,
+    listTimeEntries: (sub, from, to) => {
+      if (from !== undefined && to !== undefined)
+        return listTimeRange.all(sub, to, from) as unknown as TimeEntryRow[];
+      if (from !== undefined) return listTimeFrom.all(sub, from) as unknown as TimeEntryRow[];
+      if (to !== undefined) return listTimeTo.all(sub, to) as unknown as TimeEntryRow[];
+      return listTimeAll.all(sub) as unknown as TimeEntryRow[];
+    },
+    updateTimeEntry: (sub, id, patch) => {
+      const sets: string[] = ["updated_at = datetime('now')"];
+      const args: (string | number | null)[] = [];
+      const cols: Record<string, keyof TimeEntryPatch> = {
+        start: "start",
+        '"end"': "end",
+        description: "description",
+        provider: "provider",
+        project_external_id: "projectExternalId",
+        task_external_id: "taskExternalId",
+        client_name: "clientName",
+        project_name: "projectName",
+        task_name: "taskName",
+        billable: "billable",
+      };
+      for (const [col, key] of Object.entries(cols)) {
+        const v = patch[key];
+        if (v === undefined) continue;
+        sets.push(`${col} = ?`);
+        args.push(v);
+      }
+      args.push(sub, id);
+      const res = db
+        .prepare(`UPDATE eintime_entries SET ${sets.join(", ")} WHERE sub = ? AND id = ?`)
+        .run(...args);
+      if (res.changes === 0) return undefined;
+      return getTimeEntry.get(sub, id) as unknown as TimeEntryRow;
+    },
+    deleteTimeEntry: (sub, id) => {
+      const res = delTimeEntry.run(sub, id);
+      if (res.changes > 0) delOrphanEntryTags.run();
+      return res.changes > 0;
+    },
+    listTimeTags: (sub) => listTags.all(sub) as unknown as TimeTagRow[],
+    ensureTimeTag: (sub, id, name) => {
+      putTag.run(id, sub, name);
+      return getTagByName.get(sub, name) as unknown as TimeTagRow;
+    },
+    timeEntryTagNames: (entryIds) => {
+      const map = new Map<string, string[]>();
+      for (const id of entryIds) {
+        map.set(
+          id,
+          (entryTagNames.all(id) as { entryId: string; name: string }[]).map((r) => r.name),
+        );
+      }
+      return map;
+    },
+    setTimeEntryTags: (entryId, tagIds) => {
+      db.exec("BEGIN");
+      try {
+        delEntryTags.run(entryId);
+        for (const tagId of tagIds) putEntryTag.run(entryId, tagId);
+        db.exec("COMMIT");
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
     },
     close: () => db.close(),
   };

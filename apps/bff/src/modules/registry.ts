@@ -8,6 +8,7 @@ import { einchatMcpModule } from "./einchat-mcp.js";
 import { eindavModule } from "./eindav.js";
 import { einhubModule } from "./einhub.js";
 import { einmusicModule } from "./einmusic.js";
+import { eintimeModule } from "./eintime.js";
 import { emailModule } from "./email.js";
 import { githubModule } from "./github.js";
 import { gitlabModule } from "./gitlab.js";
@@ -70,6 +71,7 @@ export const bffModules: BffModule[] = [
   stalwartModule,
   postgesModule,
   itsaplanModule,
+  eintimeModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */

@@ -26,6 +26,12 @@ import type {
   EinMusicPlaylists,
   EinMusicTrack,
   EinMusicTracks,
+  EintimeEntries,
+  EintimeEntryResponse,
+  EintimeProjects,
+  EintimeReport,
+  EintimeTags,
+  EintimeTimer,
   EmailAccounts,
   EmailList,
   EmailMessage,
@@ -135,6 +141,12 @@ export const keys = {
   gitlabTodos: ["gitlab", "todos"] as const,
   itsaplanBoards: ["itsaplan", "boards"] as const,
   itsaplanTickets: ["itsaplan", "tickets"] as const,
+  eintimeTimer: ["eintime", "timer"] as const,
+  eintimeEntries: (from?: string, to?: string) =>
+    ["eintime", "entries", from ?? "", to ?? ""] as const,
+  eintimeProjects: ["eintime", "projects"] as const,
+  eintimeTags: ["eintime", "tags"] as const,
+  eintimeReport: (query: string) => ["eintime", "report", query] as const,
   githubNotifications: ["github", "notifications"] as const,
   authentikHealth: ["authentik", "health"] as const,
   nextcloudSettings: ["nextcloud", "settings"] as const,
@@ -856,6 +868,141 @@ export function useItsaplanUpdateTicket() {
         input.patch,
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.itsaplanTickets }),
+  });
+}
+
+/** Shared shape for entry/timer writes — mapping ids plus name snapshots (spec eintime FR-009). */
+export interface EintimeEntryInput {
+  description?: string;
+  provider?: string | null;
+  projectExternalId?: string | null;
+  taskExternalId?: string | null;
+  clientName?: string | null;
+  projectName?: string | null;
+  taskName?: string | null;
+  billable?: boolean;
+  tags?: string[];
+}
+
+const eintimeInvalidate = (qc: ReturnType<typeof useQueryClient>) => {
+  void qc.invalidateQueries({ queryKey: ["eintime"] });
+};
+
+/** The running EinTime timer (or null). */
+export function useEintimeTimer() {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.eintimeTimer,
+    queryFn: () => api.get<EintimeTimer>("/eintime/timer"),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Day-segmented entries overlapping [from, to) — feeds list, grid and timesheet alike. */
+export function useEintimeEntries(from?: string, to?: string) {
+  const api = useApi();
+  const tzOffset = new Date().getTimezoneOffset();
+  return useQuery({
+    queryKey: [...keys.eintimeEntries(from, to), tzOffset],
+    queryFn: () =>
+      api.get<EintimeEntries>(
+        `/eintime/entries?tzOffset=${tzOffset}` +
+          (from ? `&from=${encodeURIComponent(from)}` : "") +
+          (to ? `&to=${encodeURIComponent(to)}` : ""),
+      ),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useEintimeStartTimer() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EintimeEntryInput) => api.post<EintimeTimer>("/eintime/timer", input),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+export function useEintimePatchTimer() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EintimeEntryInput & { start?: string }) =>
+      api.patch<EintimeTimer>("/eintime/timer", input),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+export function useEintimeStopTimer() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<EintimeEntryResponse>("/eintime/timer/stop"),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+export function useEintimeCreateEntry() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      input: EintimeEntryInput & {
+        start: string;
+        end?: string;
+        durationMinutes?: number;
+        origin?: string;
+      },
+    ) => api.post<EintimeEntryResponse>("/eintime/entries", input),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+export function useEintimeUpdateEntry() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      patch: EintimeEntryInput & { start?: string; end?: string };
+    }) => api.patch<EintimeEntryResponse>(`/eintime/entries/${input.id}`, input.patch),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+export function useEintimeDeleteEntry() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/eintime/entries/${id}`),
+    onSuccess: () => eintimeInvalidate(qc),
+  });
+}
+
+/** Clients/projects/tasks resolved through the provider mapping layer. */
+export function useEintimeProjects() {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.eintimeProjects,
+    queryFn: () => api.get<EintimeProjects>("/eintime/projects"),
+    staleTime: 60_000,
+  });
+}
+
+export function useEintimeTags() {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.eintimeTags,
+    queryFn: () => api.get<EintimeTags>("/eintime/tags"),
+  });
+}
+
+/** Report for an already-serialised query string (`from&to&groupBy&…`). */
+export function useEintimeReport(query: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.eintimeReport(query),
+    queryFn: () => api.get<EintimeReport>(`/eintime/report?${query}`),
   });
 }
 

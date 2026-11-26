@@ -20,10 +20,12 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "~/api/client";
 import {
+  useApi,
   useConnectorStatus,
   useItsaplanBoards,
   useItsaplanTickets,
   useItsaplanUpdateTicket,
+  useModuleRegistry,
 } from "~/api/hooks";
 import type { ItsaplanBoard, ItsaplanColumn, ItsaplanTicket } from "~/api/types";
 import { ConnectorPage } from "~/components/ConnectorPage";
@@ -196,6 +198,8 @@ const formatClock = (seconds: number) => {
 
 export function ItsaplanPage() {
   const { t } = useTranslation();
+  const api = useApi();
+  const modules = useModuleRegistry();
   const status = useConnectorStatus("itsaplan");
   const connected = status.data?.connected === true;
   const boards = useItsaplanBoards(connected);
@@ -207,6 +211,7 @@ export function ItsaplanPage() {
     id: number;
     base: number;
     startedAt: number;
+    ticket: ItsaplanTicket;
   } | null>(null);
   const [now, setNow] = useState(0);
 
@@ -219,15 +224,41 @@ export function ItsaplanPage() {
 
   if (!connected) return <ConnectorPage service="itsaplan" />;
 
+  // EinTime feed (spec eintime FR-014): a saved ticket-timer session also lands
+  // as a local eintime entry — after the estimate save attempt, never blocking it.
+  const feedEintime = (ticket: ItsaplanTicket, startedAt: number) => {
+    if (modules.data?.modules.some((m) => m.id === "eintime") !== true) return;
+    api
+      .post("/eintime/entries", {
+        start: new Date(startedAt).toISOString(),
+        end: new Date().toISOString(),
+        description: `${ticket.identifier}: ${ticket.title}`,
+        provider: "itsaplan",
+        projectExternalId: ticket.projectRef,
+        taskExternalId: String(ticket.id),
+        clientName: ticket.teamName,
+        projectName: ticket.projectName,
+        taskName: `${ticket.identifier}: ${ticket.title}`,
+        origin: "itsaplan",
+      })
+      .catch((err) => console.warn("eintime feed failed", err));
+  };
+
   const toggleTimer = (ticket: ItsaplanTicket) => {
     if (running) {
       const total = running.base + Math.round((Date.now() - running.startedAt) / 60000);
       updateTicket.mutate({ issueId: running.id, patch: { estimateMinutes: total } });
+      feedEintime(running.ticket, running.startedAt);
     }
     setRunning(
       running?.id === ticket.id
         ? null
-        : { id: ticket.id, base: ticket.estimateMinutes ?? 0, startedAt: Date.now() },
+        : {
+            id: ticket.id,
+            base: ticket.estimateMinutes ?? 0,
+            startedAt: Date.now(),
+            ticket,
+          },
     );
   };
 
