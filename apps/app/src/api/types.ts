@@ -395,6 +395,49 @@ export interface GitLabTodos {
   todos: GitLabTodo[];
 }
 
+/** One itsaplan board — a project the connected user is a member of. */
+export interface ItsaplanBoard {
+  id: number;
+  key: string;
+  /** '<teamRef>.<key>' — how upstream routes name the project. */
+  ref: string;
+  name: string;
+  teamName: string;
+  teamRef: string;
+  /** Link to the board in the itsaplan web UI. */
+  url: string | null;
+  archived: boolean;
+  lastActivityAt: string | null;
+}
+
+export interface ItsaplanBoards {
+  boards: ItsaplanBoard[];
+}
+
+/** One open itsaplan ticket currently assigned to the connected user. */
+export interface ItsaplanTicket {
+  id: number;
+  identifier: string;
+  title: string;
+  projectKey: string;
+  projectRef: string;
+  projectName: string;
+  teamName: string;
+  /** Column name on the board, or null when the lookup failed. */
+  column: string | null;
+  /** backlog | unstarted | started (the open state types). */
+  stateType: string | null;
+  priority: string | null;
+  dueDate: string | null;
+  /** Link to the ticket in the itsaplan web UI. */
+  url: string | null;
+  updatedAt: string;
+}
+
+export interface ItsaplanTickets {
+  tickets: ItsaplanTicket[];
+}
+
 /** One GitHub notification thread (D44). */
 export interface GitHubNotification {
   id: string;

@@ -1,0 +1,23 @@
+{
+  "nav": "Its a Plan",
+  "intro": "Подключите Its a Plan, чтобы видеть свои доски и назначенные вам тикеты здесь, в EinHub и через EinChat. Создайте персональный API-ключ в Its a Plan в разделе «Аккаунт → API-ключи».",
+  "apiKey": "API-ключ",
+  "apiKeyPlaceholder": "itsaplan_…",
+  "url": "URL инстанса",
+  "connect": "Подключить",
+  "connecting": "Подключение…",
+  "connected": "Подключено к {{url}}.",
+  "connectedAs": "Подключено к {{url}}",
+  "disconnect": "Отключить",
+  "disconnecting": "Отключение…",
+  "hint": "Назначенные вам открытые тикеты теперь появляются в EinHub, а EinChat может перечислить ваши доски и тикеты.",
+  "invalidKey": "Its a Plan отклонил этот API-ключ.",
+  "error": "Запрос Its a Plan завершился ошибкой ({{status}}).",
+  "boards": "Доски",
+  "boardsEmpty": "Нет досок — вы не состоите ни в одном проекте itsaplan.",
+  "tickets": "Мои тикеты",
+  "ticketsEmpty": "Нет назначенных вам открытых тикетов — всё сделано.",
+  "refresh": "Обновить",
+  "priority": "Приоритет",
+  "archived": "в архиве"
+}

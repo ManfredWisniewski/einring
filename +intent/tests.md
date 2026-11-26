@@ -449,3 +449,13 @@
 - `GET /api/aufmass/` returns `roles`: the group-view suffixes (`gf|plan|monteur|abrechnung`) assigned to the caller via their Nextcloud groups — `MODULE_AUFMASS_ROLE_GROUP_MAP` csv `suffix:NC-group` pairs; unmapped suffixes match a same-named (lowercased) group. Application-shared views stay readable upstream — `roles` is an einring-side assignment because Tables cannot unshare views inside a shared application.
 - The page auto-opens and navigates to the user's own role view (first `roles` entry with a matching view, else the base table); the group-view switcher is hidden by default.
 - The hamburger menu's "Debug" item toggles `einring:debug` (localStorage + `einring-debug` event); while on, the switcher offers every readable group view again. Debug is display-level only — upstream readability is unchanged.
+
+### A56 Itsaplan connector module (spec: `+wit/specs/einring/itsaplan/`)
+
+- `POST /api/itsaplan/credentials` verifies a personal itsaplan API key against the instance (`GET /me` must answer `authenticated: true`) before sealing it per `sub`; an invalid key → `401`, unreachable instance → `502`, nothing stored (SC-001).
+- `GET /api/itsaplan/status` reports `connected` + instance URL; `DELETE /api/itsaplan/credentials` drops the stored key; every list endpoint answers `424` while unconnected (SC-001).
+- `GET /api/itsaplan/boards` returns the caller's itsaplan member projects (key/ref, name, team, archived flag, web URL); the module page lists them (SC-002).
+- `GET /api/itsaplan/tickets` returns only open issues (state types `backlog,unstarted,started`) assigned to the caller's itsaplan user — each carrying identifier, title, project ref/name, team, column/state, priority, due date and a link into the itsaplan web UI (SC-003).
+- Upstream auth loss maps to `401` and an unreachable instance to `502` on every upstream-backed route (SC-004).
+- The module behaves as a standard einring module: `MODULES` enablement, `MODULE_ITSAPLAN_URL` instance preset validated at startup, settings gear reaches the connect surface (SC-005).
+- All module strings exist in the de/en/ru/fr bundles (SC-006); the API key never reaches the browser — all upstream calls are BFF-proxied (NFR-001); the module performs no upstream writes (NFR-002).

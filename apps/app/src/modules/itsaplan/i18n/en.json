@@ -1,0 +1,23 @@
+{
+  "nav": "Its a Plan",
+  "intro": "Connect Its a Plan to see your boards and assigned tickets here, in EinHub and via EinChat. Create a personal API key in Its a Plan under Account → API keys.",
+  "apiKey": "API key",
+  "apiKeyPlaceholder": "itsaplan_…",
+  "url": "Instance URL",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "connected": "Connected to {{url}}.",
+  "connectedAs": "Connected to {{url}}",
+  "disconnect": "Disconnect",
+  "disconnecting": "Disconnecting…",
+  "hint": "Open tickets assigned to you now appear in EinHub, and EinChat can list your boards and tickets.",
+  "invalidKey": "Its a Plan rejected this API key.",
+  "error": "Its a Plan request failed ({{status}}).",
+  "boards": "Boards",
+  "boardsEmpty": "No boards — you are not a member of any itsaplan project.",
+  "tickets": "My tickets",
+  "ticketsEmpty": "No open tickets assigned to you — all done.",
+  "refresh": "Refresh",
+  "priority": "Priority",
+  "archived": "archived"
+}

@@ -1,0 +1,23 @@
+{
+  "nav": "Its a Plan",
+  "intro": "Connectez Its a Plan pour voir vos tableaux et vos tickets assignés ici, dans EinHub et via EinChat. Créez une clé API personnelle dans Its a Plan sous Compte → Clés API.",
+  "apiKey": "Clé API",
+  "apiKeyPlaceholder": "itsaplan_…",
+  "url": "URL de l'instance",
+  "connect": "Connecter",
+  "connecting": "Connexion…",
+  "connected": "Connecté à {{url}}.",
+  "connectedAs": "Connecté à {{url}}",
+  "disconnect": "Déconnecter",
+  "disconnecting": "Déconnexion…",
+  "hint": "Les tickets ouverts qui vous sont assignés apparaissent désormais dans EinHub, et EinChat peut lister vos tableaux et tickets.",
+  "invalidKey": "Its a Plan a rejeté cette clé API.",
+  "error": "La requête Its a Plan a échoué ({{status}}).",
+  "boards": "Tableaux",
+  "boardsEmpty": "Aucun tableau — vous n'êtes membre d'aucun projet itsaplan.",
+  "tickets": "Mes tickets",
+  "ticketsEmpty": "Aucun ticket ouvert qui vous est assigné — tout est fait.",
+  "refresh": "Actualiser",
+  "priority": "Priorité",
+  "archived": "archivé"
+}

@@ -31,6 +31,7 @@ BFF counterpart (`apps/bff/src/modules/registry.ts`).
 | stalwart | Stalwart mail server: principals, mail domains, JMAP capabilities (read-only) | testing | one | stalw.art |
 | school | Music-school management (people, lessons, invoicing, messaging) | dev | — (Authentik groups) | — (internal) |
 | postges | PostgreSQL table browser — per-user connections, read-only by default | dev | one per user | any PostgreSQL server |
+| itsaplan | Its a Plan boards + assigned tickets → EinHub/EinChat (read-only) | dev | one | plan.w1t.org / self-hosted croffasia/itsaplan |
 
 **State** reflects implementation maturity (acceptance criteria + test coverage), not a
 formal release process — `dev` = under active construction, `testing` = implemented with

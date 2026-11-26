@@ -1,0 +1,23 @@
+{
+  "nav": "Its a Plan",
+  "intro": "Verbinde Its a Plan, um deine Boards und dir zugewiesene Tickets hier, in EinHub und über EinChat zu sehen. Erstelle einen persönlichen API-Schlüssel in Its a Plan unter Konto → API-Schlüssel.",
+  "apiKey": "API-Schlüssel",
+  "apiKeyPlaceholder": "itsaplan_…",
+  "url": "Instanz-URL",
+  "connect": "Verbinden",
+  "connecting": "Verbinde …",
+  "connected": "Mit {{url}} verbunden.",
+  "connectedAs": "Mit {{url}} verbunden",
+  "disconnect": "Trennen",
+  "disconnecting": "Trenne …",
+  "hint": "Dir zugewiesene offene Tickets erscheinen jetzt in EinHub, und EinChat kann deine Boards und Tickets auflisten.",
+  "invalidKey": "Its a Plan hat diesen API-Schlüssel abgelehnt.",
+  "error": "Its-a-Plan-Anfrage fehlgeschlagen ({{status}}).",
+  "boards": "Boards",
+  "boardsEmpty": "Keine Boards — du bist Mitglied keines Its-a-Plan-Projekts.",
+  "tickets": "Meine Tickets",
+  "ticketsEmpty": "Keine offenen Tickets für dich — alles erledigt.",
+  "refresh": "Aktualisieren",
+  "priority": "Priorität",
+  "archived": "archiviert"
+}

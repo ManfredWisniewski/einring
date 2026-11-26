@@ -12,6 +12,7 @@ import { emailModule } from "./email";
 import { githubModule } from "./github";
 import { gitlabModule } from "./gitlab";
 import { gotifyModule } from "./gotify";
+import { itsaplanModule } from "./itsaplan";
 import { matrixModule } from "./matrix";
 import { monitorModule } from "./monitor";
 import { musicdlModule } from "./musicdl";
@@ -62,6 +63,7 @@ export const appModules: AppModule[] = [
   schoolModule,
   stalwartModule,
   postgesModule,
+  itsaplanModule,
 ];
 
 /**

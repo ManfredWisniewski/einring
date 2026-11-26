@@ -35,6 +35,8 @@ import type {
   GotifyApplications,
   GotifyMessages,
   GotifyUser,
+  ItsaplanBoards,
+  ItsaplanTickets,
   LoginFlowStart,
   MatrixMessages,
   MatrixRooms,
@@ -131,6 +133,8 @@ export const keys = {
   gotifyUser: ["gotify", "user"] as const,
   einhub: ["einhub", "notifications"] as const,
   gitlabTodos: ["gitlab", "todos"] as const,
+  itsaplanBoards: ["itsaplan", "boards"] as const,
+  itsaplanTickets: ["itsaplan", "tickets"] as const,
   githubNotifications: ["github", "notifications"] as const,
   authentikHealth: ["authentik", "health"] as const,
   nextcloudSettings: ["nextcloud", "settings"] as const,
@@ -811,6 +815,28 @@ export function useGitLabTodos(enabled = true) {
   return useQuery({
     queryKey: keys.gitlabTodos,
     queryFn: () => api.get<GitLabTodos>("/gitlab/todos"),
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The caller's itsaplan boards — projects they are a member of. */
+export function useItsaplanBoards(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.itsaplanBoards,
+    queryFn: () => api.get<ItsaplanBoards>("/itsaplan/boards"),
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The caller's open assigned itsaplan tickets — they also land in EinHub. */
+export function useItsaplanTickets(enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.itsaplanTickets,
+    queryFn: () => api.get<ItsaplanTickets>("/itsaplan/tickets"),
     enabled,
     refetchInterval: 60_000,
   });

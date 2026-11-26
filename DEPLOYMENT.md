@@ -105,6 +105,7 @@ PUBLIC_URL=https://einring.example.com
 # MODULE_AUTHENTIK_URL=       # default Authentik instance, e.g. https://auth.example.com
 # MODULE_MATRIX_URL=          # default Matrix homeserver, e.g. https://matrix.example.com
 # MODULE_STALWART_URL=        # default Stalwart server, e.g. https://mail.example.com
+# MODULE_ITSAPLAN_URL=        # itsaplan API base, e.g. https://plan.w1t.org/api (bare hosts get /api appended)
 # MODULE_RECIPES_FOLDER=      # WebDAV folder of Cookbook recipe dirs (default Recipes)
 # MODULE_POSTGES_READ_ONLY=true   # "false" enables row insert/update/delete (default: read-only)
 # MODULE_POSTGES_MAX_PAGE=200     # rows per page cap (default 200)

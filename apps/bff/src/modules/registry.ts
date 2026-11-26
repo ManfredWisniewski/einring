@@ -12,6 +12,7 @@ import { emailModule } from "./email.js";
 import { githubModule } from "./github.js";
 import { gitlabModule } from "./gitlab.js";
 import { gotifyModule } from "./gotify.js";
+import { itsaplanModule } from "./itsaplan.js";
 import { matrixModule } from "./matrix.js";
 import { monitorModule } from "./monitor.js";
 import { musicdlModule } from "./musicdl.js";
@@ -68,6 +69,7 @@ export const bffModules: BffModule[] = [
   schoolModule,
   stalwartModule,
   postgesModule,
+  itsaplanModule,
 ];
 
 /** `MODULE_<ID>_` env prefix for a module id (`monitor-hub` → `MODULE_MONITOR_HUB_`). */
