@@ -18,6 +18,13 @@
   "tickets": "Meine Tickets",
   "ticketsEmpty": "Keine offenen Tickets für dich — alles erledigt.",
   "refresh": "Aktualisieren",
+  "state": "Status",
+  "timerStart": "Starten",
+  "timerPause": "Pause",
+  "priorityUrgent": "Dringend",
+  "priorityHigh": "Hoch",
+  "priorityMedium": "Mittel",
+  "priorityLow": "Niedrig",
   "priority": "Priorität",
   "archived": "archiviert"
 }

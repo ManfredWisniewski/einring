@@ -15,6 +15,7 @@ const BOARDS = [
     teamName: "WIT",
     archivedAt: null,
     lastActivityAt: "2026-11-25T10:00:00Z",
+    timeEstimateEnabled: true,
   },
   {
     id: 2,
@@ -37,6 +38,7 @@ const ISSUES = [
     priority: "high",
     dueDate: "2026-11-30",
     updatedAt: "2026-11-25T09:00:00Z",
+    estimateMinutes: 130,
     projectId: 1,
     projectRef: "wit.CLV",
     projectKey: "CLV",
@@ -59,15 +61,20 @@ const ISSUES = [
   },
 ];
 
-const COLUMNS: Record<string, { id: number; name: string; stateType: string }[]> = {
-  "wit.CLV": [{ id: 100, name: "In Progress", stateType: "started" }],
-  "wit.OPS": [{ id: 200, name: "Todo", stateType: "unstarted" }],
+const COLUMNS: Record<string, { id: number; name: string; stateType: string; color: string }[]> = {
+  "wit.CLV": [{ id: 100, name: "In Progress", stateType: "started", color: "#ffcc00" }],
+  "wit.OPS": [{ id: 200, name: "Todo", stateType: "unstarted", color: "#00ccff" }],
 };
 
 function upstream(opts: { authed?: boolean; issuesStatus?: number } = {}) {
-  const calls: { url: string; key?: string }[] = [];
+  const calls: { url: string; key?: string; method?: string; body?: unknown }[] = [];
   const handler = fakeFetch((url, init) => {
-    calls.push({ url, key: (init?.headers as Record<string, string>)?.["x-api-key"] });
+    calls.push({
+      url,
+      key: (init?.headers as Record<string, string>)?.["x-api-key"],
+      method: init?.method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+    });
     if (url.endsWith(`${API}/me`)) {
       return json(
         opts.authed === false
@@ -76,6 +83,10 @@ function upstream(opts: { authed?: boolean; issuesStatus?: number } = {}) {
       );
     }
     if (url.endsWith(`${API}/projects`)) return json(BOARDS);
+    if (init?.method === "PATCH" && /\/issues\/\d+$/.test(url)) {
+      const payload = JSON.parse(String(init.body)) as { estimateMinutes?: number };
+      return json({ ...ISSUES[0], estimateMinutes: payload.estimateMinutes ?? null });
+    }
     if (url.includes(`${API}/issues`)) return json(ISSUES, opts.issuesStatus ?? 200);
     for (const [ref, columns] of Object.entries(COLUMNS)) {
       if (url.endsWith(`${API}/projects/${ref}`)) return json({ columns });
@@ -154,6 +165,7 @@ describe("itsaplan module", () => {
         url: "https://plan.w1t.org/wit/CLV/",
         archived: false,
         lastActivityAt: "2026-11-25T10:00:00Z",
+        timeEstimateEnabled: true,
       },
       {
         id: 2,
@@ -165,6 +177,7 @@ describe("itsaplan module", () => {
         url: "https://plan.w1t.org/wit/OPS/",
         archived: true,
         lastActivityAt: null,
+        timeEstimateEnabled: false,
       },
     ]);
     const projectsCall = fetch.calls.find((c) => c.url.endsWith(`${API}/projects`));
@@ -190,8 +203,18 @@ describe("itsaplan module", () => {
       priority: "high",
       dueDate: "2026-11-30",
       url: "https://plan.w1t.org/wit/issue/CLV-3",
+      estimateMinutes: 130,
+      columnId: 100,
     });
-    expect(keys).toMatchObject({ column: "Todo", stateType: "unstarted" });
+    expect(keys).toMatchObject({
+      column: "Todo",
+      stateType: "unstarted",
+      estimateMinutes: null,
+      columnId: 200,
+    });
+    expect(res.json().columns["wit.CLV"]).toEqual([
+      { id: 100, name: "In Progress", stateType: "started", color: "#ffcc00" },
+    ]);
     const issuesCall = fetch.calls.find((c) => c.url.includes(`${API}/issues`));
     expect(issuesCall?.url).toContain("assigneeUserId=u-1");
     expect(issuesCall?.url).toContain("stateTypes=backlog,unstarted,started");
@@ -207,6 +230,56 @@ describe("itsaplan module", () => {
     });
     const res = await app.inject({ url: "/api/itsaplan/tickets", headers: auth });
     expect(res.statusCode).toBe(502);
+  });
+
+  it("saves a ticket estimate upstream via PATCH /issues/<id>", async () => {
+    const fetch = upstream();
+    const { app, auth } = await connectedApp(fetch);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/itsaplan/tickets/11",
+      headers: { ...auth, "content-type": "application/json" },
+      payload: { estimateMinutes: 145 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ estimateMinutes: 145, columnId: 100 });
+    const patchCall = fetch.calls.find((c) => c.method === "PATCH");
+    expect(patchCall?.url).toBe(`${API}/issues/11`);
+    expect(patchCall?.key).toBe("key-1");
+    expect(patchCall?.body).toEqual({ estimateMinutes: 145 });
+  });
+
+  it("moves a ticket to another column via PATCH columnId", async () => {
+    const fetch = upstream();
+    const { app, auth } = await connectedApp(fetch);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/itsaplan/tickets/11",
+      headers: { ...auth, "content-type": "application/json" },
+      payload: { columnId: 200 },
+    });
+    expect(res.statusCode).toBe(200);
+    const patchCall = fetch.calls.find((c) => c.method === "PATCH");
+    expect(patchCall?.body).toEqual({ columnId: 200 });
+  });
+
+  it("rejects a bad estimate payload with 400 and needs a connection (424)", async () => {
+    const { app, auth } = await connectedApp();
+    const bad = await app.inject({
+      method: "PATCH",
+      url: "/api/itsaplan/tickets/11",
+      headers: { ...auth, "content-type": "application/json" },
+      payload: { estimateMinutes: -5 },
+    });
+    expect(bad.statusCode).toBe(400);
+    const { app: app2, auth: auth2 } = await testApp({ fetchImpl: upstream() });
+    const unconnected = await app2.inject({
+      method: "PATCH",
+      url: "/api/itsaplan/tickets/11",
+      headers: { ...auth2, "content-type": "application/json" },
+      payload: { estimateMinutes: 30 },
+    });
+    expect(unconnected.statusCode).toBe(424);
   });
 
   it("feeds assigned tickets to EinHub as notification items (FR-009)", async () => {

@@ -408,10 +408,20 @@ export interface ItsaplanBoard {
   url: string | null;
   archived: boolean;
   lastActivityAt: string | null;
+  /** The project's "time estimate" toggle (Settings → Estimates). */
+  timeEstimateEnabled: boolean;
 }
 
 export interface ItsaplanBoards {
   boards: ItsaplanBoard[];
+}
+
+/** A state column on an itsaplan board (the state switcher's options). */
+export interface ItsaplanColumn {
+  id: number;
+  name: string;
+  stateType: string | null;
+  color: string | null;
 }
 
 /** One open itsaplan ticket currently assigned to the connected user. */
@@ -423,6 +433,7 @@ export interface ItsaplanTicket {
   projectRef: string;
   projectName: string;
   teamName: string;
+  columnId: number;
   /** Column name on the board, or null when the lookup failed. */
   column: string | null;
   /** backlog | unstarted | started (the open state types). */
@@ -432,10 +443,14 @@ export interface ItsaplanTicket {
   /** Link to the ticket in the itsaplan web UI. */
   url: string | null;
   updatedAt: string;
+  /** Time estimate in whole minutes (null when unset or the project disables it). */
+  estimateMinutes: number | null;
 }
 
 export interface ItsaplanTickets {
   tickets: ItsaplanTicket[];
+  /** State columns of every referenced board, keyed by projectRef — the state switcher's options. */
+  columns: Record<string, ItsaplanColumn[]>;
 }
 
 /** One GitHub notification thread (D44). */

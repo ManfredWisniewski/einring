@@ -18,6 +18,13 @@
   "tickets": "Мои тикеты",
   "ticketsEmpty": "Нет назначенных вам открытых тикетов — всё сделано.",
   "refresh": "Обновить",
+  "state": "Статус",
+  "timerStart": "Старт",
+  "timerPause": "Пауза",
+  "priorityUrgent": "Срочно",
+  "priorityHigh": "Высокий",
+  "priorityMedium": "Средний",
+  "priorityLow": "Низкий",
   "priority": "Приоритет",
   "archived": "в архиве"
 }

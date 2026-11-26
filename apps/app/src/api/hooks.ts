@@ -842,6 +842,23 @@ export function useItsaplanTickets(enabled = true) {
   });
 }
 
+/** Patch a ticket upstream: time estimate (whole minutes) and/or state column. */
+export function useItsaplanUpdateTicket() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      issueId: number;
+      patch: { estimateMinutes?: number; columnId?: number };
+    }) =>
+      api.patch<{ estimateMinutes: number | null; columnId: number | null }>(
+        `/itsaplan/tickets/${input.issueId}`,
+        input.patch,
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.itsaplanTickets }),
+  });
+}
+
 /** The caller's GitHub notification threads (D44) — they also land in EinHub. */
 export function useGitHubNotifications(enabled = true) {
   const api = useApi();

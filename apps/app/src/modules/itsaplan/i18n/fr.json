@@ -18,6 +18,13 @@
   "tickets": "Mes tickets",
   "ticketsEmpty": "Aucun ticket ouvert qui vous est assigné — tout est fait.",
   "refresh": "Actualiser",
+  "state": "État",
+  "timerStart": "Démarrer",
+  "timerPause": "Pause",
+  "priorityUrgent": "Urgent",
+  "priorityHigh": "Haute",
+  "priorityMedium": "Moyenne",
+  "priorityLow": "Basse",
   "priority": "Priorité",
   "archived": "archivé"
 }
