@@ -458,4 +458,7 @@
 - `GET /api/itsaplan/tickets` returns only open issues (state types `backlog,unstarted,started`) assigned to the caller's itsaplan user — each carrying identifier, title, project ref/name, team, column/state, priority, due date and a link into the itsaplan web UI (SC-003).
 - Upstream auth loss maps to `401` and an unreachable instance to `502` on every upstream-backed route (SC-004).
 - The module behaves as a standard einring module: `MODULES` enablement, `MODULE_ITSAPLAN_URL` instance preset validated at startup, settings gear reaches the connect surface (SC-005).
-- All module strings exist in the de/en/ru/fr bundles (SC-006); the API key never reaches the browser — all upstream calls are BFF-proxied (NFR-001); the module performs no upstream writes (NFR-002).
+- All module strings exist in the de/en/ru/fr bundles (SC-006); the API key never reaches the browser — all upstream calls are BFF-proxied (NFR-001); upstream writes are limited to `PATCH /issues/:id` on `estimateMinutes`/`columnId` (NFR-002).
+- The page's filter row narrows both lists by board (multi-select) and tickets by priority (single-select; empty = all); tickets sort by priority rank then title; the refresh button refetches tickets (SC-007).
+- `PATCH /api/itsaplan/tickets/:issueId` forwards `estimateMinutes`/`columnId` to upstream `PATCH /issues/:id` — `400` on invalid payloads, `409` on `wip_limit_exceeded` (SC-008); on boards with `timeEstimateEnabled` a ticket shows `h:mm` (`0:00` unset) and its Start/Pause timer saves the accumulated minutes; only one timer runs at a time (SC-008).
+- Each ticket's state pill (colour dot + column name) lists its board's columns and PATCHes `columnId` on selection — the `columns` map ships with the tickets response (SC-009).
