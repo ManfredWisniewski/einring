@@ -8,6 +8,7 @@ import { einchatModule } from "./einchat";
 import { eindavModule } from "./eindav";
 import { einhubModule } from "./einhub";
 import { einmusicModule } from "./einmusic";
+import { einpillModule } from "./einpill";
 import { eintimeModule } from "./eintime";
 import { emailModule } from "./email";
 import { githubModule } from "./github";
@@ -66,6 +67,7 @@ export const appModules: AppModule[] = [
   postgesModule,
   itsaplanModule,
   eintimeModule,
+  einpillModule,
 ];
 
 /**

@@ -360,6 +360,13 @@ export interface GotifyUser {
   admin: boolean;
 }
 
+export interface EinHubNotificationI18n {
+  titleKey?: string;
+  titleParams?: Record<string, unknown>;
+  bodyKey?: string;
+  bodyParams?: Record<string, unknown>;
+}
+
 /** One hub notification collected from a source module (D42). */
 export interface EinHubNotification {
   id: number;
@@ -370,11 +377,69 @@ export interface EinHubNotification {
   /** Upstream event time (ISO). */
   at: string;
   read: boolean;
+  /** Optional structured translation metadata; title/body are plain-text fallbacks. */
+  i18n?: EinHubNotificationI18n;
 }
 
 export interface EinHubFeed {
   notifications: EinHubNotification[];
   unread: number;
+}
+
+export interface EinpillRevision {
+  effectiveDate: string;
+  pillsPerPackage: number;
+  dailyUsage: number;
+}
+
+export interface EinpillPackage {
+  id: string;
+  addedDate: string;
+}
+
+export interface EinpillProjection {
+  state: "untracked" | "active" | "exhausted";
+  currentPackageId: string | null;
+  currentStartedDate: string | null;
+  currentRemainingPills: number;
+  sparePackages: number;
+  totalRemainingPills: number;
+  remainingDays: number;
+  runoutDate: string | null;
+}
+
+export interface EinpillMedication {
+  id: string;
+  name: string;
+  /** Values effective at the BFF evaluation date. */
+  pillsPerPackage: number;
+  dailyUsage: number;
+  archived: boolean;
+  revisions: EinpillRevision[];
+  packages: EinpillPackage[];
+  projection: EinpillProjection;
+}
+
+export interface EinpillMedications {
+  medications: EinpillMedication[];
+}
+
+export interface EinpillMedicationResponse {
+  medication: EinpillMedication;
+}
+
+export interface EinpillDosageInput {
+  pillsPerPackage: number;
+  dailyUsage: number;
+}
+
+export interface EinpillMedicationInput extends EinpillDosageInput {
+  name: string;
+  effectiveDate?: string;
+}
+
+export interface EinpillRevisionInput extends EinpillDosageInput {
+  effectiveDate: string;
 }
 
 /** One pending GitLab todo — GitLab's API-side notification surface (D43). */

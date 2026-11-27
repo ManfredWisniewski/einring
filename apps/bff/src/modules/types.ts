@@ -25,12 +25,21 @@ export interface ChatTool {
  * One upstream event for einhub (D42). `sourceId` is the dedupe key —
  * upstream-unique within the module (Gotify message id, IMAP uid).
  */
+export interface NotificationItemI18n {
+  titleKey?: string;
+  titleParams?: Record<string, unknown>;
+  bodyKey?: string;
+  bodyParams?: Record<string, unknown>;
+}
+
 export interface NotificationItem {
   sourceId: string;
   title: string;
   body?: string;
   /** Event time (ISO); defaults to insert time. */
   at?: string;
+  /** Optional structured translation metadata; title/body remain plain-text fallbacks. */
+  i18n?: NotificationItemI18n;
 }
 
 /**

@@ -474,3 +474,13 @@
 - `GET /api/eintime/projects` returns `{clients, projects, tasks}` mapped from itsaplan (team→client, board→project, assigned ticket→task); entries keep name snapshots so upstream rename/archive doesn't blank them; disconnected itsaplan degrades the pickers only (SC-007).
 - `eintime` behaves as a standard einring module: `MODULES` enablement, `MODULE_EINTIME_*` startup validation, semver on `GET /api/modules`, settings gear, de/en/ru/fr strings, token styling only (SC-008).
 - EinChat gets `eintime_entries`, `eintime_projects`, `eintime_report` tools answering the caller's data or an empty state — never another user's (SC-009).
+
+### A58 EinPill module (spec: `+wit/specs/einring/einpill/`)
+
+- `POST /api/einpill/medications` creates a caller-scoped medication with its initial effective-dated pills-per-package/daily-usage revision; `PATCH` edits name/archive state; `DELETE` removes the medication with its revisions and package additions. Validation rejects blank/overlong names, malformed numbers, zero/negative/out-of-range usage or package counts, and cross-user access (SC-001).
+- `PUT /api/einpill/medications/:id/revision` accepts past, current and future effective dates; saving the same medication/date pair overwrites the prior values. Projection tests cover decimal usage, spare packages, same-date ordering, stock gaps, format-by-addition-date and usage-by-consumption-date with fixed UTC dates (SC-002).
+- `/einpill` shows the required medication table columns in server-returned runout urgency order and explicit loading/empty/no-package/exhausted/archived states; strings are localized and styling token-based (SC-003).
+- EinHub receives exactly one restock warning for an active recorded medication at `remainingDays <= 14` or exhausted, none above fourteen days or before the first package, no duplicates, and no new warnings for archived medications; first-contact seeding leaves only the newest item per module unread (SC-004).
+- `einpill` behaves as a standard einring module: `MODULES` enablement, semver on `GET /api/modules`, authenticated API routes, `/einpill` navigation/routing and no Nextcloud or other external-service dependency (SC-005).
+- EinPill BFF response shapes are mirrored in `apps/app/src/api/types.ts`; `pnpm typecheck` passes (SC-006).
+- EinPill warning items carry structured translation metadata and render localized title/body text in de/en/ru/fr while retaining the plain-text fallback for API consumers and non-localized upstream items (SC-007).

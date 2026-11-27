@@ -88,6 +88,8 @@ export interface NotificationRow {
   /** Upstream event time (ISO). */
   at: string;
   read: number;
+  /** Optional JSON translation metadata for React surfaces (D42 additive contract). */
+  i18n?: string | null;
 }
 
 /** An uploaded MP3's metadata — audio bytes live under DATA_DIR/einmusic/<id>.mp3 (D48). */
@@ -166,6 +168,43 @@ export interface McpTokenRow {
   label: string;
   createdAt: string;
   revokedAt?: string | null;
+}
+
+/** EinPill medication identity (spec einpill); dosage/package values live in revisions. */
+export interface EinpillMedicationRow {
+  id: string;
+  sub: string;
+  name: string;
+  archived: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Effective-dated EinPill dosage/package-format values. */
+export interface EinpillRevisionRow {
+  id: string;
+  sub: string;
+  medicationId: string;
+  effectiveDate: string;
+  pillsPerPackage: number;
+  usageMilli: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One full package added to an EinPill medication. */
+export interface EinpillPackageRow {
+  id: string;
+  sub: string;
+  medicationId: string;
+  addedDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EinpillMedicationPatch {
+  name?: string;
+  archived?: number;
 }
 
 export interface Store {
@@ -312,6 +351,30 @@ export interface Store {
   timeEntryTagNames(entryIds: string[]): Map<string, string[]>;
   /** Atomic replace of an entry's tag set. */
   setTimeEntryTags(entryId: string, tagIds: string[]): void;
+  /** EinPill (spec einpill): medications, effective-dated revisions and package additions. */
+  createEinpillMedication(
+    medication: Omit<EinpillMedicationRow, "createdAt" | "updatedAt">,
+    revision: Omit<EinpillRevisionRow, "createdAt" | "updatedAt">,
+  ): EinpillMedicationRow;
+  getEinpillMedication(sub: string, id: string): EinpillMedicationRow | undefined;
+  listEinpillMedications(sub: string, includeArchived: boolean): EinpillMedicationRow[];
+  updateEinpillMedication(
+    sub: string,
+    id: string,
+    patch: EinpillMedicationPatch,
+  ): EinpillMedicationRow | undefined;
+  /** Deletes the medication plus its revisions/packages atomically. */
+  deleteEinpillMedication(sub: string, id: string): boolean;
+  /** Same (sub, medication, effectiveDate) overwrites values — the owner-selected correction path. */
+  upsertEinpillRevision(
+    revision: Omit<EinpillRevisionRow, "createdAt" | "updatedAt">,
+  ): EinpillRevisionRow;
+  listEinpillRevisions(sub: string, medicationId: string): EinpillRevisionRow[];
+  createEinpillPackage(pkg: Omit<EinpillPackageRow, "createdAt" | "updatedAt">): EinpillPackageRow;
+  getEinpillPackage(sub: string, id: string): EinpillPackageRow | undefined;
+  listEinpillPackages(sub: string, medicationId: string): EinpillPackageRow[];
+  updateEinpillPackage(sub: string, id: string, addedDate: string): EinpillPackageRow | undefined;
+  deleteEinpillPackage(sub: string, id: string): boolean;
   close(): void;
 }
 
@@ -410,6 +473,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   body TEXT,
   at TEXT NOT NULL,
   read INTEGER NOT NULL DEFAULT 0,
+  i18n TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(sub, module, source_id)
 );
@@ -480,6 +544,38 @@ CREATE TABLE IF NOT EXISTS eintime_entry_tags (
   tag_id TEXT NOT NULL,
   PRIMARY KEY (entry_id, tag_id)
 );
+CREATE TABLE IF NOT EXISTS einpill_medications (
+  id TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS einpill_medications_sub ON einpill_medications(sub, archived, name);
+CREATE TABLE IF NOT EXISTS einpill_medication_revisions (
+  id TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  medication_id TEXT NOT NULL,
+  effective_date TEXT NOT NULL,
+  pills_per_package INTEGER NOT NULL,
+  usage_milli INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(sub, medication_id, effective_date)
+);
+CREATE INDEX IF NOT EXISTS einpill_revisions_med
+  ON einpill_medication_revisions(sub, medication_id, effective_date);
+CREATE TABLE IF NOT EXISTS einpill_package_additions (
+  id TEXT PRIMARY KEY,
+  sub TEXT NOT NULL,
+  medication_id TEXT NOT NULL,
+  added_date TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS einpill_packages_med
+  ON einpill_package_additions(sub, medication_id, added_date, created_at);
 `;
 
 /** Additive migrations for existing databases (SCHEMA covers fresh ones). */
@@ -512,6 +608,12 @@ function migrate(db: DatabaseSync) {
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS music_tracks_video ON music_tracks(sub, source_video_id) WHERE source_video_id IS NOT NULL",
   );
+  const notificationCols = new Set(
+    (db.prepare("PRAGMA table_info(notifications)").all() as { name: string }[]).map((c) => c.name),
+  );
+  if (!notificationCols.has("i18n")) {
+    db.exec("ALTER TABLE notifications ADD COLUMN i18n TEXT");
+  }
 }
 
 /** `path` may be ":memory:" for tests. */
@@ -648,11 +750,11 @@ export function openStore(path: string): Store {
     "SELECT COUNT(*) AS chunks, COUNT(DISTINCT path) AS pages FROM wiki_chunks WHERE sub = ?",
   );
   const putNotification = db.prepare(
-    `INSERT OR IGNORE INTO notifications (sub, module, source_id, title, body, at, read)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO notifications (sub, module, source_id, title, body, at, read, i18n)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const listNotifs = db.prepare(
-    `SELECT id, sub, module, source_id AS sourceId, title, body, at, read
+    `SELECT id, sub, module, source_id AS sourceId, title, body, at, read, i18n
      FROM notifications WHERE sub = ? ORDER BY id DESC LIMIT ?`,
   );
   const countNotifsFor = db.prepare(
@@ -758,6 +860,63 @@ export function openStore(path: string): Store {
   );
   const putEntryTag = db.prepare(
     "INSERT OR IGNORE INTO eintime_entry_tags (entry_id, tag_id) VALUES (?, ?)",
+  );
+
+  const EINPILL_MED_COLS =
+    "id, sub, name, archived, created_at AS createdAt, updated_at AS updatedAt";
+  const EINPILL_REV_COLS = `id, sub, medication_id AS medicationId, effective_date AS effectiveDate,
+    pills_per_package AS pillsPerPackage, usage_milli AS usageMilli,
+    created_at AS createdAt, updated_at AS updatedAt`;
+  const EINPILL_PKG_COLS = `id, sub, medication_id AS medicationId, added_date AS addedDate,
+    created_at AS createdAt, updated_at AS updatedAt`;
+  const putEinpillMed = db.prepare(
+    "INSERT INTO einpill_medications (id, sub, name, archived) VALUES (?, ?, ?, ?)",
+  );
+  const getEinpillMed = db.prepare(
+    `SELECT ${EINPILL_MED_COLS} FROM einpill_medications WHERE sub = ? AND id = ?`,
+  );
+  const listEinpillMedsActive = db.prepare(
+    `SELECT ${EINPILL_MED_COLS} FROM einpill_medications WHERE sub = ? AND archived = 0 ORDER BY name COLLATE NOCASE`,
+  );
+  const listEinpillMedsAll = db.prepare(
+    `SELECT ${EINPILL_MED_COLS} FROM einpill_medications WHERE sub = ? ORDER BY name COLLATE NOCASE`,
+  );
+  const delEinpillMed = db.prepare("DELETE FROM einpill_medications WHERE sub = ? AND id = ?");
+  const putEinpillRev = db.prepare(
+    `INSERT INTO einpill_medication_revisions
+       (id, sub, medication_id, effective_date, pills_per_package, usage_milli)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(sub, medication_id, effective_date) DO UPDATE SET
+       pills_per_package = excluded.pills_per_package,
+       usage_milli = excluded.usage_milli,
+       updated_at = datetime('now')`,
+  );
+  const getEinpillRev = db.prepare(
+    `SELECT ${EINPILL_REV_COLS} FROM einpill_medication_revisions WHERE sub = ? AND medication_id = ? AND effective_date = ?`,
+  );
+  const listEinpillRevs = db.prepare(
+    `SELECT ${EINPILL_REV_COLS} FROM einpill_medication_revisions WHERE sub = ? AND medication_id = ? ORDER BY effective_date, created_at, id`,
+  );
+  const delEinpillRevsForMed = db.prepare(
+    "DELETE FROM einpill_medication_revisions WHERE sub = ? AND medication_id = ?",
+  );
+  const putEinpillPkg = db.prepare(
+    "INSERT INTO einpill_package_additions (id, sub, medication_id, added_date) VALUES (?, ?, ?, ?)",
+  );
+  const getEinpillPkg = db.prepare(
+    `SELECT ${EINPILL_PKG_COLS} FROM einpill_package_additions WHERE sub = ? AND id = ?`,
+  );
+  const listEinpillPkgs = db.prepare(
+    `SELECT ${EINPILL_PKG_COLS} FROM einpill_package_additions WHERE sub = ? AND medication_id = ? ORDER BY added_date, created_at, id`,
+  );
+  const updEinpillPkg = db.prepare(
+    "UPDATE einpill_package_additions SET added_date = ?, updated_at = datetime('now') WHERE sub = ? AND id = ?",
+  );
+  const delEinpillPkg = db.prepare(
+    "DELETE FROM einpill_package_additions WHERE sub = ? AND id = ?",
+  );
+  const delEinpillPkgsForMed = db.prepare(
+    "DELETE FROM einpill_package_additions WHERE sub = ? AND medication_id = ?",
   );
 
   const escapeLike = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -900,8 +1059,16 @@ export function openStore(path: string): Store {
       return res.changes > 0;
     },
     insertNotification: (n) =>
-      putNotification.run(n.sub, n.module, n.sourceId, n.title, n.body, n.at, n.read ? 1 : 0)
-        .changes > 0,
+      putNotification.run(
+        n.sub,
+        n.module,
+        n.sourceId,
+        n.title,
+        n.body,
+        n.at,
+        n.read ? 1 : 0,
+        n.i18n ?? null,
+      ).changes > 0,
     listNotifications: (sub, limit) => listNotifs.all(sub, limit) as unknown as NotificationRow[],
     hasNotificationsFor: (sub, module) =>
       ((countNotifsFor.get(sub, module) as { n: number }).n ?? 0) > 0,
@@ -1043,6 +1210,93 @@ export function openStore(path: string): Store {
         throw err;
       }
     },
+    createEinpillMedication: (medication, revision) => {
+      db.exec("BEGIN");
+      try {
+        putEinpillMed.run(medication.id, medication.sub, medication.name, medication.archived);
+        putEinpillRev.run(
+          revision.id,
+          revision.sub,
+          revision.medicationId,
+          revision.effectiveDate,
+          revision.pillsPerPackage,
+          revision.usageMilli,
+        );
+        db.exec("COMMIT");
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+      return getEinpillMed.get(medication.sub, medication.id) as unknown as EinpillMedicationRow;
+    },
+    getEinpillMedication: (sub, id) =>
+      getEinpillMed.get(sub, id) as unknown as EinpillMedicationRow | undefined,
+    listEinpillMedications: (sub, includeArchived) =>
+      (includeArchived ? listEinpillMedsAll : listEinpillMedsActive).all(
+        sub,
+      ) as unknown as EinpillMedicationRow[],
+    updateEinpillMedication: (sub, id, patch) => {
+      const sets: string[] = ["updated_at = datetime('now')"];
+      const args: (string | number)[] = [];
+      if (patch.name !== undefined) {
+        sets.push("name = ?");
+        args.push(patch.name);
+      }
+      if (patch.archived !== undefined) {
+        sets.push("archived = ?");
+        args.push(patch.archived);
+      }
+      args.push(sub, id);
+      const res = db
+        .prepare(`UPDATE einpill_medications SET ${sets.join(", ")} WHERE sub = ? AND id = ?`)
+        .run(...args);
+      if (res.changes === 0) return undefined;
+      return getEinpillMed.get(sub, id) as unknown as EinpillMedicationRow;
+    },
+    deleteEinpillMedication: (sub, id) => {
+      db.exec("BEGIN");
+      try {
+        delEinpillRevsForMed.run(sub, id);
+        delEinpillPkgsForMed.run(sub, id);
+        const res = delEinpillMed.run(sub, id);
+        db.exec("COMMIT");
+        return res.changes > 0;
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+    upsertEinpillRevision: (revision) => {
+      putEinpillRev.run(
+        revision.id,
+        revision.sub,
+        revision.medicationId,
+        revision.effectiveDate,
+        revision.pillsPerPackage,
+        revision.usageMilli,
+      );
+      return getEinpillRev.get(
+        revision.sub,
+        revision.medicationId,
+        revision.effectiveDate,
+      ) as unknown as EinpillRevisionRow;
+    },
+    listEinpillRevisions: (sub, medicationId) =>
+      listEinpillRevs.all(sub, medicationId) as unknown as EinpillRevisionRow[],
+    createEinpillPackage: (pkg) => {
+      putEinpillPkg.run(pkg.id, pkg.sub, pkg.medicationId, pkg.addedDate);
+      return getEinpillPkg.get(pkg.sub, pkg.id) as unknown as EinpillPackageRow;
+    },
+    getEinpillPackage: (sub, id) =>
+      getEinpillPkg.get(sub, id) as unknown as EinpillPackageRow | undefined,
+    listEinpillPackages: (sub, medicationId) =>
+      listEinpillPkgs.all(sub, medicationId) as unknown as EinpillPackageRow[],
+    updateEinpillPackage: (sub, id, addedDate) => {
+      const res = updEinpillPkg.run(addedDate, sub, id);
+      if (res.changes === 0) return undefined;
+      return getEinpillPkg.get(sub, id) as unknown as EinpillPackageRow;
+    },
+    deleteEinpillPackage: (sub, id) => delEinpillPkg.run(sub, id).changes > 0,
     close: () => db.close(),
   };
 }

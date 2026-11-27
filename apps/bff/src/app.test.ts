@@ -3242,7 +3242,7 @@ describe("einhub", () => {
     expect(res.json()).toEqual({ notifications: [], unread: 0 });
   });
 
-  it("seeds the first poll as read history, then alerts on new items", async () => {
+  it("seeds first-poll history read except the newest item, which stays unread", async () => {
     const { app, auth, store, secrets } = await testApp({
       config: loadConfig(hubEnv()),
       fetchImpl: gotifyFetch([MSG_1]),
@@ -3257,11 +3257,29 @@ describe("einhub", () => {
           title: "Backup done",
           body: "all good",
           at: MSG_1.date,
-          read: true,
+          read: false,
         },
       ],
-      unread: 0,
+      unread: 1,
     });
+  });
+
+  it("seeds only the newest of several first-poll items unread", async () => {
+    const older = { ...MSG_1, id: 10, title: "Old push", date: "2026-10-16T10:00:00Z" };
+    const newer = { ...MSG_1, id: 11, title: "New push", date: "2026-10-17T10:00:00Z" };
+    const tied = { ...MSG_1, id: 12, title: "Tied push", date: "2026-10-17T10:00:00Z" };
+    const { app, auth, store, secrets } = await testApp({
+      config: loadConfig(hubEnv()),
+      fetchImpl: gotifyFetch([older, newer, tied]),
+    });
+    seedGotify(store, secrets);
+    const res = await get(app, auth);
+    const byTitle = (title: string) =>
+      res.json().notifications.find((n: { title: string }) => n.title === title);
+    expect(byTitle("Old push").read).toBe(true);
+    expect(byTitle("New push").read).toBe(false);
+    expect(byTitle("Tied push").read).toBe(true);
+    expect(res.json().unread).toBe(1);
   });
 
   it("inserts new upstream items as unread and dedupes by source id", async () => {
@@ -3274,7 +3292,7 @@ describe("einhub", () => {
     await get(app, auth); // seed
     messages.push({ ...MSG_1, id: 12, title: "New push" });
     const second = await get(app, auth);
-    expect(second.json().unread).toBe(1);
+    expect(second.json().unread).toBe(2);
     expect(second.json().notifications[0]).toMatchObject({
       module: "gotify",
       title: "New push",
@@ -3283,7 +3301,7 @@ describe("einhub", () => {
     // Same upstream state again → no duplicates.
     const third = await get(app, auth);
     expect(third.json().notifications).toHaveLength(2);
-    expect(third.json().unread).toBe(1);
+    expect(third.json().unread).toBe(2);
   });
 
   it("collects email envelopes via the imap source", async () => {
@@ -3340,7 +3358,7 @@ describe("einhub", () => {
       ]),
     });
     seedGotify(store, secrets);
-    await get(app, auth); // seed both as read
+    await get(app, auth); // first poll seeds the newest item unread
     store.insertNotification({
       sub: TEST_USER.sub,
       module: "gotify",
@@ -3350,7 +3368,7 @@ describe("einhub", () => {
       at: "2026-10-17T11:00:00Z",
     });
     const list = await get(app, auth);
-    expect(list.json().unread).toBe(1);
+    expect(list.json().unread).toBe(2);
     const id = list.json().notifications[0].id as number;
     const read = await app.inject({
       method: "POST",
@@ -4395,7 +4413,7 @@ describe("talk", () => {
       url: "/api/einhub/notifications",
       headers: auth,
     });
-    expect(first.json().unread).toBe(0); // seed pass marks existing as read
+    expect(first.json().unread).toBe(1); // first-contact seeding leaves the newest item unread
     const second = await app.inject({
       method: "GET",
       url: "/api/einhub/notifications",
@@ -5066,6 +5084,7 @@ describe("module framework", () => {
         { id: "postges", version: "0.1.0", requires: [] },
         { id: "itsaplan", version: "0.1.0", requires: [] },
         { id: "eintime", version: "0.1.0", requires: [] },
+        { id: "einpill", version: "0.1.0", requires: [] },
       ],
     });
   });

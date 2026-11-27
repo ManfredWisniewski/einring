@@ -74,9 +74,21 @@ export const einhubModule: BffModule<EinHubConfig> = {
         }
         if (!items?.length) continue;
         // First contact with a module: existing upstream items are history,
-        // not alerts — seed them as read (D42).
+        // but the newest item remains unread so a single current-state alert is visible (D42 amendment).
         const seed = !ctx.store.hasNotificationsFor(sub, id);
-        for (const n of items) {
+        let newestIndex = -1;
+        let newestTime = Number.NEGATIVE_INFINITY;
+        if (seed) {
+          items.forEach((n, index) => {
+            const time = n.at ? Date.parse(n.at) : Number.NaN;
+            const sortTime = Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+            if (sortTime > newestTime) {
+              newestTime = sortTime;
+              newestIndex = index;
+            }
+          });
+        }
+        for (const [index, n] of items.entries()) {
           ctx.store.insertNotification({
             sub,
             module: id,
@@ -84,7 +96,8 @@ export const einhubModule: BffModule<EinHubConfig> = {
             title: n.title,
             body: n.body ?? null,
             at: n.at ?? new Date().toISOString(),
-            read: seed,
+            read: seed && index !== newestIndex,
+            i18n: n.i18n ? JSON.stringify(n.i18n) : null,
           });
         }
       }
@@ -98,14 +111,25 @@ export const einhubModule: BffModule<EinHubConfig> = {
       );
       const rows = ctx.store.listNotifications(req.user.sub, limit);
       return {
-        notifications: rows.map((r) => ({
-          id: r.id,
-          module: r.module,
-          title: r.title,
-          body: r.body,
-          at: r.at,
-          read: r.read === 1,
-        })),
+        notifications: rows.map((r) => {
+          let i18n: unknown;
+          if (r.i18n) {
+            try {
+              i18n = JSON.parse(r.i18n);
+            } catch {
+              i18n = undefined;
+            }
+          }
+          return {
+            id: r.id,
+            module: r.module,
+            title: r.title,
+            body: r.body,
+            at: r.at,
+            read: r.read === 1,
+            ...(i18n && typeof i18n === "object" ? { i18n } : {}),
+          };
+        }),
         unread: ctx.store.unreadNotificationCount(req.user.sub),
       };
     });

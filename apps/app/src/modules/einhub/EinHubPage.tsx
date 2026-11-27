@@ -14,10 +14,16 @@ import {
 import type { EinHubNotification } from "~/api/types";
 
 /** One notification row — click marks it read; "Open" jumps to the source module. */
-function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boolean }) {
+export function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boolean }) {
   const { t } = useTranslation();
   const mark = useEinHubMarkRead();
   const moduleName = t(`modules.${n.module}.nav`, { defaultValue: n.module });
+  const title = n.i18n?.titleKey
+    ? t(n.i18n.titleKey, { ...(n.i18n.titleParams ?? {}), defaultValue: n.title })
+    : n.title;
+  const body = n.i18n?.bodyKey
+    ? t(n.i18n.bodyKey, { ...(n.i18n.bodyParams ?? {}), defaultValue: n.body ?? "" })
+    : n.body;
   return (
     <Card className={n.read ? undefined : "einhub-card--unread"}>
       <button
@@ -30,11 +36,11 @@ function NotificationRow({ n, enabled }: { n: EinHubNotification; enabled: boole
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             {!n.read && <span className="status-dot status-dot--dnd" aria-hidden />}
-            {n.title}
+            {title}
           </CardTitle>
           <CardDescription>
             {moduleName}
-            {n.body ? ` · ${n.body}` : ""} · {new Date(n.at).toLocaleString()}
+            {body ? ` · ${body}` : ""} · {new Date(n.at).toLocaleString()}
           </CardDescription>
         </CardHeader>
       </button>

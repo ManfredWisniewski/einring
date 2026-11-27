@@ -26,6 +26,10 @@ import type {
   EinMusicPlaylists,
   EinMusicTrack,
   EinMusicTracks,
+  EinpillMedicationInput,
+  EinpillMedicationResponse,
+  EinpillMedications,
+  EinpillRevisionInput,
   EintimeEntries,
   EintimeEntryResponse,
   EintimeProjects,
@@ -138,6 +142,8 @@ export const keys = {
   gotifyApps: ["gotify", "applications"] as const,
   gotifyUser: ["gotify", "user"] as const,
   einhub: ["einhub", "notifications"] as const,
+  einpillMedications: (includeArchived: boolean) =>
+    ["einpill", "medications", includeArchived] as const,
   gitlabTodos: ["gitlab", "todos"] as const,
   itsaplanBoards: ["itsaplan", "boards"] as const,
   itsaplanTickets: ["itsaplan", "tickets"] as const,
@@ -818,6 +824,89 @@ export function useEinHubReadAll() {
   return useMutation({
     mutationFn: () => api.post("/einhub/read-all"),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.einhub }),
+  });
+}
+
+const einpillInvalidate = (qc: ReturnType<typeof useQueryClient>) => {
+  void qc.invalidateQueries({ queryKey: ["einpill"] });
+};
+
+export function useEinpillMedications(includeArchived = false) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.einpillMedications(includeArchived),
+    queryFn: () =>
+      api.get<EinpillMedications>(
+        `/einpill/medications${includeArchived ? "?includeArchived=1" : ""}`,
+      ),
+  });
+}
+
+export function useEinpillCreateMedication() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EinpillMedicationInput) =>
+      api.post<EinpillMedicationResponse>("/einpill/medications", input),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillPatchMedication() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; name?: string; archived?: boolean }) =>
+      api.patch<EinpillMedicationResponse>(`/einpill/medications/${id}`, patch),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillPutRevision() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: EinpillRevisionInput & { id: string }) =>
+      api.put<EinpillMedicationResponse>(`/einpill/medications/${id}/revision`, input),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillDeleteMedication() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/einpill/medications/${id}`),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillAddPackage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, addedDate }: { id: string; addedDate: string }) =>
+      api.post<EinpillMedicationResponse>(`/einpill/medications/${id}/packages`, { addedDate }),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillPatchPackage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, addedDate }: { id: string; addedDate: string }) =>
+      api.patch<EinpillMedicationResponse>(`/einpill/packages/${id}`, { addedDate }),
+    onSuccess: () => einpillInvalidate(qc),
+  });
+}
+
+export function useEinpillDeletePackage() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/einpill/packages/${id}`),
+    onSuccess: () => einpillInvalidate(qc),
   });
 }
 
