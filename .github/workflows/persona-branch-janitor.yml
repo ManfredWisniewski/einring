@@ -33,7 +33,9 @@ jobs:
         run: |
           open=$(gh issue list --search 'persona-branch-janitor in:title' --state open --json number --jq 'length')
           if [ "$open" -eq 0 ]; then
+            # no `|| true`: a failed issue create must surface — the
+            # conflict would otherwise stay invisible.
             gh issue create --title 'persona-branch-janitor: merge conflicts' \
-              --body-file janitor.log || true
+              --body-file janitor.log
           fi
           exit 1

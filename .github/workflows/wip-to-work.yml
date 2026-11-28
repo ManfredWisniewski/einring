@@ -47,7 +47,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          open=$(gh pr list --state open --base work --head wip --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            echo "conflict PR already open: #$open — nothing to do."
+            exit 0
+          fi
+          # no `|| true`: if PR creation fails (e.g. Actions PR permission
+          # disabled), the step must go red — a silently missing conflict
+          # PR leaves the merge failure invisible.
           gh pr create --base work --head wip \
             --title "wip → work (merge conflict)" \
-            --body "Automatic merge of wip into work failed. Resolve the conflicts in this PR, then merge it — work is unchanged until then." \
-            || true
+            --body "Automatic merge of wip into work failed. Resolve the conflicts in this PR, then merge it — work is unchanged until then."

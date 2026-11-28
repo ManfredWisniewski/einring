@@ -37,10 +37,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # +wit's ssh remote is unreachable from GitHub runners and biti is
-          # private — submodule contents are not needed; an unverifiable
-          # gitlink just blocks the auto-merge and defers to the human gate.
-          submodules: false
+          submodules: true
 
       - name: Fast-forward main to work if diff is content-only
         run: |
