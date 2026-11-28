@@ -6,6 +6,7 @@ Each entry: decision, alternatives considered, reason. Change a decision by addi
 ## Naming
 
 - **D01 Project name: `einring`** – "one ring to rule them all"; fits the norse naming of related WIT projects.
+  - *2026-11-28 provenance*: The managed common template files last synced into this repository were sourced from `+wit` commit `a2606f4b791a4b0cf4cd6e0c89e1d7530e7ceaec` (`+wit/common/templates/common/`).
 - **D02 Android application ID: `de.wit.einring`**, display name **Einring**.
 - **D03 Package names: `@einring/app`, `@einring/bff`, `@einring/tokens`.**
 

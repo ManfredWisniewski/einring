@@ -7,6 +7,7 @@
 Before making changes, read the shared WIT development guidance in `+wit/development/` in this repository. Start with `+wit/development/README.md` and `+wit/development/AGENTS.md`, then read the relevant convention or best-practice files. These shared definitions apply independently of which skill or AI agent is performing the work.
 
 - `/+intent` — purpose, decisions and acceptance criteria of this repository
+- `/knowledge` — durable project knowledge and decision records
 - `/+wit` — submodule, shared knowledge: research, plans, templates and domain standards (`development/` for this project)
 - `/+team` — per-persona task files and shared coordination logs
 
@@ -17,8 +18,19 @@ Before making changes, read the shared WIT development guidance in `+wit/develop
 | `apps/app` | React + Vite UI; wrapped by Capacitor for Android (`de.wit.einring`) |
 | `apps/bff` | Fastify backend-for-frontend: validates Authentik JWTs, holds Nextcloud app passwords, proxies APIs, serves the web build |
 | `packages/tokens` | Design tokens (DTCG JSON) built with Terrazzo into CSS variables |
+| `brands/` | Brand assets used by branded APK variants |
+| `structure/` | Repository-owned organization and taxonomy documents |
+| `knowledge/` | Durable project knowledge and decision records |
 | `+intent` | Project intent, decisions and test strategy |
 | `+team/+tasks` | Per-persona task files; `backlog.md` is the human-owned parking lot |
+| `+wit/` | Shared WIT guidance, conventions, templates and skills |
+| `biti/` | Shared UI component submodule |
+| `wit_pytools/` | Python helper-tools submodule |
+| `scripts/` | Repository maintenance and automation scripts |
+| `.github/workflows/` | CI, integration, release and APK-variant workflows |
+| `.devin/` | Devin session-start hook configuration |
+| `.agents/skills/` | Generated local copies of shared agent skills |
+| `.idea/`, `.vscode/` | IDE settings |
 | `priorities.md` | Owner-written direction for agents |
 
 ## Repository setup
